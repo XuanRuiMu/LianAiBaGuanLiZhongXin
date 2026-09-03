@@ -1,0 +1,54 @@
+# ===== Java / Maven =====
+backend-java/target/
+*.class
+*.jar
+*.war
+*.ear
+*.log
+hs_err_pid*
+replay_pid*
+
+# ===== Node.js / Frontend =====
+analytics-frontend/node_modules/
+analytics-frontend/dist/
+analytics-frontend/.vite/
+*.local
+
+# ===== Python =====
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+ai-service/.venv/
+ai-service/venv/
+ai-service/.pytest_cache/
+ai-service/chroma_db/
+tts-service/.venv/
+tts-service/venv/
+tts-service/.pytest_cache/
+tts-service/__pycache__/
+
+# ===== Environment / Secrets =====
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+
+# ===== IDE / Editor =====
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# ===== Docker =====
+infra/mysql/data/
+infra/redis/data/
+
+# ===== OS =====
+Desktop.ini
+$RECYCLE.BIN/
