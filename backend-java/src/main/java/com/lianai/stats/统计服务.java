@@ -9,6 +9,7 @@ import com.lianai.mapper.mubiao.挑战排行Mapper;
 import com.lianai.mapper.mubiao.阶段分布Mapper;
 import com.lianai.mapper.mubiao.消息趋势Mapper;
 import com.lianai.mapper.mubiao.用户趋势Mapper;
+import com.lianai.mapper.mubiao.留存趋势Mapper;
 import com.lianai.stats.dto.AI用量行;
 import com.lianai.stats.dto.概览行;
 import com.lianai.stats.dto.人设热度行;
@@ -16,6 +17,7 @@ import com.lianai.stats.dto.挑战排名行;
 import com.lianai.stats.dto.阶段分布行;
 import com.lianai.stats.dto.消息趋势行;
 import com.lianai.stats.dto.用户趋势行;
+import com.lianai.stats.dto.留存趋势行;
 import com.fasterxml.jackson.core.type.TypeReference;
 import java.time.LocalDate;
 import java.util.List;
@@ -36,6 +38,7 @@ public class 统计服务 {
     private final 阶段分布Mapper 阶段Mapper;
     private final 人设排行Mapper 人设Mapper;
     private final 挑战排行Mapper 挑战Mapper;
+    private final 留存趋势Mapper 留存Mapper;
     private final MessageSource 文案源;
 
     public 统计服务(缓存服务 缓存,
@@ -46,6 +49,7 @@ public class 统计服务 {
                   阶段分布Mapper 阶段Mapper,
                   人设排行Mapper 人设Mapper,
                   挑战排行Mapper 挑战Mapper,
+                  留存趋势Mapper 留存Mapper,
                   MessageSource 文案源) {
         this.缓存 = 缓存;
         this.概览Mapper = 概览Mapper;
@@ -55,6 +59,7 @@ public class 统计服务 {
         this.阶段Mapper = 阶段Mapper;
         this.人设Mapper = 人设Mapper;
         this.挑战Mapper = 挑战Mapper;
+        this.留存Mapper = 留存Mapper;
         this.文案源 = 文案源;
     }
 
@@ -99,6 +104,13 @@ public class 统计服务 {
 
     public List<挑战排名行> 挑战排行() {
         return 缓存.查询列表("challenge", "all", new TypeReference<List<挑战排名行>>() {}, 挑战Mapper::全部);
+    }
+
+    public List<留存趋势行> 留存趋势(int 天数) {
+        校验天数(天数);
+        String 子键 = String.valueOf(天数);
+        return 缓存.查询列表("retention", 子键, new TypeReference<List<留存趋势行>>() {},
+                () -> 留存Mapper.按区间(起始日期(天数), 结束日期()));
     }
 
     private void 校验天数(int 天数) {

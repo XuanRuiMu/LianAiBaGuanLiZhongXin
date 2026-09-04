@@ -1,6 +1,7 @@
 ﻿import json
 
-from app.api.sse import 格式化sse事件, 提取文本
+from app.api.sse import 格式化sse事件
+from app.texts import 提取文本
 
 
 async def 测试_token事件格式正确():

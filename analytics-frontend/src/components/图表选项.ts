@@ -6,6 +6,7 @@ import type {
   人设热度项,
   消息趋势点,
   注册趋势点,
+  留存趋势点,
   阶段分布项,
 } from '../types/接口类型'
 
@@ -16,6 +17,9 @@ const 系列名 = {
   AI消息: 翻译.大屏.AI消息,
   请求次数: 翻译.大屏.请求次数,
   Token消耗: 翻译.大屏.Token消耗,
+  次日留存: 翻译.大屏.次日留存,
+  三日留存: 翻译.大屏.三日留存,
+  七日留存: 翻译.大屏.七日留存,
 }
 
 function 轴通用() {
@@ -184,6 +188,34 @@ export function 构建人设热度选项(数据: 人设热度项[]): EChartsCore
         },
         label: { show: true, position: 'right', color: 配色.文字次 },
       },
+    ],
+  }
+}
+
+export function 构建留存趋势选项(数据: 留存趋势点[]): EChartsCoreOption {
+  const 留存系列 = (
+    名称: string,
+    取值: (点: 留存趋势点) => number,
+    颜色: string,
+    虚线 = false,
+  ) => ({
+    name: 名称,
+    type: 'line',
+    smooth: true,
+    showSymbol: false,
+    data: 数据.map(取值),
+    lineStyle: 虚线 ? { width: 2, type: 'dashed' as const, color: 颜色 } : { width: 2, color: 颜色 },
+    itemStyle: { color: 颜色 },
+  })
+  return {
+    ...轴通用(),
+    legend: { data: [系列名.次日留存, 系列名.三日留存, 系列名.七日留存], top: 0, right: 0 },
+    xAxis: { type: 'category', data: 数据.map((点) => 点.date) },
+    yAxis: { type: 'value', name: '%', min: 0, max: 100 },
+    series: [
+      留存系列(系列名.次日留存, (点) => 点.day1Rate, 配色.主蓝),
+      留存系列(系列名.三日留存, (点) => 点.day3Rate, 配色.翠绿),
+      留存系列(系列名.七日留存, (点) => 点.day7Rate, 配色.次紫, true),
     ],
   }
 }

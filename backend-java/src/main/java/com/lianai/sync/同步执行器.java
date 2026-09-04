@@ -7,6 +7,8 @@ import com.lianai.mapper.mubiao.概览快照Mapper;
 import com.lianai.mapper.mubiao.挑战排行Mapper;
 import com.lianai.mapper.mubiao.阶段分布Mapper;
 import com.lianai.mapper.mubiao.消息趋势Mapper;
+import com.lianai.mapper.mubiao.用户趋势Mapper;
+import com.lianai.mapper.mubiao.留存趋势Mapper;
 import com.lianai.mapper.yuan.源统计Mapper;
 import java.time.LocalDate;
 import org.springframework.beans.factory.annotation.Value;
@@ -27,6 +29,7 @@ public class 同步执行器 {
     private final 阶段分布Mapper 阶段库;
     private final 人设排行Mapper 人设库;
     private final 挑战排行Mapper 挑战库;
+    private final 留存趋势Mapper 留存库;
     private final int 趋势天数;
 
     public 同步执行器(源统计Mapper 源库,
@@ -37,6 +40,7 @@ public class 同步执行器 {
                    阶段分布Mapper 阶段库,
                    人设排行Mapper 人设库,
                    挑战排行Mapper 挑战库,
+                   留存趋势Mapper 留存库,
                    @Value("${app.sync.trend-days}") int 趋势天数) {
         this.源库 = 源库;
         this.概览库 = 概览库;
@@ -46,6 +50,7 @@ public class 同步执行器 {
         this.阶段库 = 阶段库;
         this.人设库 = 人设库;
         this.挑战库 = 挑战库;
+        this.留存库 = 留存库;
         this.趋势天数 = 趋势天数;
     }
 
@@ -58,6 +63,7 @@ public class 同步执行器 {
             case PERSONA -> 同步人设();
             case CHALLENGE -> 同步挑战();
             case AI_USAGE -> 同步AI用量();
+            case RETENTION -> 同步留存();
         };
     }
 
@@ -111,6 +117,14 @@ public class 同步执行器 {
         var 趋势 = 源库.统计AI用量趋势(趋势天数);
         if (!趋势.isEmpty()) {
             AI用量库.批量插入或更新(趋势);
+        }
+        return 趋势.size();
+    }
+
+    private long 同步留存() {
+        var 趋势 = 源库.统计留存聚合(趋势天数);
+        if (!趋势.isEmpty()) {
+            留存库.批量插入或更新(趋势);
         }
         return 趋势.size();
     }

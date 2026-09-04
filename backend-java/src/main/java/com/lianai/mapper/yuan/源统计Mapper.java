@@ -7,6 +7,7 @@ import com.lianai.stats.dto.挑战排名行;
 import com.lianai.stats.dto.阶段分布行;
 import com.lianai.stats.dto.消息趋势行;
 import com.lianai.stats.dto.用户趋势行;
+import com.lianai.stats.dto.留存趋势行;
 import java.util.List;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
@@ -75,6 +76,49 @@ public interface 源统计Mapper {
             ORDER BY g.d
             """)
     List<AI用量行> 统计AI用量趋势(@Param("days") int days);
+
+    @Select("""
+            SELECT TO_CHAR(g.d, 'YYYY-MM-DD') AS "统计日期",
+                   COALESCE(c."同期人数", 0) AS "同期人数",
+                   CASE WHEN g.d > CURRENT_DATE - INTERVAL '1 day' THEN 0
+                        ELSE COALESCE(ROUND(100.0 * d1."回访人数" / NULLIF(c."同期人数", 0), 2), 0) END AS "次日留存率",
+                   CASE WHEN g.d > CURRENT_DATE - INTERVAL '3 days' THEN 0
+                        ELSE COALESCE(ROUND(100.0 * d3."回访人数" / NULLIF(c."同期人数", 0), 2), 0) END AS "三日留存率",
+                   CASE WHEN g.d > CURRENT_DATE - INTERVAL '7 days' THEN 0
+                        ELSE COALESCE(ROUND(100.0 * d7."回访人数" / NULLIF(c."同期人数", 0), 2), 0) END AS "七日留存率"
+            FROM generate_series(CURRENT_DATE - CAST(#{days} - 1 AS INTEGER), CURRENT_DATE, INTERVAL '1 day') AS g(d)
+            LEFT JOIN (
+              SELECT ("创建时间" AT TIME ZONE 'Asia/Shanghai')::date AS rd, COUNT(*) AS "同期人数"
+              FROM "用户"
+              GROUP BY 1
+            ) c ON c.rd = g.d
+            LEFT JOIN (
+              SELECT (u."创建时间" AT TIME ZONE 'Asia/Shanghai')::date AS rd, COUNT(DISTINCT u."ID") AS "回访人数"
+              FROM "用户" u JOIN "消息" m ON m."用户ID" = u."ID"
+              WHERE m."已撤回" = FALSE
+                AND (m."创建时间" AT TIME ZONE 'Asia/Shanghai')::date
+                  = (u."创建时间" AT TIME ZONE 'Asia/Shanghai')::date + 1
+              GROUP BY 1
+            ) d1 ON d1.rd = g.d
+            LEFT JOIN (
+              SELECT (u."创建时间" AT TIME ZONE 'Asia/Shanghai')::date AS rd, COUNT(DISTINCT u."ID") AS "回访人数"
+              FROM "用户" u JOIN "消息" m ON m."用户ID" = u."ID"
+              WHERE m."已撤回" = FALSE
+                AND (m."创建时间" AT TIME ZONE 'Asia/Shanghai')::date
+                  = (u."创建时间" AT TIME ZONE 'Asia/Shanghai')::date + 3
+              GROUP BY 1
+            ) d3 ON d3.rd = g.d
+            LEFT JOIN (
+              SELECT (u."创建时间" AT TIME ZONE 'Asia/Shanghai')::date AS rd, COUNT(DISTINCT u."ID") AS "回访人数"
+              FROM "用户" u JOIN "消息" m ON m."用户ID" = u."ID"
+              WHERE m."已撤回" = FALSE
+                AND (m."创建时间" AT TIME ZONE 'Asia/Shanghai')::date
+                  = (u."创建时间" AT TIME ZONE 'Asia/Shanghai')::date + 7
+              GROUP BY 1
+            ) d7 ON d7.rd = g.d
+            ORDER BY g.d
+            """)
+    List<留存趋势行> 统计留存聚合(@Param("days") int days);
 
     @Select("""
             SELECT "关系阶段" AS "阶段", COUNT(*) AS "数量"

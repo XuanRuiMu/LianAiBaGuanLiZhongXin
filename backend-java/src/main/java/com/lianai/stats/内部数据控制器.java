@@ -52,6 +52,11 @@ public class 内部数据控制器 {
         return 服务.AI用量趋势(校验天数(days));
     }
 
+    @GetMapping("/retention")
+    public Object 留存趋势(@RequestParam(defaultValue = "30") int days) {
+        return 服务.留存趋势(校验天数(days));
+    }
+
     private int 校验天数(int 天数) {
         if (天数 < 7 || 天数 > 90) {
             throw new 业务异常("validation.days.range", HttpStatus.BAD_REQUEST);

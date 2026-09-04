@@ -7,6 +7,7 @@ import type {
   消息趋势点,
   注册趋势点,
   概览数据,
+  留存趋势点,
   阶段分布项,
 } from '../types/接口类型'
 import { 获取 } from './http'
@@ -37,6 +38,10 @@ export function 获取AI用量(天数: number = 常量.统计天数): Promise<AI
 
 export function 获取挑战排行(): Promise<挑战排行项[]> {
   return 获取<挑战排行项[]>('/api/v1/stats/challenge/rank')
+}
+
+export function 获取留存趋势(天数: number = 常量.统计天数): Promise<留存趋势点[]> {
+  return 获取<留存趋势点[]>('/api/v1/stats/retention', { days: 天数 })
 }
 
 export function 获取同步状态(): Promise<同步状态数据> {

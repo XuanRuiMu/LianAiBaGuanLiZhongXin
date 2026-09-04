@@ -55,6 +55,14 @@ export interface AI用量点 {
   activeUsers: number
 }
 
+export interface 留存趋势点 {
+  date: string
+  cohortSize: number
+  day1Rate: number
+  day3Rate: number
+  day7Rate: number
+}
+
 export interface 同步日志项 {
   status: string
   rowsSynced: number

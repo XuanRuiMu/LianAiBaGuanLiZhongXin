@@ -16,9 +16,11 @@ import com.lianai.mapper.mubiao.挑战排行Mapper;
 import com.lianai.mapper.mubiao.阶段分布Mapper;
 import com.lianai.mapper.mubiao.消息趋势Mapper;
 import com.lianai.mapper.mubiao.用户趋势Mapper;
+import com.lianai.mapper.mubiao.留存趋势Mapper;
 import com.lianai.stats.dto.概览行;
 import com.lianai.stats.dto.阶段分布行;
 import com.lianai.stats.dto.用户趋势行;
+import com.lianai.stats.dto.留存趋势行;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
@@ -60,6 +62,9 @@ class 统计服务Test {
     @Mock
     private 挑战排行Mapper 挑战Mapper;
 
+    @Mock
+    private 留存趋势Mapper 留存Mapper;
+
     private MessageSource 文案源;
     private 统计服务 服务;
 
@@ -70,7 +75,7 @@ class 统计服务Test {
                 .thenAnswer(invocation -> invocation.getArgument(2));
         when(文案源.getMessage(eq("stage.lengDan"), any(), anyString(), any(Locale.class))).thenReturn("冷淡");
         服务 = new 统计服务(缓存, 概览Mapper, 用户趋势Mapper, 消息趋势Mapper, AI用量Mapper,
-                阶段Mapper, 人设Mapper, 挑战Mapper, 文案源);
+                阶段Mapper, 人设Mapper, 挑战Mapper, 留存Mapper, 文案源);
     }
 
     @Test
@@ -120,6 +125,33 @@ class 统计服务Test {
 
         assertThat(结果.get(0).get标签()).isEqualTo("冷淡");
         assertThat(结果.get(1).get标签()).isEqualTo("mystery");
+    }
+
+    @Test
+    @DisplayName("留存趋势走缓存且天数越界拒绝")
+    void 留存趋势透传() {
+        留存趋势行 行 = new 留存趋势行();
+        行.set统计日期("2026-08-20");
+        行.set同期人数(10);
+        行.set次日留存率(50.0);
+        行.set三日留存率(30.0);
+        行.set七日留存率(20.0);
+        List<留存趋势行> 预期 = List.of(行);
+        when(缓存.查询列表(eq("retention"), eq("30"), any(), any()))
+                .thenAnswer(invocation -> {
+                    java.util.function.Supplier<List<留存趋势行>> 加载器 = (java.util.function.Supplier<List<留存趋势行>>) invocation.getArgument(3);
+                    return 加载器.get();
+                });
+        when(留存Mapper.按区间(anyString(), anyString())).thenReturn(预期);
+
+        List<留存趋势行> 结果 = 服务.留存趋势(30);
+
+        assertThat(结果).isSameAs(预期);
+        assertThat(结果.get(0).get同期人数()).isEqualTo(10);
+        verify(留存Mapper).按区间(org.mockito.ArgumentMatchers.argThat(
+                起始 -> 起始.matches("\\d{4}-\\d{2}-\\d{2}")), anyString());
+        assertThat(org.junit.jupiter.api.Assertions.assertThrows(com.lianai.common.业务异常.class,
+                () -> 服务.留存趋势(5)).getMessage()).isEqualTo("validation.days.range");
     }
 
     @Test

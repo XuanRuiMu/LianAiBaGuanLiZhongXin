@@ -67,6 +67,11 @@ async def 关系分布逻辑() -> str:
     return _转文本(await 请求内部接口("/api/internal/stats/favorability/distribution"))
 
 
+async def 留存逻辑(days: int) -> str:
+    days = 趋势天数入参(days=days).days
+    return _转文本(await 请求内部接口("/api/internal/stats/retention", {"days": days}))
+
+
 async def 知识检索逻辑(query: str) -> str:
     query = 检索入参(query=query).query
     try:
@@ -116,6 +121,19 @@ async def query_favorability_distribution() -> str:
     return await 关系分布逻辑()
 
 
+@tool(args_schema=趋势天数入参)
+async def query_retention(days: int) -> str:
+    """查询最近 N 天各注册批次用户的次日/3日/7日留存率（同期群分析）。
+
+    口径：以注册日为锚，注册后第 N 天当日有过消息行为即算回访；未满 N 天的批次对应留存率为 0。
+    适用于"最近留存怎么样""次日留存多少"这类留存分析问题。
+
+    Args:
+        days: 统计回溯天数，7~30 之间的整数，例如 7 表示近一周。
+    """
+    return await 留存逻辑(days)
+
+
 @tool(args_schema=检索入参)
 async def search_knowledge(query: str) -> str:
     """从产品知识库检索资料，知识库包含产品手册（角色卡系统、好感度五维、挑战玩法）、平台架构说明、运营常见问题。
@@ -126,7 +144,7 @@ async def search_knowledge(query: str) -> str:
     return await 知识检索逻辑(query)
 
 
-工具列表 = [query_overview, query_user_trend, query_message_trend, query_favorability_distribution, search_knowledge]
+工具列表 = [query_overview, query_user_trend, query_message_trend, query_favorability_distribution, query_retention, search_knowledge]
 
 
 async def 执行单个工具调用(调用: dict) -> ToolMessage:

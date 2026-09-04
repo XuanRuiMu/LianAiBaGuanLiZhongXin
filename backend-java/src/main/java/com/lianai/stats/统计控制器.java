@@ -56,6 +56,11 @@ public class 统计控制器 {
         return 包装数据(服务.AI用量趋势(days));
     }
 
+    @GetMapping("/retention")
+    public 统一响应<Object> 留存趋势(@RequestParam(defaultValue = "30") @jakarta.validation.constraints.Min(value = 7, message = "{validation.days.range}") @jakarta.validation.constraints.Max(value = 90, message = "{validation.days.range}") int days) {
+        return 包装数据(服务.留存趋势(days));
+    }
+
     private 统一响应<Object> 包装数据(Object 数据) {
         boolean 无数据 = 数据 == null || (数据 instanceof Collection<?> 集合 && 集合.isEmpty());
         String 文案 = 无数据

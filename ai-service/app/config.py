@@ -1,5 +1,6 @@
 from functools import lru_cache
 
+import app.texts as texts
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -36,4 +37,7 @@ class 配置(BaseSettings):
 
 @lru_cache
 def 取配置() -> 配置:
-    return 配置()
+    实例 = 配置()
+    if not 实例.INTERNAL_TOKEN or not 实例.INTERNAL_TOKEN.strip():
+        raise RuntimeError(texts.配置错误_缺内部令牌)
+    return 实例

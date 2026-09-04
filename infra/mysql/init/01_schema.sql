@@ -65,6 +65,16 @@ CREATE TABLE IF NOT EXISTS `stat_ai_usage_trend` (
     PRIMARY KEY (`stat_date`)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS `stat_retention_trend` (
+    `stat_date` DATE NOT NULL,
+    `cohort_size` BIGINT NOT NULL DEFAULT 0,
+    `day1_rate` DECIMAL(5,2) NOT NULL DEFAULT 0,
+    `day3_rate` DECIMAL(5,2) NOT NULL DEFAULT 0,
+    `day7_rate` DECIMAL(5,2) NOT NULL DEFAULT 0,
+    `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (`stat_date`)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS `sync_log` (
     `id` BIGINT NOT NULL AUTO_INCREMENT,
     `batch_id` VARCHAR(64) NOT NULL,

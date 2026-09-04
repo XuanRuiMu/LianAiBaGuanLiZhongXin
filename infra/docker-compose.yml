@@ -86,12 +86,6 @@ services:
       retries: 12
       start_period: 30s
 
-volumes:
-  mysql_data:
-  redis_data:
-  kafka_data:
-  source_pg_data:
-
   tts-service:
     build: ../tts-service
     container_name: love-tts-service
@@ -105,3 +99,9 @@ volumes:
       timeout: 10s
       retries: 3
       start_period: 20s
+
+volumes:
+  mysql_data:
+  redis_data:
+  kafka_data:
+  source_pg_data:

@@ -6,5 +6,6 @@ public enum 同步类型 {
     FAVORABILITY,
     PERSONA,
     CHALLENGE,
-    AI_USAGE
+    AI_USAGE,
+    RETENTION
 }

@@ -14,18 +14,6 @@ from app.config import 取配置
 from app.llm import 创建聊天模型
 
 
-def 提取文本内容(内容: Any) -> str:
-    if isinstance(内容, str):
-        return 内容
-    if isinstance(内容, list):
-        return "".join(
-            片段.get("text", "")
-            for 片段 in 内容
-            if isinstance(片段, dict) and isinstance(片段.get("text"), str)
-        )
-    return ""
-
-
 def 规划路由(state: AgentState, 最大轮数: int) -> Literal["execute_tools", "generate"]:
     if state.get("iterations", 0) >= 最大轮数:
         return "generate"
@@ -77,7 +65,7 @@ def 构建分析图谱(基础模型: BaseChatModel | None = None) -> CompiledSta
                 HumanMessage(content=问题),
             ]
         )
-        新检索词 = 提取文本内容(回复.content).strip()[:50] or 问题[:50]
+        新检索词 = texts.提取文本(回复.content).strip()[:50] or 问题[:50]
         return {
             "messages": [SystemMessage(content=texts.反思指令模板.format(query=新检索词))],
             "reflections": state.get("reflections", 0) + 1,

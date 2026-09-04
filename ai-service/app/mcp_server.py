@@ -1,6 +1,6 @@
 from mcp.server.fastmcp import FastMCP
 
-from app.agent.tools import 关系分布逻辑, 概览逻辑, 注册趋势逻辑, 知识检索逻辑
+from app.agent.tools import 关系分布逻辑, 概览逻辑, 注册趋势逻辑, 留存逻辑, 知识检索逻辑
 
 服务器 = FastMCP("liaolian-datacenter")
 
@@ -25,6 +25,16 @@ async def query_user_trend(days: int) -> str:
 async def query_favorability() -> str:
     """查询好感度关系阶段（冷淡/疏远/认识/熟悉/朋友/好友/暧昧/心动/热恋/深爱）分布。"""
     return await 关系分布逻辑()
+
+
+@服务器.tool()
+async def query_retention(days: int) -> str:
+    """查询最近 N 天各注册批次的次日/3日/7日留存率（同期群分析，口径：注册后第 N 天当日有消息行为算回访）。
+
+    Args:
+        days: 统计回溯天数，7~30 之间的整数。
+    """
+    return await 留存逻辑(days)
 
 
 @服务器.tool()

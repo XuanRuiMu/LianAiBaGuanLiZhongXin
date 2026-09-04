@@ -16,3 +16,17 @@
 最终总结指令 = "你已达到最大分析轮数。请基于以上已获得的工具结果直接给出结论，不要再调用任何工具；若数据不足请明确说明。"
 
 服务错误_通用 = "AI 分析服务出现异常，请稍后再试。"
+
+配置错误_缺内部令牌 = "缺少 INTERNAL_TOKEN 环境变量，AI 服务拒绝以空令牌启动，请在 .env 中设置该值。"
+
+
+def 提取文本(内容) -> str:
+    if isinstance(内容, str):
+        return 内容
+    if isinstance(内容, list):
+        return "".join(
+            片段.get("text", "")
+            for 片段 in 内容
+            if isinstance(片段, dict) and isinstance(片段.get("text"), str)
+        )
+    return ""

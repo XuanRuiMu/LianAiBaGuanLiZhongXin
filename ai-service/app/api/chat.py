@@ -8,7 +8,7 @@ from starlette.responses import StreamingResponse
 
 import app.texts as texts
 from app.agent.graph import 构建分析图谱
-from app.api.sse import 格式化sse事件, 提取文本
+from app.api.sse import 格式化sse事件
 from app.config import 取配置
 
 路由 = APIRouter()
@@ -41,7 +41,7 @@ async def _事件流(请求: 对话请求) -> AsyncIterator[str]:
             if 模式 == "messages":
                 消息块, _元数据 = 载荷
                 if isinstance(消息块, AIMessageChunk):
-                    文本 = 提取文本(消息块.content)
+                    文本 = texts.提取文本(消息块.content)
                     if 文本:
                         yield 格式化sse事件("token", {"content": 文本})
             else:

@@ -91,6 +91,24 @@ async def 测试_检索词长度校验():
 
 
 @respx.mock
+async def 测试_留存接口透传days参数():
+    路由 = respx.get("http://localhost:8080/api/internal/stats/retention").respond(
+        json={"code": 200, "message": "ok", "data": [{"date": "2026-08-25", "cohortSize": 10, "day1Rate": 50.0, "day3Rate": 30.0, "day7Rate": 20.0}]}
+    )
+    结果 = json.loads(await 工具模块.留存逻辑(7))
+    assert 结果[0]["day1Rate"] == 50.0
+    assert dict(路由.calls.last.request.url.params)["days"] == "7"
+
+
+@respx.mock
+async def 测试_留存工具注册进工具列表():
+    名称们 = [t.name for t in 工具模块.工具列表]
+    assert "query_retention" in 名称们
+    消息 = await 工具模块.执行单个工具调用({"name": "query_retention", "args": {"days": 999}, "id": "c9"})
+    assert 消息.content.startswith("[TOOL_ERROR]")
+
+
+@respx.mock
 async def 测试_执行兜底_未知工具():
     消息 = await 工具模块.执行单个工具调用({"name": "no_such_tool", "args": {}, "id": "c1"})
     assert 消息.content == "未知的工具：no_such_tool。"
