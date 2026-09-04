@@ -32,8 +32,8 @@ public class 定时同步调度器 {
         this.主题 = 主题;
     }
 
-    @Scheduled(fixedDelayString = "${app.sync.fixed-delay-millis}",
-            initialDelayString = "${app.sync.initial-delay-millis}")
+    @Scheduled(fixedDelayString = "${app.sync.fixed-delay}",
+            initialDelayString = "${app.sync.initial-delay}")
     public void 定时同步() {
         if (定时启用) {
             提交("scheduler");

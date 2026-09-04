@@ -1,5 +1,6 @@
 # ===== Java / Maven =====
 backend-java/target/
+.workbuddy/
 *.class
 *.jar
 *.war
