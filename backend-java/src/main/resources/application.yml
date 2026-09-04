@@ -30,6 +30,8 @@ spring:
       ack-mode: record
 
 app:
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5174,http://127.0.0.1:5174}
   jwt:
     secret: ${JWT_SECRET:dev-only-jwt-secret-change-me-min-32-bytes!!}
     ttl-hours: ${JWT_TTL_HOURS:24}
