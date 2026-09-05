@@ -28,7 +28,8 @@ public class Jwt认证过滤器 extends OncePerRequestFilter {
     @Override
     protected boolean shouldNotFilter(HttpServletRequest 请求) {
         String 路径 = 请求.getRequestURI();
-        return 路径.startsWith("/api/internal/") || 路径.equals("/api/v1/auth/login");
+        return 路径.startsWith("/api/internal/") || 路径.equals("/api/v1/auth/login")
+                || 路径.equals("/health") || 路径.equals("/api/health");
     }
 
     @Override
