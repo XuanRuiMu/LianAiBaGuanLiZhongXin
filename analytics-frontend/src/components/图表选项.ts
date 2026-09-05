@@ -155,7 +155,7 @@ export function 构建阶段分布选项(数据: 阶段分布项[]): EChartsCore
 }
 
 export function 构建人设热度选项(数据: 人设热度项[]): EChartsCoreOption {
-  const 排序后 = [...数据].sort((甲, 乙) => 乙.userCount - 甲.userCount)
+  const 排序后 = [...数据].sort((甲, 乙) => 乙.count - 甲.count)
   return {
     ...轴通用(),
     tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
@@ -164,14 +164,14 @@ export function 构建人设热度选项(数据: 人设热度项[]): EChartsCore
     yAxis: {
       type: 'category',
       inverse: true,
-      data: 排序后.map((项) => 项.personaTag),
+      data: 排序后.map((项) => 项.persona),
       axisLabel: { color: 配色.文字主, width: 90, overflow: 'truncate' },
     },
     series: [
       {
         type: 'bar',
         barMaxWidth: 14,
-        data: 排序后.map((项) => 项.userCount),
+        data: 排序后.map((项) => 项.count),
         itemStyle: {
           borderRadius: [0, 7, 7, 0],
           color: {
@@ -234,7 +234,7 @@ export function 构建AI用量选项(数据: AI用量点[]): EChartsCoreOption {
         name: 系列名.请求次数,
         type: 'bar',
         barMaxWidth: 14,
-        data: 数据.map((点) => 点.requestCount),
+        data: 数据.map((点) => 点.aiCount),
         itemStyle: {
           borderRadius: [4, 4, 0, 0],
           color: {
@@ -256,7 +256,7 @@ export function 构建AI用量选项(数据: AI用量点[]): EChartsCoreOption {
         smooth: true,
         showSymbol: false,
         yAxisIndex: 1,
-        data: 数据.map((点) => 点.totalTokens),
+        data: 数据.map((点) => 点.total),
         lineStyle: { width: 2, color: 配色.琥珀 },
         itemStyle: { color: 配色.琥珀 },
       },

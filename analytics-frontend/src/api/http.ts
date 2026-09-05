@@ -22,23 +22,31 @@ function 清令牌并跳登录(): void {
   }
 }
 
-interface 响应信封 {
+interface 响应信封<T = unknown> {
   code: number
   message: string
+  data: T
+}
+
+export type 信封解析结果<T> =
+  | { 成功: true; 数据: T }
+  | { 成功: false; 错误: string; 需重新登录: boolean }
+
+export function 解析响应信封<T>(原始: unknown): 信封解析结果<T> | null {
+  if (!原始 || typeof 原始 !== 'object' || !('code' in 原始)) return null
+  const 信封 = 原始 as 响应信封<T>
+  if (信封.code === 200) return { 成功: true, 数据: 信封.data }
+  if (信封.code === 401) return { 成功: false, 错误: 翻译.通用.未授权提示, 需重新登录: true }
+  return { 成功: false, 错误: 信封.message || 翻译.通用.业务错误, 需重新登录: false }
 }
 
 http.interceptors.response.use(
   (响应) => {
-    const 信封 = 响应.data as 响应信封 | undefined
-    if (信封 && typeof 信封 === 'object' && 'code' in 信封) {
-      if (信封.code === 0) return 信封 as never
-      if (信封.code === 401) {
-        清令牌并跳登录()
-        return Promise.reject(new 业务错误(翻译.通用.未授权提示))
-      }
-      return Promise.reject(new 业务错误(信封.message || 翻译.通用.业务错误))
-    }
-    return 响应.data as never
+    const 解析 = 解析响应信封(响应.data)
+    if (!解析) return 响应.data as never
+    if (解析.成功) return 解析.数据 as never
+    if (解析.需重新登录) 清令牌并跳登录()
+    return Promise.reject(new 业务错误(解析.错误))
   },
   (错误: unknown) => {
     const axios错误 = 错误 as { response?: { status?: number } } | undefined

@@ -11,7 +11,7 @@ export interface 登录数据 {
 
 export interface 概览数据 {
   totalUsers: number
-  totalCharacters: number
+  totalRoles: number
   totalMessages: number
   newUsers24h: number
   newMessages24h: number
@@ -37,8 +37,8 @@ export interface 阶段分布项 {
 }
 
 export interface 人设热度项 {
-  personaTag: string
-  userCount: number
+  persona: string
+  count: number
 }
 
 export interface 挑战排行项 {
@@ -50,9 +50,9 @@ export interface 挑战排行项 {
 
 export interface AI用量点 {
   date: string
-  requestCount: number
-  totalTokens: number
+  aiCount: number
   activeUsers: number
+  total: number
 }
 
 export interface 留存趋势点 {
