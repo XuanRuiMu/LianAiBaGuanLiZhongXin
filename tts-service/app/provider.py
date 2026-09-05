@@ -10,6 +10,7 @@ import struct
 import wave
 from abc import ABC, abstractmethod
 
+from app import 文案
 from app.cache import 合成缓存, 缓存键
 from app.config import settings
 from app.voices import 归一化音色
@@ -17,23 +18,23 @@ from app.voices import 归一化音色
 logger = logging.getLogger(__name__)
 
 风格预设: dict[str, dict] = {
-    "normal": {"rate": 0.0, "pitch": 0.0},
-    "cheerful": {"rate": 0.10, "pitch": 4.0},
-    "gentle": {"rate": -0.08, "pitch": -2.0},
-    "sad": {"rate": -0.15, "pitch": -4.0},
-    "angry": {"rate": 0.12, "pitch": 6.0},
-    "whisper": {"rate": -0.10, "pitch": -3.0},
-    "excited": {"rate": 0.15, "pitch": 5.0},
-    "calm": {"rate": -0.05, "pitch": -1.0},
+    "normal": {"语速偏移": 0.0, "音调偏移": 0.0},
+    "cheerful": {"语速偏移": 0.10, "音调偏移": 4.0},
+    "gentle": {"语速偏移": -0.08, "音调偏移": -2.0},
+    "sad": {"语速偏移": -0.15, "音调偏移": -4.0},
+    "angry": {"语速偏移": 0.12, "音调偏移": 6.0},
+    "whisper": {"语速偏移": -0.10, "音调偏移": -3.0},
+    "excited": {"语速偏移": 0.15, "音调偏移": 5.0},
+    "calm": {"语速偏移": -0.05, "音调偏移": -1.0},
 }
 
 
 class 合成错误(Exception):
-    def __init__(self, code: int, message: str, retryable: bool = False):
-        self.code = code
-        self.message = message
-        self.retryable = retryable
-        super().__init__(f"TTS Error {code}: {message}")
+    def __init__(self, 错误码: int, 错误信息: str, 可重试: bool = False):
+        self.错误码 = 错误码
+        self.错误信息 = 错误信息
+        self.可重试 = 可重试
+        super().__init__(f"语音合成错误 {错误码}: {错误信息}")
 
 
 def _限幅(x: float, lo: float, hi: float) -> float:
@@ -77,8 +78,8 @@ class EdgeTTSProvider(语音Provider):
     @staticmethod
     def _调制(语速: float, 音调: float, 音量: float, 风格: str) -> tuple[str, str, str]:
         预设 = 风格预设.get(风格, 风格预设["normal"])
-        语速比 = _限幅(语速 - 1.0 + 预设["rate"], -0.5, 1.0)
-        音调值 = _限幅(音调 + 预设["pitch"], -50.0, 50.0)
+        语速比 = _限幅(语速 - 1.0 + 预设["语速偏移"], -0.5, 1.0)
+        音调值 = _限幅(音调 + 预设["音调偏移"], -50.0, 50.0)
         音量比 = _限幅(音量 - 1.0, -1.0, 1.0)
         return f"{语速比:+.0%}", f"{音调值:+.0f}Hz", f"{音量比:+.0%}"
 
@@ -98,7 +99,7 @@ class EdgeTTSProvider(语音Provider):
                 数据 = buf.getvalue()
                 if 数据:
                     return 数据, "mp3"
-                raise 合成错误(500, "Edge返回空音频", retryable=True)
+                raise 合成错误(500, 文案.边缘返回空音频, 可重试=True)
             except 合成错误:
                 raise
             except (asyncio.TimeoutError, TimeoutError) as e:
@@ -109,7 +110,7 @@ class EdgeTTSProvider(语音Provider):
                 logger.warning(f"Edge TTS失败 第{轮 + 1}轮: {e}")
             if 轮 < self._重试:
                 await asyncio.sleep((2 ** 轮) * 0.4)
-        raise 合成错误(502, f"Edge TTS不可用，已重试{self._重试 + 1}次: {最后错}", retryable=True)
+        raise 合成错误(502, 文案.边缘不可用.format(次数=self._重试 + 1), 可重试=True)
 
 
 class 离线Provider(语音Provider):
@@ -121,10 +122,10 @@ class 离线Provider(语音Provider):
 
 class 合成服务:
     def __init__(self):
-        self._缓存 = 合成缓存(settings.cache_size)
-        self._边缘 = EdgeTTSProvider(settings.edge_timeout, settings.edge_max_retries)
+        self._缓存 = 合成缓存(settings.缓存上限)
+        self._边缘 = EdgeTTSProvider(settings.边缘超时秒, settings.边缘最大重试)
         self._离线 = 离线Provider()
-        self._模式 = (settings.tts_provider or "auto").lower()
+        self._模式 = (settings.提供者 or "auto").lower()
 
     @property
     def 缓存(self) -> 合成缓存:
@@ -140,14 +141,14 @@ class 合成服务:
     async def 合成(self, 文本: str, 音色: str | None, 语速: float = 1.0, 音调: float = 0.0, 音量: float = 1.0, 风格: str = "normal") -> tuple[bytes, str, bool, str]:
         正文 = (文本 or "").strip()
         if not 正文:
-            raise 合成错误(400, "文本不能为空", retryable=False)
-        if len(正文) > settings.max_chars:
-            raise 合成错误(400, f"文本超长（上限{settings.max_chars}字）", retryable=False)
+            raise 合成错误(400, 文案.文本不能为空, 可重试=False)
+        if len(正文) > settings.单次上限字数:
+            raise 合成错误(400, 文案.文本超长.format(上限=settings.单次上限字数), 可重试=False)
         语速 = _限幅(float(语速), 0.5, 2.0)
         音调 = _限幅(float(音调), -50.0, 50.0)
         音量 = _限幅(float(音量), 0.0, 2.0)
         风格名 = 风格 if 风格 in 风格预设 else "normal"
-        真音色 = 归一化音色(音色, settings.edge_default_voice)
+        真音色 = 归一化音色(音色, settings.默认音色)
         键 = 缓存键(正文, 真音色, 语速, 音调, 音量, 风格名)
         命中, 未来 = await self._缓存.单飞(键)
         if 命中:
@@ -166,8 +167,8 @@ class 合成服务:
                     数据, 格式 = await self._边缘.合成(正文, 真音色, 语速, 音调, 音量, 风格名)
                     用名 = self._边缘.名称
                 except 合成错误 as e:
-                    if e.retryable:
-                        logger.warning(f"Edge失败降级离线: {e.message}")
+                    if e.可重试:
+                        logger.warning(f"边缘失败降级离线: {e.错误信息}")
                         数据, 格式 = await self._离线.合成(正文, 真音色, 语速, 音调, 音量, 风格名)
                         用名 = f"{self._离线.名称}(fallback)"
                     else:

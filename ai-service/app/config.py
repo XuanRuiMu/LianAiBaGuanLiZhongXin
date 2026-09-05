@@ -1,11 +1,13 @@
 from functools import lru_cache
 
+from pydantic import Field
+
 import app.texts as texts
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class 配置(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore", populate_by_name=True)
 
     HOST: str = "0.0.0.0"
     PORT: int = 8000
@@ -33,6 +35,11 @@ class 配置(BaseSettings):
     MAX_ITERATIONS: int = 6
     MAX_HISTORY_MESSAGES: int = 20
     TOOL_EVENT_SUMMARY_LENGTH: int = 300
+
+    JWT密钥: str = Field(default="", alias="JWT_SECRET")
+    聊天限流次数: int = Field(default=30, alias="CHAT_RATE_LIMIT")
+    聊天限流窗口秒: int = Field(default=60, alias="CHAT_RATE_WINDOW_SECONDS")
+    MCP挂载开关: bool = Field(default=True, alias="MCP_ENABLED")
 
 
 @lru_cache

@@ -16,11 +16,18 @@ export async function 流式对话(
   事件回调: (事件: SSE事件) => void,
 ): Promise<void> {
   const 请求体: 流式对话参数 = { question: 问题, history: 历史 }
+  const 令牌 = localStorage.getItem(常量.本地存储键.令牌)
   const 响应 = await fetch(`${常量.AI基础地址}/api/chat/stream`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(令牌 ? { Authorization: `Bearer ${令牌}` } : {}),
+    },
     body: JSON.stringify(请求体),
   })
+  if (响应.status === 401) {
+    throw new 业务错误(翻译.通用.未授权提示)
+  }
   if (!响应.ok || !响应.body) {
     throw new 业务错误(`${翻译.通用.HTTP错误前缀}${响应.status})`)
   }

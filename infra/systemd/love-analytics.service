@@ -1,0 +1,15 @@
+[Unit]
+Description=恋爱吧数据中心一键部署
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/opt/love-analytics/infra
+ExecStart=/bin/bash ./deploy.sh --env prod
+ExecStop=/usr/bin/docker compose down
+TimeoutStartSec=600
+
+[Install]
+WantedBy=multi-user.target

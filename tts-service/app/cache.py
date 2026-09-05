@@ -7,8 +7,8 @@ import hashlib
 from collections import OrderedDict
 
 
-def 缓存键(text: str, voice: str, rate: float, pitch: float, volume: float, style: str) -> str:
-    原料 = f"{text}\x00{voice}\x00{rate:.3f}\x00{pitch:.3f}\x00{volume:.3f}\x00{style}"
+def 缓存键(文本: str, 音色: str, 语速: float, 音调: float, 音量: float, 风格: str) -> str:
+    原料 = f"{文本}\x00{音色}\x00{语速:.3f}\x00{音调:.3f}\x00{音量:.3f}\x00{风格}"
     return hashlib.sha256(原料.encode("utf-8")).hexdigest()
 
 

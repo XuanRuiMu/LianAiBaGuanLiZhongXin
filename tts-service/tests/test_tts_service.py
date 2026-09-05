@@ -89,19 +89,24 @@ class TestEdgeModulation:
 
 
 class TestRouter:
+    def _凭证头(self, monkeypatch):
+        import app.鉴权 as 鉴权模块
+        monkeypatch.setattr(鉴权模块.settings, "内部令牌", "test-internal-token-p0")
+        return {"X-Internal-Token": "test-internal-token-p0"}
+
     def test_voices(self):
         from app.main import app
         c = TestClient(app)
         r = c.get("/api/tts/voices")
         assert r.status_code == 200
         body = r.json()
-        assert body["count"] >= 10 and any(v["id"] == "zh-CN-XiaoxiaoNeural" for v in body["voices"])
+        assert body["总数"] >= 10 and any(v["编号"] == "zh-CN-XiaoxiaoNeural" for v in body["音色列表"])
 
     def test_health(self):
         from app.main import app
         c = TestClient(app)
         r = c.get("/api/tts/health")
-        assert r.status_code == 200 and r.json()["status"] == "ok"
+        assert r.status_code == 200 and r.json()["状态"] == "正常"
 
     def test_synthesize_offline(self, monkeypatch):
         import app.router as 路由
@@ -115,7 +120,7 @@ class TestRouter:
 
         monkeypatch.setattr(路由.合成服务单例, "合成", 假合成)
         c = TestClient(app)
-        r = c.post("/api/tts/synthesize", json={"text": "你好呀", "voice": "zh-CN-XiaoxiaoNeural"})
+        r = c.post("/api/tts/synthesize", json={"text": "你好呀", "voice": "zh-CN-XiaoxiaoNeural"}, headers=self._凭证头(monkeypatch))
         assert r.status_code == 200
         body = r.json()
         assert body["audio_hex"] and body["duration_ms"] > 0 and body["voice"] == "zh-CN-XiaoxiaoNeural"
@@ -134,20 +139,21 @@ class TestRouter:
 
         monkeypatch.setattr(路由.合成服务单例, "合成", 假合成)
         c = TestClient(app)
-        r = c.post("/api/tts/synthesize", json={"text": "兼容测试", "voice_id": "female-shaonv", "speed": 1.2})
+        r = c.post("/api/tts/synthesize", json={"text": "兼容测试", "voice_id": "female-shaonv", "speed": 1.2}, headers=self._凭证头(monkeypatch))
         assert r.status_code == 200
 
-    def test_validation(self):
+    def test_validation(self, monkeypatch):
         from app.main import app
+        头 = self._凭证头(monkeypatch)
         c = TestClient(app)
-        assert c.post("/api/tts/synthesize", json={"text": "", "voice": "zh-CN-XiaoxiaoNeural"}).status_code == 422
-        assert c.post("/api/tts/synthesize", json={"text": "x" * 5001, "voice": "v"}).status_code == 422
-        assert c.post("/api/tts/synthesize", json={"text": "hi", "voice": "v", "speed": 3.0}).status_code == 422
+        assert c.post("/api/tts/synthesize", json={"text": "", "voice": "zh-CN-XiaoxiaoNeural"}, headers=头).status_code == 422
+        assert c.post("/api/tts/synthesize", json={"text": "x" * 5001, "voice": "v"}, headers=头).status_code == 422
+        assert c.post("/api/tts/synthesize", json={"text": "hi", "voice": "v", "speed": 3.0}, headers=头).status_code == 422
 
-    def test_未知音色被白名单拒绝(self):
+    def test_未知音色被白名单拒绝(self, monkeypatch):
         from app.main import app
         c = TestClient(app)
-        r = c.post("/api/tts/synthesize", json={"text": "你好", "voice": "zh-CN-NotExistNeural"})
+        r = c.post("/api/tts/synthesize", json={"text": "你好", "voice": "zh-CN-NotExistNeural"}, headers=self._凭证头(monkeypatch))
         assert r.status_code == 400
         assert "未知音色" in r.json()["detail"]
 
@@ -162,7 +168,8 @@ class TestRouter:
             return 数据, 格式, False, kwargs.get("音色") or "zh-CN-XiaoxiaoNeural"
 
         monkeypatch.setattr(路由.合成服务单例, "合成", 假合成)
+        头 = self._凭证头(monkeypatch)
         c = TestClient(app)
         for 音色 in ["zh-CN-XiaoxiaoNeural", "female-shaonv"]:
-            r = c.post("/api/tts/synthesize", json={"text": "你好", "voice": 音色})
+            r = c.post("/api/tts/synthesize", json={"text": "你好", "voice": 音色}, headers=头)
             assert r.status_code == 200, 音色
