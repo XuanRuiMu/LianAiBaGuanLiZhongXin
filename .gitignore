@@ -10,6 +10,9 @@ hs_err_pid*
 replay_pid*
 
 # ===== Node.js / Frontend =====
+/node_modules/
+/package.json
+/package-lock.json
 analytics-frontend/node_modules/
 analytics-frontend/dist/
 analytics-frontend/.vite/
