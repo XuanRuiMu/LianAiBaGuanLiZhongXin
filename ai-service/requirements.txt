@@ -64,6 +64,7 @@ numpy==2.5.2
 oauthlib==3.3.1
 onnxruntime==1.29.0
 openai==3.3.1
+openpyxl==3.1.5
 opentelemetry-api==1.44.0
 opentelemetry-exporter-otlp-proto-common==1.44.0
 opentelemetry-exporter-otlp-proto-grpc==1.44.0
@@ -96,6 +97,7 @@ pywin32==312
 PyYAML==6.0.3
 referencing==0.37.0
 regex==2026.7.19
+reportlab==5.0.1
 requests==2.34.2
 requests-oauthlib==2.0.0
 requests-toolbelt==1.0.0

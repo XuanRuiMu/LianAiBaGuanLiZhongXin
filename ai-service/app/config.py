@@ -41,6 +41,11 @@ class 配置(BaseSettings):
     聊天限流窗口秒: int = Field(default=60, alias="CHAT_RATE_WINDOW_SECONDS")
     MCP挂载开关: bool = Field(default=True, alias="MCP_ENABLED")
 
+    报表目录: str = Field(default="./reports", alias="REPORT_DIR")
+    报表定时秒: int = Field(default=3600, alias="REPORT_INTERVAL_SECONDS")
+    报表限流次数: int = Field(default=10, alias="REPORT_RATE_LIMIT")
+    报表限流窗口秒: int = Field(default=60, alias="REPORT_RATE_WINDOW_SECONDS")
+
 
 @lru_cache
 def 取配置() -> 配置:

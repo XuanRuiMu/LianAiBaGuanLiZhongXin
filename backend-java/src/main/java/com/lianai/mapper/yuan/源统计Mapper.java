@@ -15,26 +15,38 @@ import org.apache.ibatis.annotations.Select;
 public interface 源统计Mapper {
 
     @Select("""
-            SELECT
-              (SELECT COUNT(*) FROM "用户") AS "总用户数",
-              (SELECT COUNT(*) FROM "角色") AS "总角色数",
-              (SELECT COUNT(*) FROM "消息") AS "总消息数",
-              (SELECT COUNT(*) FROM "用户" WHERE "创建时间" >= NOW() - INTERVAL '24 hours') AS "近24小时新增用户",
-              (SELECT COUNT(*) FROM "消息" WHERE "创建时间" >= NOW() - INTERVAL '24 hours') AS "近24小时新增消息"
+            SELECT u.总数 AS "总用户数", r.总数 AS "总角色数", m.总数 AS "总消息数",
+                   u.新增 AS "近24小时新增用户", m.新增 AS "近24小时新增消息"
+            FROM (SELECT COUNT(*) AS 总数,
+                         COUNT(*) FILTER (WHERE "创建时间" >= NOW() - INTERVAL '24 hours') AS 新增
+                  FROM "用户") u
+            CROSS JOIN (SELECT COUNT(*) AS 总数 FROM "角色") r
+            CROSS JOIN (SELECT COUNT(*) AS 总数,
+                               COUNT(*) FILTER (WHERE "创建时间" >= NOW() - INTERVAL '24 hours') AS 新增
+                        FROM "消息") m
             """)
     概览行 统计概览();
 
     @Select("""
-            SELECT TO_CHAR(g.d, 'YYYY-MM-DD') AS "统计日期",
-                   COALESCE(u."新增数", 0) AS "新增数",
-                   COALESCE((SELECT COUNT(*) FROM "用户"
-                             WHERE ("创建时间" AT TIME ZONE 'Asia/Shanghai')::date <= g.d), 0) AS "累计数"
-            FROM generate_series(CURRENT_DATE - CAST(#{days} - 1 AS INTEGER), CURRENT_DATE, INTERVAL '1 day') AS g(d)
-            LEFT JOIN (
+            WITH 起点 AS (
+              SELECT COUNT(*) AS 基数 FROM "用户"
+              WHERE ("创建时间" AT TIME ZONE 'Asia/Shanghai')::date
+                    < CURRENT_DATE - CAST(#{days} - 1 AS INTEGER)
+            ),
+            每日 AS (
               SELECT ("创建时间" AT TIME ZONE 'Asia/Shanghai')::date AS rd, COUNT(*) AS "新增数"
               FROM "用户"
+              WHERE ("创建时间" AT TIME ZONE 'Asia/Shanghai')::date
+                    >= CURRENT_DATE - CAST(#{days} - 1 AS INTEGER)
               GROUP BY 1
-            ) u ON u.rd = g.d
+            )
+            SELECT TO_CHAR(g.d, 'YYYY-MM-DD') AS "统计日期",
+                   COALESCE(每日."新增数", 0) AS "新增数",
+                   起点.基数 + SUM(COALESCE(每日."新增数", 0)) OVER (ORDER BY g.d) AS "累计数"
+            FROM generate_series(CURRENT_DATE - CAST(#{days} - 1 AS INTEGER),
+                                 CURRENT_DATE, INTERVAL '1 day') AS g(d)
+            LEFT JOIN 每日 ON 每日.rd = g.d
+            CROSS JOIN 起点
             ORDER BY g.d
             """)
     List<用户趋势行> 统计用户趋势(@Param("days") int days);
@@ -81,11 +93,11 @@ public interface 源统计Mapper {
             SELECT TO_CHAR(g.d, 'YYYY-MM-DD') AS "统计日期",
                    COALESCE(c."同期人数", 0) AS "同期人数",
                    CASE WHEN g.d > CURRENT_DATE - INTERVAL '1 day' THEN 0
-                        ELSE COALESCE(ROUND(100.0 * d1."回访人数" / NULLIF(c."同期人数", 0), 2), 0) END AS "次日留存率",
+                        ELSE COALESCE(ROUND(100.0 * r."次日回访" / NULLIF(c."同期人数", 0), 2), 0) END AS "次日留存率",
                    CASE WHEN g.d > CURRENT_DATE - INTERVAL '3 days' THEN 0
-                        ELSE COALESCE(ROUND(100.0 * d3."回访人数" / NULLIF(c."同期人数", 0), 2), 0) END AS "三日留存率",
+                        ELSE COALESCE(ROUND(100.0 * r."三日回访" / NULLIF(c."同期人数", 0), 2), 0) END AS "三日留存率",
                    CASE WHEN g.d > CURRENT_DATE - INTERVAL '7 days' THEN 0
-                        ELSE COALESCE(ROUND(100.0 * d7."回访人数" / NULLIF(c."同期人数", 0), 2), 0) END AS "七日留存率"
+                        ELSE COALESCE(ROUND(100.0 * r."七日回访" / NULLIF(c."同期人数", 0), 2), 0) END AS "七日留存率"
             FROM generate_series(CURRENT_DATE - CAST(#{days} - 1 AS INTEGER), CURRENT_DATE, INTERVAL '1 day') AS g(d)
             LEFT JOIN (
               SELECT ("创建时间" AT TIME ZONE 'Asia/Shanghai')::date AS rd, COUNT(*) AS "同期人数"
@@ -93,29 +105,17 @@ public interface 源统计Mapper {
               GROUP BY 1
             ) c ON c.rd = g.d
             LEFT JOIN (
-              SELECT (u."创建时间" AT TIME ZONE 'Asia/Shanghai')::date AS rd, COUNT(DISTINCT u."ID") AS "回访人数"
+              SELECT (u."创建时间" AT TIME ZONE 'Asia/Shanghai')::date AS rd,
+                     COUNT(DISTINCT u."ID") FILTER (WHERE (m."创建时间" AT TIME ZONE 'Asia/Shanghai')::date
+                       = (u."创建时间" AT TIME ZONE 'Asia/Shanghai')::date + 1) AS "次日回访",
+                     COUNT(DISTINCT u."ID") FILTER (WHERE (m."创建时间" AT TIME ZONE 'Asia/Shanghai')::date
+                       = (u."创建时间" AT TIME ZONE 'Asia/Shanghai')::date + 3) AS "三日回访",
+                     COUNT(DISTINCT u."ID") FILTER (WHERE (m."创建时间" AT TIME ZONE 'Asia/Shanghai')::date
+                       = (u."创建时间" AT TIME ZONE 'Asia/Shanghai')::date + 7) AS "七日回访"
               FROM "用户" u JOIN "消息" m ON m."用户ID" = u."ID"
               WHERE m."已撤回" = FALSE
-                AND (m."创建时间" AT TIME ZONE 'Asia/Shanghai')::date
-                  = (u."创建时间" AT TIME ZONE 'Asia/Shanghai')::date + 1
               GROUP BY 1
-            ) d1 ON d1.rd = g.d
-            LEFT JOIN (
-              SELECT (u."创建时间" AT TIME ZONE 'Asia/Shanghai')::date AS rd, COUNT(DISTINCT u."ID") AS "回访人数"
-              FROM "用户" u JOIN "消息" m ON m."用户ID" = u."ID"
-              WHERE m."已撤回" = FALSE
-                AND (m."创建时间" AT TIME ZONE 'Asia/Shanghai')::date
-                  = (u."创建时间" AT TIME ZONE 'Asia/Shanghai')::date + 3
-              GROUP BY 1
-            ) d3 ON d3.rd = g.d
-            LEFT JOIN (
-              SELECT (u."创建时间" AT TIME ZONE 'Asia/Shanghai')::date AS rd, COUNT(DISTINCT u."ID") AS "回访人数"
-              FROM "用户" u JOIN "消息" m ON m."用户ID" = u."ID"
-              WHERE m."已撤回" = FALSE
-                AND (m."创建时间" AT TIME ZONE 'Asia/Shanghai')::date
-                  = (u."创建时间" AT TIME ZONE 'Asia/Shanghai')::date + 7
-              GROUP BY 1
-            ) d7 ON d7.rd = g.d
+            ) r ON r.rd = g.d
             ORDER BY g.d
             """)
     List<留存趋势行> 统计留存聚合(@Param("days") int days);

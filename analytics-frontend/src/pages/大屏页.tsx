@@ -165,6 +165,12 @@ export function 大屏页() {
             >
               {翻译.大屏.助手入口}
             </Link>
+            <Link
+              to="/ops"
+              className="rounded-md border border-sky-500/40 px-3 py-1.5 text-xs text-sky-300 transition hover:bg-sky-500/10"
+            >
+              {翻译.运营.标题}
+            </Link>
             <button
               onClick={处理退出登录}
               className="rounded-md border border-[#22304d] px-3 py-1.5 text-xs text-slate-400 transition hover:border-rose-500/50 hover:text-rose-300"

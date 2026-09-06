@@ -1,13 +1,16 @@
+import asyncio
 import contextvars
 import logging
 import uuid
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import chat, health
+from app.api import chat, health, 报表
 from app.api.鉴权 import 鉴权限流中间件
 from app.config import 取配置
+from app.报表.定时 import 报表定时循环
 
 请求追踪号: contextvars.ContextVar[str] = contextvars.ContextVar("请求追踪号", default="-")
 
@@ -36,10 +39,21 @@ async def 追踪中间件(请求, 调用下一个):
     return 响应
 
 
+@asynccontextmanager
+async def 生命周期(应用: FastAPI):
+    停止事件 = asyncio.Event()
+    任务 = asyncio.create_task(报表定时循环(停止事件))
+    try:
+        yield
+    finally:
+        停止事件.set()
+        任务.cancel()
+
+
 def 创建应用() -> FastAPI:
     配置日志()
     配置 = 取配置()
-    应用 = FastAPI(title="恋爱吧数据中心 AI 分析服务")
+    应用 = FastAPI(title="恋爱吧数据中心 AI 分析服务", lifespan=生命周期)
     应用.add_middleware(
         CORSMiddleware,
         allow_origins=配置.CORS_ORIGINS,
@@ -51,6 +65,7 @@ def 创建应用() -> FastAPI:
     应用.middleware("http")(鉴权限流中间件)
     应用.include_router(chat.路由)
     应用.include_router(health.路由)
+    应用.include_router(报表.路由)
     if 配置.MCP挂载开关:
         from app.mcp_server import 服务器
         应用.mount("/mcp", 服务器.streamable_http_app())

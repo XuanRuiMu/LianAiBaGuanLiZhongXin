@@ -5,6 +5,7 @@ import { ToastHost } from './components/ToastHost'
 import { 登录页 } from './pages/登录页'
 import { 大屏页 } from './pages/大屏页'
 import { 助手页 } from './pages/助手页'
+import { 运营看板页 } from './pages/运营看板页'
 
 function 路由守卫({ children }: { children: ReactNode }) {
   if (!已登录()) return <Navigate to="/login" replace />
@@ -33,6 +34,14 @@ export default function App() {
           element={
             <路由守卫>
               <助手页 />
+            </路由守卫>
+          }
+        />
+        <Route
+          path="/ops"
+          element={
+            <路由守卫>
+              <运营看板页 />
             </路由守卫>
           }
         />

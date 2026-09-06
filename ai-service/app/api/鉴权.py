@@ -90,16 +90,23 @@ class 滑动窗口限流器:
 
 
 聊天限流器 = 滑动窗口限流器()
+报表限流器 = 滑动窗口限流器()
 
 
 async def 鉴权限流中间件(请求: Request, 调用下一个: Callable[[Request], Awaitable]) -> JSONResponse:
-    if 请求.url.path != "/api/chat/stream":
+    路径 = 请求.url.path
+    if 路径 == "/api/chat/stream":
+        限流器, 取限流 = 聊天限流器, lambda 配置: (配置.聊天限流次数, 配置.聊天限流窗口秒)
+    elif 路径.startswith("/api/v1/reports/"):
+        限流器, 取限流 = 报表限流器, lambda 配置: (配置.报表限流次数, 配置.报表限流窗口秒)
+    else:
         return await 调用下一个(请求)
     try:
         身份 = 提取身份(请求)
     except 凭证异常 as 异常:
         return JSONResponse(status_code=异常.状态码, content={"detail": 异常.文案})
     配置 = 取配置()
-    if not 聊天限流器.检查并占用(身份, 配置.聊天限流次数, 配置.聊天限流窗口秒):
+    上限, 窗口秒 = 取限流(配置)
+    if not 限流器.检查并占用(身份, 上限, 窗口秒):
         return JSONResponse(status_code=429, content={"detail": texts.限流_超限})
     return await 调用下一个(请求)

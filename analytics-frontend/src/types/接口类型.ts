@@ -75,6 +75,23 @@ export interface 同步状态数据 {
   lastSyncTimes: Record<string, string>
 }
 
+export interface 运营类型状态 {
+  类型: string
+  运行次数: number
+  成功次数: number
+  失败次数: number
+  成功率: number
+  总行数: number
+  平均耗时毫秒: number
+  迟到: boolean
+}
+
+export interface 运营总览数据 {
+  血缘: string[]
+  类型状态: 运营类型状态[]
+  质量告警: Record<string, unknown>[]
+}
+
 export type 对话角色 = 'user' | 'assistant'
 
 export interface 对话历史项 {

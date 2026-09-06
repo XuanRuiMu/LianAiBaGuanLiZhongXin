@@ -16,6 +16,7 @@ describe('翻译文件完整性', () => {
     expect(翻译.登录).toBeTruthy()
     expect(翻译.大屏).toBeTruthy()
     expect(翻译.助手).toBeTruthy()
+    expect(翻译.运营).toBeTruthy()
     expect(翻译.通用).toBeTruthy()
   })
 

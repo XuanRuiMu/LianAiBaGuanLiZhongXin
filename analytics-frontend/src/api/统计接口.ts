@@ -8,6 +8,7 @@ import type {
   注册趋势点,
   概览数据,
   留存趋势点,
+  运营总览数据,
   阶段分布项,
 } from '../types/接口类型'
 import { 获取 } from './http'
@@ -46,4 +47,8 @@ export function 获取留存趋势(天数: number = 常量.统计天数): Promis
 
 export function 获取同步状态(): Promise<同步状态数据> {
   return 获取<同步状态数据>('/api/v1/sync/status')
+}
+
+export function 获取运营总览(): Promise<运营总览数据> {
+  return 获取<运营总览数据>('/api/v1/ops/overview')
 }

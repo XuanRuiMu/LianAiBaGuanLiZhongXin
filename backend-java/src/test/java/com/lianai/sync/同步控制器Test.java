@@ -45,11 +45,14 @@ class 同步控制器Test {
     @Mock
     private KafkaTemplate<String, String> kafka模板;
 
+    @Mock
+    private com.lianai.mapper.mubiao.数仓Mapper 数仓;
+
     private 同步控制器 控制器;
 
     @BeforeEach
     void 初始化() {
-        控制器 = new 同步控制器(调度器, 日志Mapper, 文案源, kafka模板, new ObjectMapper(), "love.sync.events");
+        控制器 = new 同步控制器(调度器, 日志Mapper, 文案源, kafka模板, new ObjectMapper(), "love.sync.events", 数仓);
         when(文案源.getMessage(anyString(), any(), anyString(), any())).thenAnswer(调用 -> 调用.getArgument(2));
         when(kafka模板.send(anyString(), anyString(), anyString()))
                 .thenReturn(CompletableFuture.completedFuture(null));

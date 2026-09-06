@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lianai.common.业务异常;
 import com.lianai.common.统一响应;
 import com.lianai.mapper.mubiao.同步日志Mapper;
+import com.lianai.mapper.mubiao.数仓Mapper;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -31,23 +32,36 @@ public class 同步控制器 {
     private final KafkaTemplate<String, String> kafka模板;
     private final ObjectMapper 序列化器;
     private final String 同步主题;
+    private final 数仓Mapper 数仓;
 
     public 同步控制器(定时同步调度器 调度器, 同步日志Mapper 日志Mapper, MessageSource 文案源,
                    KafkaTemplate<String, String> kafka模板, ObjectMapper 序列化器,
-                   @Value("${app.sync.topic}") String 同步主题) {
+                   @Value("${app.sync.topic}") String 同步主题, 数仓Mapper 数仓) {
         this.调度器 = 调度器;
         this.日志Mapper = 日志Mapper;
         this.文案源 = 文案源;
         this.kafka模板 = kafka模板;
         this.序列化器 = 序列化器;
         this.同步主题 = 同步主题;
+        this.数仓 = 数仓;
     }
 
     @PostMapping("/trigger")
     public 统一响应<String> 手动触发() {
         String 批次号 = 调度器.提交("manual");
+        记录批次(批次号, java.util.Arrays.stream(同步类型.values()).map(同步类型::name)
+                .collect(java.util.stream.Collectors.joining(",")), "manual");
         return 统一响应.响应(200, 文案源.getMessage("sync.triggered", null,
                 "sync.triggered", LocaleContextHolder.getLocale()), 批次号);
+    }
+
+    private void 记录批次(String 批次号, String 类型串, String 来源) {
+        try {
+            数仓.记录批次(批次号, 类型串, 来源);
+        } catch (Exception 异常) {
+            org.slf4j.LoggerFactory.getLogger(同步控制器.class)
+                    .warn("ods batch write failed, batchId={}", 批次号, 异常);
+        }
     }
 
     @GetMapping("/status")
@@ -105,6 +119,8 @@ public class 同步控制器 {
         } catch (Exception 异常) {
             throw new 业务异常("error.server.error", HttpStatus.INTERNAL_SERVER_ERROR);
         }
+        记录批次(干净批次, 待重放.stream().map(同步类型::name)
+                .collect(java.util.stream.Collectors.joining(",")), "replay");
         Map<String, Object> 回执 = new LinkedHashMap<>();
         回执.put("批次号", 干净批次);
         回执.put("重放类型", 待重放.stream().map(同步类型::name).toList());

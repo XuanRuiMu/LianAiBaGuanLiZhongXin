@@ -41,12 +41,18 @@ class Kafka同步消费者Test {
     @Mock
     private KafkaTemplate<String, String> kafka模板;
 
+    @Mock
+    private com.lianai.mapper.mubiao.数仓Mapper 数仓;
+
+    @Mock
+    private 质量校验服务 质量;
+
     private ObjectMapper 序列化器 = new ObjectMapper();
     private Kafka同步消费者 消费者;
 
     @BeforeEach
     void 初始化() {
-        消费者 = new Kafka同步消费者(序列化器, 执行器, 日志Mapper, kafka模板, 死信主题, 2, 0);
+        消费者 = new Kafka同步消费者(序列化器, 执行器, 日志Mapper, kafka模板, 死信主题, 2, 0, 数仓, 质量);
         when(kafka模板.send(anyString(), anyString(), anyString()))
                 .thenReturn(CompletableFuture.completedFuture(null));
         when(日志Mapper.insert(any(同步日志.class))).thenReturn(1);

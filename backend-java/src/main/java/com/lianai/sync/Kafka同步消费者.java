@@ -3,6 +3,7 @@ package com.lianai.sync;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lianai.entity.同步日志;
 import com.lianai.mapper.mubiao.同步日志Mapper;
+import com.lianai.mapper.mubiao.数仓Mapper;
 import java.time.LocalDateTime;
 import java.util.concurrent.CompletableFuture;
 import org.slf4j.Logger;
@@ -25,6 +26,8 @@ public class Kafka同步消费者 {
     private final String 死信主题;
     private final int 重试次数;
     private final long 退避毫秒;
+    private final 数仓Mapper 数仓;
+    private final 质量校验服务 质量;
 
     public Kafka同步消费者(ObjectMapper 序列化器,
                         同步执行器 执行器,
@@ -32,7 +35,9 @@ public class Kafka同步消费者 {
                         KafkaTemplate<String, String> kafka模板,
                         @Value("${app.sync.dlt-topic}") String 死信主题,
                         @Value("${app.sync.retry-count}") int 重试次数,
-                        @Value("${app.sync.retry-backoff-millis}") long 退避毫秒) {
+                        @Value("${app.sync.retry-backoff-millis}") long 退避毫秒,
+                        数仓Mapper 数仓,
+                        质量校验服务 质量) {
         this.序列化器 = 序列化器;
         this.执行器 = 执行器;
         this.日志Mapper = 日志Mapper;
@@ -40,6 +45,8 @@ public class Kafka同步消费者 {
         this.死信主题 = 死信主题;
         this.重试次数 = 重试次数;
         this.退避毫秒 = 退避毫秒;
+        this.数仓 = 数仓;
+        this.质量 = 质量;
     }
 
     @KafkaListener(topics = "${app.sync.topic}")
@@ -70,6 +77,8 @@ public class Kafka同步消费者 {
             return;
         }
         Exception 最后异常 = null;
+        long 开始纳秒 = System.nanoTime();
+        记录明细开始(批次号, 类型);
         for (int 尝试序号 = 0; 尝试序号 <= 重试次数; 尝试序号++) {
             if (尝试序号 > 0 && 退避毫秒 > 0) {
                 try {
@@ -82,6 +91,8 @@ public class Kafka同步消费者 {
             try {
                 long 行数 = 执行器.执行(类型, 批次号);
                 写日志(批次号, 类型, 同步执行器.状态成功, 行数, null);
+                记录明细完成(批次号, 类型, 同步执行器.状态成功, 行数, 开始纳秒, null);
+                运行质量校验(批次号, 类型, 行数);
                 日志.info("sync done for batchId={}, type={}, rows={}", 批次号, 类型, 行数);
                 return;
             } catch (Exception 异常) {
@@ -91,7 +102,34 @@ public class Kafka同步消费者 {
         }
         String 错误文本 = 最后异常 == null ? "unknown" : 最后异常.getClass().getName() + ": " + 最后异常.getMessage();
         写日志(批次号, 类型, 同步执行器.状态失败, 0, 截断(错误文本));
+        记录明细完成(批次号, 类型, 同步执行器.状态失败, 0, 开始纳秒, 截断(错误文本));
         发送死信(批次号, 类型, 错误文本);
+    }
+
+    private void 记录明细开始(String 批次号, 同步类型 类型) {
+        try {
+            数仓.明细开始(批次号, 类型.name());
+        } catch (Exception 异常) {
+            日志.warn("dwd start write failed, batchId={}, type={}", 批次号, 类型, 异常);
+        }
+    }
+
+    private void 记录明细完成(String 批次号, 同步类型 类型, String 状态,
+                              long 行数, long 开始纳秒, String 错误信息) {
+        try {
+            long 耗时毫秒 = (System.nanoTime() - 开始纳秒) / 1_000_000;
+            数仓.明细完成(批次号, 类型.name(), 状态, 行数, 耗时毫秒, 错误信息);
+        } catch (Exception 异常) {
+            日志.warn("dwd finish write failed, batchId={}, type={}", 批次号, 类型, 异常);
+        }
+    }
+
+    private void 运行质量校验(String 批次号, 同步类型 类型, long 行数) {
+        try {
+            质量.校验(批次号, 类型.name(), 行数);
+        } catch (Exception 异常) {
+            日志.warn("quality check failed, batchId={}, type={}", 批次号, 类型, 异常);
+        }
     }
 
     private void 写日志(String 批次号, 同步类型 类型, String 状态, long 行数, String 错误信息) {
