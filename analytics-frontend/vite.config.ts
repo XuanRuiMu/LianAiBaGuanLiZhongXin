@@ -8,9 +8,16 @@ export default defineConfig({
     chunkSizeWarningLimit: 600,
     rollupOptions: {
       output: {
-        manualChunks: {
-          echarts: ['echarts'],
-          react厂商: ['react', 'react-dom', 'react-router-dom', 'axios'],
+        manualChunks(模块: string) {
+          if (模块.includes('echarts')) return 'echarts'
+          if (
+            模块.includes('react') ||
+            模块.includes('axios') ||
+            模块.includes('zustand')
+          ) {
+            return 'react厂商'
+          }
+          return undefined
         },
       },
     },
