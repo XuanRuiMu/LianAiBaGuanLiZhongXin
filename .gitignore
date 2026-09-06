@@ -35,6 +35,8 @@ tts-service/__pycache__/
 coverage.xml
 htmlcov/
 n8n-nodes-liaolian/node_modules/
+test-results/
+playwright-report/
 
 # ===== Environment / Secrets =====
 .env
