@@ -29,6 +29,9 @@ tts-service/.venv/
 tts-service/venv/
 tts-service/.pytest_cache/
 tts-service/__pycache__/
+.coverage
+coverage.xml
+htmlcov/
 
 # ===== Environment / Secrets =====
 .env
