@@ -34,6 +34,7 @@ tts-service/__pycache__/
 .coverage
 coverage.xml
 htmlcov/
+n8n-nodes-liaolian/node_modules/
 
 # ===== Environment / Secrets =====
 .env

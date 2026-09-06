@@ -61,6 +61,8 @@ class 配置(BaseSettings):
     事件订阅地址: str = Field(default="", alias="EVENT_SUBSCRIBERS")
     事件密钥: str = Field(default="", alias="EVENT_SECRET")
 
+    TTS服务地址: str = Field(default="http://localhost:8001", alias="TTS_BASE_URL")
+
 
 @lru_cache
 def 取配置() -> 配置:

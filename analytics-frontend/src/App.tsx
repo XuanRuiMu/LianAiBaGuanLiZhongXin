@@ -6,6 +6,7 @@ import { 登录页 } from './pages/登录页'
 import { 大屏页 } from './pages/大屏页'
 import { 助手页 } from './pages/助手页'
 import { 运营看板页 } from './pages/运营看板页'
+import { 编排页 } from './pages/编排页'
 
 function 路由守卫({ children }: { children: ReactNode }) {
   if (!已登录()) return <Navigate to="/login" replace />
@@ -42,6 +43,14 @@ export default function App() {
           element={
             <路由守卫>
               <运营看板页 />
+            </路由守卫>
+          }
+        />
+        <Route
+          path="/orchestrate"
+          element={
+            <路由守卫>
+              <编排页 />
             </路由守卫>
           }
         />

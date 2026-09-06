@@ -1,0 +1,44 @@
+{
+  "name": "每日运营统计",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "手动触发",
+      "name": "手动触发",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        240,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "服务地址": "http://ai-service:8000",
+        "接口密钥": "MUST-CHANGE-填开放平台密钥",
+        "查询": "总览"
+      },
+      "id": "查询统计",
+      "name": "查询统计",
+      "type": "liaolian查询统计",
+      "typeVersion": 1,
+      "position": [
+        460,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "手动触发": {
+      "main": [
+        [
+          {
+            "node": "查询统计",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

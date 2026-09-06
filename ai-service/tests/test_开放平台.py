@@ -1,4 +1,5 @@
 import json
+import os
 import time
 
 import pytest
@@ -98,3 +99,54 @@ class Test渠道:
             assert await 广播通知("标题", "内容") == {}
         finally:
             取配置.cache_clear()
+
+
+class Test新增开放端点:
+    def test_问答无密钥503(self, 测试存储, monkeypatch):
+        from app.config import 取配置
+        monkeypatch.setenv("DEEPSEEK_API_KEY", "")
+        取配置.cache_clear()
+        try:
+            from app.main import app
+            明文 = 测试存储.创建密钥("问答应用")
+            客户端 = TestClient(app, raise_server_exceptions=False)
+            响应 = 客户端.post("/api/v1/问答", json={"问题": "你好"},
+                               headers={"X-API-Key": 明文})
+            assert 响应.status_code == 503
+        finally:
+            取配置.cache_clear()
+
+    def test_触发编排真实跑通(self, 测试存储, tmp_path, monkeypatch):
+        import app.api.编排 as 编排路由
+        from app.编排.存储 import 编排存储
+        from app.编排.追踪 import 追踪存储
+        monkeypatch.setattr(编排路由, "_编排库", 编排存储(str(tmp_path / "编排.db")))
+        monkeypatch.setattr(编排路由, "_追踪库", 追踪存储(str(tmp_path / "追踪.db")))
+        from app.main import app
+        明文 = 测试存储.创建密钥("编排应用")
+        头 = {"X-API-Key": 明文}
+        客户端 = TestClient(app, raise_server_exceptions=False)
+        保存 = 客户端.post("/api/v1/编排/流程", json={"定义": {
+            "名称": "开放触发流",
+            "节点": [{"编号": "开始", "类型": "开始"},
+                    {"编号": "算", "类型": "代码", "参数": {"表达式": "6 * 7"}}],
+            "边": [{"从": "开始", "到": "算"}]}}, headers={
+            "X-Internal-Token": os.environ.get("INTERNAL_TOKEN", "test-token")})
+        assert 保存.status_code == 200
+        触发 = 客户端.post("/api/v1/触发编排",
+                           json={"流程名称": "开放触发流", "输入": {}}, headers=头)
+        assert 触发.status_code == 200
+        assert 触发.json()["data"]["上下文"]["算"] == 42
+
+    def test_语音合成代理TTS(self, 测试存储):
+        import respx
+        from app.main import app
+        明文 = 测试存储.创建密钥("语音应用")
+        客户端 = TestClient(app, raise_server_exceptions=False)
+        with respx.mock:
+            respx.post("http://localhost:8001/api/tts/synthesize").respond(
+                json={"format": "wav", "duration_ms": 500, "audio_hex": "aabbcc"})
+            响应 = 客户端.post("/api/v1/语音合成", json={"文本": "你好"},
+                               headers={"X-API-Key": 明文})
+        assert 响应.status_code == 200
+        assert 响应.json()["data"]["字节数"] == 3

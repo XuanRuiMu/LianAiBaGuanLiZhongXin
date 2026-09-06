@@ -12,7 +12,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+ARG PIP_INDEX_URL=https://pypi.org/simple
+ARG PIP_TRUSTED_HOST=
+RUN if [ -z "$PIP_TRUSTED_HOST" ]; then \
+      pip install --no-cache-dir --timeout 120 --retries 5 -r requirements.txt; \
+    else \
+      pip install --no-cache-dir --timeout 120 --retries 5 \
+        --index-url ${PIP_INDEX_URL} --trusted-host ${PIP_TRUSTED_HOST} -r requirements.txt; \
+    fi
 
 COPY app/ ./app/
 COPY knowledge/ ./knowledge/

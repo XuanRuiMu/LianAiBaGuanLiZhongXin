@@ -176,6 +176,36 @@ services:
       - backend-java
       - ai-service
 
+  n8n:
+    image: n8nio/n8n:2.37.10
+    container_name: love-n8n
+    restart: unless-stopped
+    ports:
+      - "${N8N_PORT:-5678}:5678"
+    environment:
+      N8N_HOST: localhost
+      N8N_PORT: 5678
+      N8N_PROTOCOL: http
+      N8N_BASIC_AUTH_ACTIVE: "true"
+      N8N_BASIC_AUTH_USER: ${N8N_USER:-admin}
+      N8N_BASIC_AUTH_PASSWORD: ${N8N_PASSWORD:-admin123}
+      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY:-dev-n8n-key-change-me-32bytes!!}
+      N8N_CUSTOM_EXTENSIONS: /home/node/.n8n/custom
+      AI_SERVICE_URL: http://ai-service:8000
+    volumes:
+      - n8n_data:/home/node/.n8n
+      - ../n8n-nodes-liaolian:/home/node/.n8n/custom/n8n-nodes-liaolian:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - ai-service
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:5678/healthz || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
 volumes:
   mysql_data:
   redis_data:
@@ -183,3 +213,4 @@ volumes:
   source_pg_data:
   backend_logs:
   ai_chroma:
+  n8n_data:

@@ -99,3 +99,71 @@ async def 外部触发(请求: Request, 事件: 入站事件):
     except Exception:
         pass
     return {"code": 200, "data": 结果}
+
+
+class 问答请求(BaseModel):
+    问题: str = Field(min_length=1, max_length=500)
+
+
+@路由.post("/api/v1/问答")
+async def 开放问答(请求: Request, 体: 问答请求):
+    if _校验开放密钥(请求) is None:
+        return _拒绝(texts.鉴权失败_缺凭证)
+    配置 = 取配置()
+    if not 配置.DEEPSEEK_API_KEY:
+        return _拒绝("未配置大模型密钥，问答暂不可用", 503)
+    try:
+        from langchain_core.messages import HumanMessage
+        from app.agent.graph import 构建分析图谱
+        图谱 = 构建分析图谱()
+        结果 = await 图谱.ainvoke({"messages": [HumanMessage(体.问题)], "question": 体.问题})
+        消息们 = 结果.get("messages", [])
+        最后 = 消息们[-1] if 消息们 else None
+        return {"code": 200, "data": {"回答": getattr(最后, "content", "")}}
+    except Exception:
+        return _拒绝(texts.服务错误_通用, 502)
+
+
+class 触发编排请求(BaseModel):
+    流程名称: str = Field(min_length=1, max_length=128)
+    输入: dict = Field(default_factory=dict)
+
+
+@路由.post("/api/v1/触发编排")
+async def 开放触发编排(请求: Request, 体: 触发编排请求):
+    if _校验开放密钥(请求) is None:
+        return _拒绝(texts.鉴权失败_缺凭证)
+    try:
+        from app.api.编排 import 取编排库, 取引擎
+        定义 = 取编排库().取版本(体.流程名称)
+        if 定义 is None:
+            return _拒绝("流程不存在", 404)
+        return {"code": 200, "data": await 取引擎().运行(定义, 体.输入)}
+    except Exception:
+        return _拒绝(texts.服务错误_通用, 502)
+
+
+class 语音合成请求(BaseModel):
+    文本: str = Field(min_length=1, max_length=500)
+
+
+@路由.post("/api/v1/语音合成")
+async def 开放语音合成(请求: Request, 体: 语音合成请求):
+    if _校验开放密钥(请求) is None:
+        return _拒绝(texts.鉴权失败_缺凭证)
+    try:
+        import httpx
+        配置 = 取配置()
+        async with httpx.AsyncClient(timeout=60) as 客户端:
+            响应 = await 客户端.post(
+                f"{配置.TTS服务地址.rstrip('/')}/api/tts/synthesize",
+                json={"text": 体.文本},
+                headers={"X-Internal-Token": 配置.INTERNAL_TOKEN})
+        if 响应.status_code != 200:
+            return _拒绝(texts.服务错误_通用, 502)
+        体数据 = 响应.json()
+        return {"code": 200, "data": {"格式": 体数据.get("format"),
+                                     "时长毫秒": 体数据.get("duration_ms"),
+                                     "字节数": len(体数据.get("audio_hex", "")) // 2}}
+    except Exception:
+        return _拒绝(texts.服务错误_通用, 502)

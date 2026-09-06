@@ -1,4 +1,4 @@
-FROM maven:3.9-eclipse-temurin-21 AS 构建
+FROM maven:3.9-eclipse-temurin-21 AS builder
 
 WORKDIR /build
 COPY pom.xml .
@@ -14,7 +14,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-COPY --from=构建 /build/target/love-analytics-backend-1.0.0.jar ./app.jar
+COPY --from=builder /build/target/love-analytics-backend-1.0.0.jar ./app.jar
 
 EXPOSE 8080
 

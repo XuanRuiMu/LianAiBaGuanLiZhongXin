@@ -171,6 +171,12 @@ export function 大屏页() {
             >
               {翻译.运营.标题}
             </Link>
+            <Link
+              to="/orchestrate"
+              className="rounded-md border border-emerald-500/40 px-3 py-1.5 text-xs text-emerald-300 transition hover:bg-emerald-500/10"
+            >
+              编排
+            </Link>
             <button
               onClick={处理退出登录}
               className="rounded-md border border-[#22304d] px-3 py-1.5 text-xs text-slate-400 transition hover:border-rose-500/50 hover:text-rose-300"
