@@ -46,7 +46,8 @@ class 全局异常处理契约Test {
     @Test
     @DisplayName("畸形报文统一 400")
     void 畸形报文() {
-        var 响应 = 处理器.处理报文解析异常(new HttpMessageNotReadableException("bad json"));
+        var 响应 = 处理器.处理报文解析异常(new HttpMessageNotReadableException(
+                "bad json", org.mockito.Mockito.mock(org.springframework.http.HttpInputMessage.class)));
         assertThat(响应.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(响应.getBody().code()).isEqualTo(400);
     }
