@@ -115,7 +115,7 @@ async def 开放问答(请求: Request, 体: 问答请求):
     try:
         from langchain_core.messages import HumanMessage
         from app.agent.graph import 构建分析图谱
-        图谱 = 构建分析图谱()
+        图谱 = await 构建分析图谱()
         结果 = await 图谱.ainvoke({"messages": [HumanMessage(体.问题)], "question": 体.问题})
         消息们 = 结果.get("messages", [])
         最后 = 消息们[-1] if 消息们 else None

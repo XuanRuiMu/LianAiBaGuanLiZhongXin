@@ -32,13 +32,19 @@ class 追踪存储:
     def 记跨度(self, 跟踪号: str, 节点: str, 状态: str, 耗时毫秒: int,
                输入: object, 输出: object, 错误: str = "") -> str:
         跨度号 = uuid.uuid4().hex[:16]
+        输入文本 = json.dumps(输入, ensure_ascii=False, default=str)[:4000]
+        输出文本 = json.dumps(输出, ensure_ascii=False, default=str)[:4000]
         with self._锁, self._连接() as 库:
             库.execute("INSERT INTO 跨度 (跟踪号, 跨度号, 节点, 状态, 耗时毫秒, 输入快照, 输出快照, 错误, 创建时间)"
                        " VALUES (?,?,?,?,?,?,?,?,?)",
                        (跟踪号, 跨度号, 节点, 状态, 耗时毫秒,
-                        json.dumps(输入, ensure_ascii=False, default=str)[:4000],
-                        json.dumps(输出, ensure_ascii=False, default=str)[:4000],
-                        错误[:2000], time.time()))
+                        输入文本, 输出文本, 错误[:2000], time.time()))
+        try:
+            from app.记忆.记忆库 import 取记忆库
+            取记忆库().记跨度(跟踪号, 跨度号, 节点, 状态, 耗时毫秒,
+                              输入文本, 输出文本, 错误[:2000])
+        except Exception:
+            pass
         return 跨度号
 
     def 按跟踪回放(self, 跟踪号: str) -> list[dict]:

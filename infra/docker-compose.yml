@@ -86,6 +86,26 @@ services:
       retries: 12
       start_period: 30s
 
+  vector-postgres:
+    image: pgvector/pgvector:pg18
+    container_name: love-analytics-vector-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${MEMORY_PG_DB:-love_memory}
+      POSTGRES_PASSWORD: ${MEMORY_PG_PASSWORD:-MustChangeMemory2026}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "${MEMORY_PG_PORT:-55433}:5432"
+    volumes:
+      - vector_pg_data:/var/lib/postgresql/data
+      - ./vector-postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d ${MEMORY_PG_DB:-love_memory}"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
   backend-java:
     build: ../backend-java
     container_name: love-analytics-backend
@@ -214,3 +234,4 @@ volumes:
   backend_logs:
   ai_chroma:
   n8n_data:
+  vector_pg_data:

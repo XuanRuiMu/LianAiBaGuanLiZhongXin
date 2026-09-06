@@ -63,6 +63,10 @@ class 配置(BaseSettings):
 
     TTS服务地址: str = Field(default="http://localhost:8001", alias="TTS_BASE_URL")
 
+    记忆库地址: str = Field(default="postgresql://postgres:MemoryDemo2026@localhost:55433/love_memory",
+                        alias="MEMORY_PG_URL")
+    重排模型: str = Field(default="BAAI/bge-reranker-v2-m3", alias="RERANK_MODEL")
+
 
 @lru_cache
 def 取配置() -> 配置:

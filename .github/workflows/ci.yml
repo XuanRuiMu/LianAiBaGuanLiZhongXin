@@ -63,12 +63,31 @@ jobs:
 
   算法服务单测:
     runs-on: ubuntu-latest
+    services:
+      记忆库:
+        image: pgvector/pgvector:pg18
+        env:
+          POSTGRES_DB: love_memory
+          POSTGRES_PASSWORD: MemoryDemo2026
+        ports:
+          - 55433:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d love_memory"
+          --health-interval 10s --health-timeout 5s --health-retries 12
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: 初始化记忆库结构
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client
+          PGPASSWORD=MemoryDemo2026 psql -h localhost -p 55433 -U postgres -d love_memory \
+            -f infra/vector-postgres/init/01_记忆追踪.sql
       - name: AI 与 TTS 单测（含覆盖率门禁）
+        env:
+          MEMORY_PG_URL: postgresql://postgres:MemoryDemo2026@localhost:55433/love_memory
+          MEMORY_PG_PASSWORD: MemoryDemo2026
         run: |
           python -m pip install -r ai-service/requirements.txt
           python -m pytest ai-service/tests -q
