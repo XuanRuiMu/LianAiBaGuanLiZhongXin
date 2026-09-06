@@ -46,6 +46,21 @@ class 配置(BaseSettings):
     报表限流次数: int = Field(default=10, alias="REPORT_RATE_LIMIT")
     报表限流窗口秒: int = Field(default=60, alias="REPORT_RATE_WINDOW_SECONDS")
 
+    开放平台库路径: str = Field(default="./data/开放平台.db", alias="OPEN_DB_PATH")
+
+    飞书地址: str = Field(default="", alias="FEISHU_WEBHOOK")
+    企微地址: str = Field(default="", alias="WEWORK_WEBHOOK")
+    钉钉地址: str = Field(default="", alias="DINGTALK_WEBHOOK")
+    邮件服务: str = Field(default="", alias="SMTP_HOST")
+    邮件端口: int = Field(default=25, alias="SMTP_PORT")
+    邮件发件人: str = Field(default="", alias="SMTP_FROM")
+    邮件收件人: str = Field(default="", alias="SMTP_TO")
+    邮件用户名: str = Field(default="", alias="SMTP_USER")
+    邮件密码: str = Field(default="", alias="SMTP_PASS")
+
+    事件订阅地址: str = Field(default="", alias="EVENT_SUBSCRIBERS")
+    事件密钥: str = Field(default="", alias="EVENT_SECRET")
+
 
 @lru_cache
 def 取配置() -> 配置:

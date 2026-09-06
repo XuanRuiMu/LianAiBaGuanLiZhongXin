@@ -1,50 +1,43 @@
+import inspect
+
 from mcp.server.fastmcp import FastMCP
 
-from app.agent.tools import 关系分布逻辑, 概览逻辑, 注册趋势逻辑, 留存逻辑, 知识检索逻辑
+from app.工具总线.注册表 import 注册表
 
 服务器 = FastMCP("liaolian-datacenter")
 
 
-@服务器.tool()
-async def query_overview() -> str:
-    """获取「和我恋爱吧」平台核心运营总量概览（累计用户数、角色卡总数、消息总数等汇总指标）。"""
-    return await 概览逻辑()
+def _包装(定义) -> object:
+    模型 = 定义.参数模型
+    if 模型 is None:
+        async def 无参调用() -> str:
+            return await 定义.执行函数()
+        无参调用.__name__ = 定义.名称
+        无参调用.__doc__ = 定义.描述
+        return 无参调用
+
+    async def 有参调用(**参数) -> str:
+        已校验 = 模型.model_validate(参数)
+        return await 定义.执行函数(**已校验.model_dump())
+
+    有参调用.__name__ = 定义.名称
+    参数行 = "\n".join(
+        f"        {名}: {字段.description or 名}。"
+        for 名, 字段 in 模型.model_fields.items()
+    )
+    有参调用.__doc__ = f"{定义.描述}\n\n    Args:\n{参数行}\n    "
+    有参调用.__signature__ = inspect.Signature(
+        parameters=[
+            inspect.Parameter(名, inspect.Parameter.POSITIONAL_OR_KEYWORD,
+                              annotation=字段.annotation)
+            for 名, 字段 in 模型.model_fields.items()
+        ]
+    )
+    return 有参调用
 
 
-@服务器.tool()
-async def query_user_trend(days: int) -> str:
-    """查询最近 N 天每日新增注册用户趋势。
-
-    Args:
-        days: 统计回溯天数，7~30 之间的整数。
-    """
-    return await 注册趋势逻辑(days)
-
-
-@服务器.tool()
-async def query_favorability() -> str:
-    """查询好感度关系阶段（冷淡/疏远/认识/熟悉/朋友/好友/暧昧/心动/热恋/深爱）分布。"""
-    return await 关系分布逻辑()
-
-
-@服务器.tool()
-async def query_retention(days: int) -> str:
-    """查询最近 N 天各注册批次的次日/3日/7日留存率（同期群分析，口径：注册后第 N 天当日有消息行为算回访）。
-
-    Args:
-        days: 统计回溯天数，7~30 之间的整数。
-    """
-    return await 留存逻辑(days)
-
-
-@服务器.tool()
-async def search_knowledge(query: str) -> str:
-    """检索恋爱吧产品知识库（产品手册、平台架构说明、运营常见问题）。
-
-    Args:
-        query: 检索词，2~50 个字的中文短语。
-    """
-    return await 知识检索逻辑(query)
+for _定义 in 注册表.全部():
+    服务器.tool()(_包装(_定义))
 
 
 if __name__ == "__main__":
