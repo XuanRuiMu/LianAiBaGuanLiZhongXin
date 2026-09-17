@@ -1,4 +1,6 @@
-# Boot 3.5 → 4.1 迁移记录（实测，按官方迁移指南逐项）
+﻿# Boot 3.5 → 4.1 迁移记录（实测，按官方迁移指南逐项）
+
+> 2026-09-10 环境同源切换声明：以下为双栈时期记录，已冻结备查，见 docs/archive/Boot4迁移记录.md（backend-java 已删除）。
 
 基线：Spring Boot 4.1.1 / JDK 25（`maven.compiler.release=25`）/ JaCoCo 0.8.15 /
 MyBatis-Plus `spring-boot4-starter` 3.5.17 / Testcontainers 2.0.5（模块改名）。
@@ -21,3 +23,4 @@ MyBatis-Plus `spring-boot4-starter` 3.5.17 / Testcontainers 2.0.5（模块改名
 
 - Spring AI 2.0.1 未引入：后端无 LLM 调用场景，引入即死依赖，
   违反简洁优先；AI 能力在 ai-service（LangGraph）。若将来后端需要，先补调用点再引依赖。
+

@@ -1,0 +1,18 @@
+[Unit]
+Description=恋爱吧管理中心一键部署
+After=docker.service
+Requires=docker.service
+
+[Service]
+# YH-120 systemd改常驻：常驻服务加自动拉起，路径参数化经环境变量覆写
+Type=simple
+Restart=always
+RestartSec=10
+WorkingDirectory=/opt/love-management/infra
+EnvironmentFile=-/etc/love-management/management.env
+ExecStart=/bin/bash ./deploy.sh --env prod
+ExecStop=/usr/bin/docker compose down
+TimeoutStartSec=600
+
+[Install]
+WantedBy=multi-user.target

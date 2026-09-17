@@ -1,5 +1,4 @@
 # ===== Java / Maven =====
-backend-java/target/
 .workbuddy/
 *.class
 *.jar
@@ -11,11 +10,14 @@ replay_pid*
 
 # ===== Node.js / Frontend =====
 /node_modules/
+管理后端/node_modules/
+管理后端/dist/
+管理后端/coverage/
+管理前端/node_modules/
+管理前端/dist/
+管理前端/coverage/
 /package.json
 /package-lock.json
-analytics-frontend/node_modules/
-analytics-frontend/dist/
-analytics-frontend/.vite/
 *.local
 
 # ===== Python =====
@@ -24,16 +26,9 @@ __pycache__/
 *$py.class
 *.so
 .Python
-ai-service/.venv/
-ai-service/venv/
-ai-service/.pytest_cache/
-ai-service/chroma_db/
-ai-service/reports/
-ai-service/data/
 tts-service/.venv/
 tts-service/venv/
 tts-service/.pytest_cache/
-tts-service/__pycache__/
 .coverage
 coverage.xml
 htmlcov/
@@ -56,10 +51,6 @@ playwright-report/
 *~
 .DS_Store
 Thumbs.db
-
-# ===== Docker =====
-infra/mysql/data/
-infra/redis/data/
 
 # ===== OS =====
 Desktop.ini

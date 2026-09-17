@@ -14,13 +14,13 @@
     },
     {
       "parameters": {
-        "服务地址": "http://ai-service:8000",
+        "服务地址": "http://management-backend:3100",
         "接口密钥": "MUST-CHANGE-填开放平台密钥",
         "查询": "总览"
       },
       "id": "查询统计",
       "name": "查询统计",
-      "type": "liaolian查询统计",
+      "type": "CUSTOM.liaolian查询统计",
       "typeVersion": 1,
       "position": [
         460,

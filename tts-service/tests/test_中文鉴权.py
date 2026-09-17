@@ -1,10 +1,7 @@
-import base64
-import hashlib
-import hmac
-import json
+import pytest
+import jwt as PyJWT
 import time
 
-import pytest
 from fastapi.testclient import TestClient
 
 from app import 文案
@@ -16,11 +13,28 @@ from app.鉴权 import 校验访问令牌, 合成限流器
 
 
 def _签发(用户名: str, 密钥: str, 过期秒: int = 3600) -> str:
-    头 = base64.urlsafe_b64encode(json.dumps({"alg": "HS256", "typ": "JWT"}).encode()).decode().rstrip("=")
-    体 = base64.urlsafe_b64encode(json.dumps({"sub": 用户名, "exp": time.time() + 过期秒}).encode()).decode().rstrip("=")
-    签 = hmac.new(密钥.encode(), f"{头}.{体}".encode(), hashlib.sha256).digest()
-    尾 = base64.urlsafe_b64encode(签).decode().rstrip("=")
-    return f"{头}.{体}.{尾}"
+    # YH-114 测试签发走PyJWT白名单算法，与实现同源
+    return PyJWT.encode({"sub": 用户名, "exp": time.time() + 过期秒}, 密钥, algorithm="HS256")
+
+
+def _签发契约载荷(载荷: dict, 密钥: str) -> str:
+    return PyJWT.encode(载荷, 密钥, algorithm="HS256")
+
+
+契约密钥 = "契约对齐专用密钥契约对齐专用密钥0123456789"
+
+
+def _契约载荷() -> dict:
+    现在 = int(time.time())
+    return {
+        "yongHuId": "用户0001",
+        "shouJiHao": "13800000000",
+        "jti": "令牌编号0001",
+        "iat": 现在,
+        "exp": 现在 + 3600,
+        "qianFaHaoMiao": 现在 * 1000,
+        "tokenType": "access",
+    }
 
 
 class Test中文收尾:
@@ -92,16 +106,139 @@ class Test合成鉴权:
     def test_离线模式凭证通过可合成(self, monkeypatch):
         import app.鉴权 as 鉴权模块
         from app.provider import 合成服务单例
-        monkeypatch.setattr(鉴权模块.settings, "内部令牌", "test-internal-token-p0")
+        # YH-114 内部令牌长度门禁16字节：测试令牌需满足长度校验
+        monkeypatch.setattr(鉴权模块.settings, "内部令牌", "test-internal-token-16p0")
         monkeypatch.setattr(合成服务单例, "_模式", "offline")
         try:
             客户端 = TestClient(app, raise_server_exceptions=False)
             响应 = 客户端.post("/api/tts/synthesize", json={"text": "你好世界"},
-                                headers={"X-Internal-Token": "test-internal-token-p0"})
+                                headers={"X-Internal-Token": "test-internal-token-16p0"})
             assert 响应.status_code == 200
             assert 响应.json()["format"] == "wav"
         finally:
             monkeypatch.setattr(鉴权模块.settings, "内部令牌", "")
+
+
+class Test契约对齐:
+    def test_和我恋爱吧载荷放行(self, monkeypatch):
+        import app.鉴权 as 鉴权模块
+        monkeypatch.setattr(鉴权模块.settings, "令牌密钥", 契约密钥)
+        monkeypatch.setattr(鉴权模块.settings, "缓存地址", "")
+        try:
+            令牌 = _签发契约载荷(_契约载荷(), 契约密钥)
+            assert 校验访问令牌(令牌) == "用户0001"
+        finally:
+            monkeypatch.setattr(鉴权模块.settings, "令牌密钥", "")
+
+    def test_黑名单命中拒收(self, monkeypatch):
+        import app.鉴权 as 鉴权模块
+        monkeypatch.setattr(鉴权模块.settings, "令牌密钥", 契约密钥)
+        monkeypatch.setattr(鉴权模块, "读吊销值", lambda 键: "1" if 键.startswith("jwt_blacklist:") else None)
+        try:
+            with pytest.raises(ValueError):
+                校验访问令牌(_签发契约载荷(_契约载荷(), 契约密钥))
+        finally:
+            monkeypatch.setattr(鉴权模块.settings, "令牌密钥", "")
+
+    def test_用户吊销拒收(self, monkeypatch):
+        import app.鉴权 as 鉴权模块
+        monkeypatch.setattr(鉴权模块.settings, "令牌密钥", 契约密钥)
+        载荷 = _契约载荷()
+        monkeypatch.setattr(鉴权模块, "读吊销值", lambda 键: str(载荷["qianFaHaoMiao"] + 1000))
+        try:
+            with pytest.raises(ValueError):
+                校验访问令牌(_签发契约载荷(载荷, 契约密钥))
+        finally:
+            monkeypatch.setattr(鉴权模块.settings, "令牌密钥", "")
+
+    def test_吊销检查不可用拒收(self, monkeypatch):
+        import app.鉴权 as 鉴权模块
+        monkeypatch.setattr(鉴权模块.settings, "令牌密钥", 契约密钥)
+
+        def 坏读(键: str):
+            raise ValueError("吊销检查不可用")
+
+        monkeypatch.setattr(鉴权模块, "读吊销值", 坏读)
+        try:
+            with pytest.raises(ValueError):
+                校验访问令牌(_签发契约载荷(_契约载荷(), 契约密钥))
+        finally:
+            monkeypatch.setattr(鉴权模块.settings, "令牌密钥", "")
+
+    def test_无用户标识拒收(self, monkeypatch):
+        import app.鉴权 as 鉴权模块
+        monkeypatch.setattr(鉴权模块.settings, "令牌密钥", 契约密钥)
+        monkeypatch.setattr(鉴权模块.settings, "缓存地址", "")
+        try:
+            载荷 = {"exp": time.time() + 3600}
+            with pytest.raises(ValueError):
+                校验访问令牌(_签发契约载荷(载荷, 契约密钥))
+        finally:
+            monkeypatch.setattr(鉴权模块.settings, "令牌密钥", "")
+
+    def test_非白名单算法拒收(self, monkeypatch):
+        # YH-114 算法白名单：none/RS256伪造一律拒收
+        import app.鉴权 as 鉴权模块
+        monkeypatch.setattr(鉴权模块.settings, "令牌密钥", 契约密钥)
+        monkeypatch.setattr(鉴权模块.settings, "缓存地址", "")
+        try:
+            载荷 = _契约载荷()
+            无算法令牌 = PyJWT.encode(载荷, "", algorithm="none")
+            with pytest.raises(ValueError):
+                校验访问令牌(无算法令牌)
+        finally:
+            monkeypatch.setattr(鉴权模块.settings, "令牌密钥", "")
+
+    def test_用户吊销兼容iat(self, monkeypatch):
+        import app.鉴权 as 鉴权模块
+        monkeypatch.setattr(鉴权模块.settings, "令牌密钥", 契约密钥)
+        现在 = int(time.time())
+        载荷 = {"yongHuId": "用户0002", "iat": 现在, "exp": 现在 + 3600}
+        monkeypatch.setattr(鉴权模块, "读吊销值", lambda 键: str(现在 * 1000 + 5000))
+        try:
+            with pytest.raises(ValueError):
+                校验访问令牌(_签发契约载荷(载荷, 契约密钥))
+        finally:
+            monkeypatch.setattr(鉴权模块.settings, "令牌密钥", "")
+
+    def test_损坏过期值拒收(self, monkeypatch):
+        import app.鉴权 as 鉴权模块
+        monkeypatch.setattr(鉴权模块.settings, "令牌密钥", 契约密钥)
+        monkeypatch.setattr(鉴权模块.settings, "缓存地址", "")
+        try:
+            with pytest.raises(ValueError):
+                校验访问令牌(_签发契约载荷({"yongHuId": "用户0003", "exp": "坏值"}, 契约密钥))
+        finally:
+            monkeypatch.setattr(鉴权模块.settings, "令牌密钥", "")
+
+    def test_未配缓存跳过吊销(self, monkeypatch):
+        import app.鉴权 as 鉴权模块
+        monkeypatch.setattr(鉴权模块.settings, "缓存地址", "")
+        鉴权模块._缓存连接 = None
+        assert 鉴权模块.取缓存连接() is None
+
+    def test_损坏吊销值不误杀(self, monkeypatch):
+        import app.鉴权 as 鉴权模块
+        monkeypatch.setattr(鉴权模块.settings, "令牌密钥", 契约密钥)
+        monkeypatch.setattr(鉴权模块, "读吊销值", lambda 键: None if 键.startswith("jwt_blacklist:") else "坏值")
+        try:
+            assert 校验访问令牌(_签发契约载荷(_契约载荷(), 契约密钥)) == "用户0001"
+        finally:
+            monkeypatch.setattr(鉴权模块.settings, "令牌密钥", "")
+
+    def test_吊销令牌接口返回401(self, monkeypatch):
+        import app.鉴权 as 鉴权模块
+        monkeypatch.setattr(鉴权模块.settings, "令牌密钥", 契约密钥)
+        monkeypatch.setattr(鉴权模块, "读吊销值", lambda 键: "1")
+        try:
+            客户端 = TestClient(app, raise_server_exceptions=False)
+            令牌 = _签发契约载荷(_契约载荷(), 契约密钥)
+            响应 = 客户端.post("/api/tts/synthesize", json={"text": "你好"},
+                                headers={"Authorization": f"Bearer {令牌}"})
+            assert 响应.status_code == 401
+            assert 响应.json()["提示"] == 文案.令牌无效
+        finally:
+            monkeypatch.setattr(鉴权模块.settings, "令牌密钥", "")
 
 
 class Test离线合成中文文案:

@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="恋爱吧管理中心——账号、聊天、思考链、封禁、审计、统计一体监察" />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%23b03a2e'/%3E%3Ctext x='32' y='44' font-size='32' text-anchor='middle' fill='%23fff8f2' font-family='serif' font-weight='bold'%3E%E6%81%8B%3C/text%3E%3C/svg%3E"
+    />
+    <title>恋爱吧管理中心</title>
+    <!-- YH-119 生产可重复构建：字体自托管优先，外链失败本地回退禁阻塞首屏（自托管字体缺失时禁preload空转刷404控制台错，走系统字体栈） -->
+    <style>
+      body { font-family: 'Noto Sans SC', system-ui, -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif; }
+    </style>
+    <script>
+      try {
+        var 存 = window.localStorage.getItem('lian-ai-guan-li-zhu-ti');
+        if (存 === '深' || (存 !== '浅' && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+          document.documentElement.classList.add('dark');
+        }
+      } catch (错误) {
+        void 错误;
+      }
+    </script>
+  </head>
+  <body>
+    <div id="ying-yong"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

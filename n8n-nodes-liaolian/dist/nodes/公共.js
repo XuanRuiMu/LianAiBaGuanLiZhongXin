@@ -5,6 +5,9 @@ exports.通用参数 = 通用参数;
 async function 调开放接口(上下文, 路径, 方法 = 'GET', 查询 = {}, 请求体 = undefined) {
     const 服务地址 = 上下文.getNodeParameter('服务地址', 0);
     const 接口密钥 = 上下文.getNodeParameter('接口密钥', 0);
+    if (!接口密钥 || 接口密钥.trim().length < 16) {
+        throw new Error('开放接口令牌缺失或长度不足，拒绝发起调用');
+    }
     const 地址 = new URL(`/api/v1/${路径}`, 服务地址);
     for (const [键, 值] of Object.entries(查询))
         地址.searchParams.set(键, 值);
@@ -23,8 +26,8 @@ function 通用参数() {
             displayName: '服务地址',
             name: '服务地址',
             type: 'string',
-            default: 'http://ai-service:8000',
-            description: 'AI 服务地址',
+            default: 'http://management-backend:3100',
+            description: '管理后端地址（容器内3100，宿主经MANAGEMENT_BACKEND_PORT映射）',
         },
         {
             displayName: '接口密钥',

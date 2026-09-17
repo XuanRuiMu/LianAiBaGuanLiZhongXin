@@ -37,6 +37,10 @@ set -a
 source ./.env
 set +a
 
+# shellcheck disable=SC1091
+source "$jiaoBenMuLu/scripts/同源环境.sh"
+buQiZhuPeiZhi "$jiaoBenMuLu/../../和我恋爱吧/.env"
+
 if [[ "$gouJian" == "true" ]]; then
   docker compose build
 fi
@@ -61,9 +65,9 @@ echo "等待服务健康..."
     i=$((i + 1))
   done
 }
-等待健康 "http://localhost:${BACKEND_PORT:-8080}/health" "后端"
-等待健康 "http://localhost:${AI_PORT:-8000}/health" "AI服务"
+等待健康 "http://localhost:${MANAGEMENT_BACKEND_PORT:-3100}/api/jian-kang" "管理后端"
 等待健康 "http://localhost:${TTS_PORT:-8001}/health" "语音服务"
+等待健康 "http://localhost:${N8N_PORT:-5678}/healthz" "编排服务"
 
 docker compose ps
 echo "部署完成（环境=$huanJing）"

@@ -19,6 +19,7 @@ class 运行配置(BaseSettings):
 
     令牌密钥: str = Field("", alias="JWT_SECRET")
     内部令牌: str = Field("", alias="INTERNAL_TOKEN")
+    缓存地址: str = Field("", alias="REDIS_URL")
     合成限流次数: int = Field(60, alias="TTS_RATE_LIMIT")
     合成限流窗口秒: int = Field(60, alias="TTS_RATE_WINDOW_SECONDS")
 

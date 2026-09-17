@@ -1,0 +1,34 @@
+{
+  "name": "lian-ai-ba-guan-li-qian-duan",
+  "private": true,
+  "version": "0.1.0",
+  "description": "恋爱吧管理中心 - 轻量管理前端（Vue3+Vite+TS，与和我恋爱吧同栈）",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "lint": "eslint .",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "axios": "1.20.0",
+    "pinia": "4.0.3",
+    "vue": "3.5.42",
+    "vue-router": "5.3.1"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@vitejs/plugin-vue": "6.0.8",
+    "@vue/test-utils": "2.5.0",
+    "eslint": "10.10.0",
+    "eslint-plugin-vue": "10.11.0",
+    "jsdom": "29.1.1",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.70.0",
+    "vite": "8.3.0",
+    "vitest": "4.1.11",
+    "vue-eslint-parser": "10.4.1",
+    "vue-tsc": "3.3.11"
+  }
+}

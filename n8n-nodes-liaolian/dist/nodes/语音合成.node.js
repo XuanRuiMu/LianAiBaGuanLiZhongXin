@@ -19,7 +19,7 @@ class 语音合成 {
                     displayName: '文本',
                     name: '文本',
                     type: 'string',
-                    default: '你好，这里是恋爱吧数据中心',
+                    default: '你好，这里是恋爱吧管理中心',
                 },
             ],
         };

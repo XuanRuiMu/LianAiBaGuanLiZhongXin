@@ -1,3 +1,0 @@
-# Windows 本地开发补充依赖（Docker 镜像不得包含，仅 Windows 主机 venv 使用）
--r requirements.txt
-pywin32==312

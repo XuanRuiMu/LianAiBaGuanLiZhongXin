@@ -1,0 +1,50 @@
+{
+  "name": "lian-ai-ba-guan-li-hou-duan",
+  "version": "0.1.0",
+  "description": "恋爱吧管理中心 - 管理后端（与和我恋爱吧同栈同库，读写分离：查询走只读视图掩码，写入一律事务加审计）",
+  "main": "dist/启动.js",
+  "scripts": {
+    "dev": "nodemon --exec ts-node src/启动.ts",
+    "build": "tsc --noEmit && tsc -p tsconfig.build.json",
+    "start": "node dist/启动.js",
+    "lint": "eslint .",
+    "test": "vitest run"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "express-rate-limit": "^8.5.1",
+    "helmet": "^8.1.0",
+    "ioredis": "^5.11.1",
+    "jsonwebtoken": "^9.0.3",
+    "pg": "^8.20.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/bcryptjs": "^2.4.6",
+    "@types/cookie-parser": "^1.4.10",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/node": "^22.0.0",
+    "@types/pg": "^8.20.0",
+    "@types/supertest": "^7.2.0",
+    "eslint": "^10.5.0",
+    "nodemon": "^3.1.14",
+    "supertest": "^7.2.2",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.0",
+    "typescript-eslint": "^8.61.1",
+    "vitest": "^4.1.6"
+  }
+}

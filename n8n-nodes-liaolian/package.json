@@ -1,7 +1,7 @@
 {
   "name": "n8n-nodes-liaolian",
   "version": "0.1.0",
-  "description": "恋爱吧数据中心 n8n 自定义节点",
+  "description": "恋爱吧管理中心 n8n 自定义节点",
   "license": "MIT",
   "main": "dist/index.js",
   "scripts": {
@@ -12,10 +12,10 @@
     "n8nNodesApiVersion": 1,
     "credentials": [],
     "nodes": [
-      "dist/查询统计.node.js",
-      "dist/发起问答.node.js",
-      "dist/触发流程.node.js",
-      "dist/语音合成.node.js"
+      "dist/nodes/查询统计.node.js",
+      "dist/nodes/发起问答.node.js",
+      "dist/nodes/触发流程.node.js",
+      "dist/nodes/语音合成.node.js"
     ]
   },
   "devDependencies": {

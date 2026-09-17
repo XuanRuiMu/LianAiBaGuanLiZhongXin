@@ -14,14 +14,14 @@
     },
     {
       "parameters": {
-        "服务地址": "http://ai-service:8000",
+        "服务地址": "http://management-backend:3100",
         "接口密钥": "MUST-CHANGE-填开放平台密钥",
         "流程名称": "演示流程",
         "输入": "{}"
       },
       "id": "触发流程",
       "name": "触发流程",
-      "type": "liaolian触发流程",
+      "type": "CUSTOM.liaolian触发流程",
       "typeVersion": 1,
       "position": [
         460,
