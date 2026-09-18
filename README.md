@@ -4,6 +4,7 @@
 
 [![Stars](https://img.shields.io/github/stars/XuanRuiMu/LianAiBaGuanLiZhongXin?style=flat&logo=github)](https://github.com/XuanRuiMu/LianAiBaGuanLiZhongXin/stargazers)
 [![Forks](https://img.shields.io/github/forks/XuanRuiMu/LianAiBaGuanLiZhongXin?style=flat&logo=github)](https://github.com/XuanRuiMu/LianAiBaGuanLiZhongXin/forks)
+[![License: MIT](https://img.shields.io/github/license/XuanRuiMu/LianAiBaGuanLiZhongXin)](LICENSE)
 [![Last Commit](https://img.shields.io/github/last-commit/XuanRuiMu/LianAiBaGuanLiZhongXin)](https://github.com/XuanRuiMu/LianAiBaGuanLiZhongXin/commits/main)
 [![Issues](https://img.shields.io/github/issues/XuanRuiMu/LianAiBaGuanLiZhongXin)](https://github.com/XuanRuiMu/LianAiBaGuanLiZhongXin/issues)
 [![Repo Size](https://img.shields.io/github/repo-size/XuanRuiMu/LianAiBaGuanLiZhongXin)](https://github.com/XuanRuiMu/LianAiBaGuanLiZhongXin)
@@ -116,4 +117,4 @@ cd tts-service && pytest      # TTS 服务测试
 
 ## 许可证
 
-本仓库仅作项目开源展示。**Made with ❤️ —— 运营好每一段 AI 恋爱。**
+[MIT](LICENSE) —— 本仓库仅作项目开源展示。**Made with ❤️ —— 运营好每一段 AI 恋爱。**
