@@ -1,119 +1,120 @@
-# LianAiBaGuanLiZhongXin · 恋爱吧管理中心
+# 恋爱吧管理中心 · LianAiBaGuanLiZhongXin
 
-> The dedicated operations console for "和我恋爱吧 (HeWoLianAiBa)" — accounts / chat / reasoning chains / bans / audit / stats, managed in one panel. Same stack, same database, same origin as the main app, with read/write separation.
+> 「和我恋爱吧」的专属运营管理端 —— 账号 / 聊天 / 思考链 / 封禁 / 审计 / 统计，七块面板一块管。与主应用同栈、同库、同源，读写分离，专为 AI 恋爱模拟产品护航。
 
 [![Stars](https://img.shields.io/github/stars/XuanRuiMu/LianAiBaGuanLiZhongXin?style=flat&logo=github)](https://github.com/XuanRuiMu/LianAiBaGuanLiZhongXin/stargazers)
 [![Forks](https://img.shields.io/github/forks/XuanRuiMu/LianAiBaGuanLiZhongXin?style=flat&logo=github)](https://github.com/XuanRuiMu/LianAiBaGuanLiZhongXin/forks)
+[![License: MIT](https://img.shields.io/github/license/XuanRuiMu/LianAiBaGuanLiZhongXin)](LICENSE)
 [![Last Commit](https://img.shields.io/github/last-commit/XuanRuiMu/LianAiBaGuanLiZhongXin)](https://github.com/XuanRuiMu/LianAiBaGuanLiZhongXin/commits/main)
 [![Issues](https://img.shields.io/github/issues/XuanRuiMu/LianAiBaGuanLiZhongXin)](https://github.com/XuanRuiMu/LianAiBaGuanLiZhongXin/issues)
 [![Repo Size](https://img.shields.io/github/repo-size/XuanRuiMu/LianAiBaGuanLiZhongXin)](https://github.com/XuanRuiMu/LianAiBaGuanLiZhongXin)
 [![CI](https://img.shields.io/github/actions/workflow/status/XuanRuiMu/LianAiBaGuanLiZhongXin/ci.yml?label=CI)](https://github.com/XuanRuiMu/LianAiBaGuanLiZhongXin/actions)
 [![Stack](https://img.shields.io/badge/stack-Vue3%20%2B%20Express5%20%2B%20PostgreSQL-blue)](https://github.com/XuanRuiMu/LianAiBaGuanLiZhongXin)
 
-> 🌐 [中文](README.md) ｜ English
+> 🌐 简体中文 ｜ [English](README_EN.md)
 
 ---
 
-## What is this?
+## 这是什么？
 
-[HeWoLianAiBa](https://github.com/XuanRuiMu/HeWoLianAiBa) is an AI romance simulation game. **LianAiBaGuanLiZhongXin** is its **dedicated operations console**: it connects directly to the same database and environment as the main app, letting operators (account managers, content reviewers, risk control) handle all daily management in one place.
+[和我恋爱吧](https://github.com/XuanRuiMu/HeWoLianAiBa) 是一个 AI 恋爱模拟游戏。**恋爱吧管理中心** 是它的**专属运营管理后台**：直接对接主应用同一套数据库与环境，让运营者（账号管理员、内容审核员、风控）在一个控制台里完成全部日常管理动作。
 
-**Architecture principle: separated frontend/backend — frontend runs locally, backend runs on the server.**
+**架构原则：前后端分离，前端部署本地、后端部署服务器。**
 
-- The console frontend runs on the operator's local machine (saves server resources and guarantees only the designated frontend can talk to the admin API);
-- The admin backend deploys on the server, connects to the shared database, reads through read-only view masking, and **every write goes through a transaction + audit**.
+- 管理中心的前端跑在运营者本地电脑（省服务器资源，且保证只有指定前端能对接管理后端）；
+- 管理后端部署在服务器，直连同库，查询走只读视图掩码、写入一律**事务 + 审计**。
 
 ---
 
-## Core modules
+## 核心功能
 
-| Module | Description |
+| 模块 | 说明 |
 | --- | --- |
-| 👤 Account list / detail | Full user account search, detail view, exclusive-binding relations |
-| 💬 Chat history | Full replay of user–AI conversations for content QA |
-| 🧠 Reasoning chain | Inspect the AI's reasoning process to judge response quality |
-| ✅ Review & ops | Content review and moderation workflows |
-| 🚫 Ban management | Account ban / unban with transactional consistency |
-| 🧾 Audit log | Full operation audit — who did what when, fully traceable |
-| 📊 Statistics & charts | Operational metric visualization (signups, activity, retention, engagement) |
+| 👤 账号列表 / 详情 | 全量用户账号检索、详情查看、专属绑定关系 |
+| 💬 聊天记录 | 用户与 AI 的完整聊天回放，用于内容质检 |
+| 🧠 思考链 | 查看 AI 的思考过程（reasoning chain），辅助判断回复质量 |
+| ✅ 审核运营 | 内容审核与运营操作，待审 / 已审管理 |
+| 🚫 封禁管理 | 账号封禁 / 解封，基于事务保证一致性 |
+| 🧾 审计日志 | 全量操作审计，谁在什么时候做了什么，可追溯 |
+| 📊 统计图表 | 运营指标可视化（注册、活跃、留存、互动等）|
 
 ---
 
-## Tech stack
+## 技术栈
 
-| Subproject | Technology |
+| 子项目 | 技术 |
 | --- | --- |
-| **Admin frontend** (`管理前端/`) | Vue 3 + Vite + TypeScript + Pinia + Vue Router (7 business pages) |
-| **Admin backend** (`管理后端/`) | Node.js ≥20 + Express 5 + TypeScript + PostgreSQL (pg) + Redis (ioredis) + JWT + Helmet + rate limiting |
-| **TTS service** (`tts-service/`) | Python + FastAPI — voice synthesis (auth / voices / cache) |
-| **n8n nodes** (`n8n-nodes-liaolian/`) | Custom n8n nodes: daily ops stats / orchestration workflows |
-| **Infrastructure** (`infra/`) | Docker Compose, systemd, backup / restore / deploy scripts, multi-env config |
+| **管理前端**（`管理前端/`）| Vue 3 + Vite + TypeScript + Pinia + Vue Router（7 个业务页面）|
+| **管理后端**（`管理后端/`）| Node.js ≥20 + Express 5 + TypeScript + PostgreSQL（pg）+ Redis（ioredis）+ JWT + Helmet + 限流 |
+| **TTS 服务**（`tts-service/`）| Python + FastAPI，语音合成服务（鉴权 / 音色 / 缓存）|
+| **n8n 节点**（`n8n-nodes-liaolian/`）| 自定义 n8n 节点：每日运营统计 / 编排触发等自动化工作流 |
+| **基础设施**（`infra/`）| Docker Compose、systemd 服务、备份 / 恢复 / 部署脚本、多环境配置 |
 
-Backend security design: JWT auth + admin-permission middleware + global rate limiting + real-IP resolution + whitelist-based input validation.
+后端安全设计：JWT 认证 + 管理员权限中间件 + 全局限流 + 真实 IP 解析 + 参数白名单校验。
 
 ---
 
-## Quick start
+## 快速开始
 
 ```bash
-# 1. Install subproject deps
+# 1. 安装各子项目依赖
 npm --prefix 管理后端 install
 npm --prefix 管理前端 install
 pip install -r tts-service/requirements.txt
 
-# 2. Configure env (see each subproject's .env.example)
+# 2. 配置环境变量（参照各子项目 .env.example）
 cp 管理后端/.env.example 管理后端/.env
 cp 管理前端/.env.example 管理前端/.env
 
-# 3. Start (one-click scripts at repo root)
-./本地启动.ps1        # or ./start.ps1
+# 3. 启动（根目录一键脚本）
+./本地启动.ps1        # 或 ./start.ps1
 ```
 
-> See [部署手册](docs/部署手册.md), [运维手册](docs/运维手册.md), [用户手册](docs/用户手册.md) for details.
+> 详细步骤见 [部署手册](docs/部署手册.md)、[运维手册](docs/运维手册.md)、[用户手册](docs/用户手册.md)。
 
 ---
 
-## Project structure
+## 项目结构
 
 ```text
 LianAiBaGuanLiZhongXin/
-├── 管理前端/                 # Vue 3 admin UI (accounts/chat/review/ban/audit/stats)
-├── 管理后端/                 # Express 5 API (routes / middleware / db / cache / analytics)
+├── 管理前端/                # Vue 3 管理界面（账号/聊天/审核/封禁/审计/统计）
+├── 管理后端/                # Express 5 API（路由 / 中间件 / 数据库 / 缓存 / 埋点）
 │   └── src/
-│       ├── 路由/             # auth · accounts · review · ban · audit · stats · chat · reasoning · admin-write
-│       ├── 中间件/           # auth(admin) / auth / rate limit
-│       └── 数据库.ts 缓存.ts 日志.ts 埋点.ts …
-├── tts-service/             # FastAPI voice synthesis (Python)
-├── n8n-nodes-liaolian/      # n8n custom nodes + workflows (daily ops stats, etc.)
-├── infra/                   # docker-compose / systemd / backup & restore / env config
-├── docs/                    # architecture · deploy · ops · API · tests · troubleshooting · FAQ
-│   └── archive/             # archived docs
-├── tests                    # unit (frontend+backend) + pytest (tts) + integration
-└── start.ps1 / 本地启动.ps1  # one-click launch
+│       ├── 路由/             # 登录·账号·审核·封禁·审计·统计·聊天·思考·管理写
+│       ├── 中间件/           # 认证(admin) / 认证 / 限流
+│       └── 数据库.ts 缓存.ts 日志.ts 埋点.ts ...
+├── tts-service/            # FastAPI 语音合成服务（Python）
+├── n8n-nodes-liaolian/     # n8n 自定义节点 + 工作流（每日运营统计等）
+├── infra/                  # docker-compose / systemd / 备份恢复 / 多环境配置
+├── docs/                   # 架构 · 部署 · 运维 · API · 测试 · 故障排查 · FAQ
+│   └── archive/            # 归档文档
+├── database/· 测试资产       # 单测(前后端) + pytest(tts) + 集成测试
+└── start.ps1 / 本地启动.ps1 # 一键启动脚本
 ```
 
 ---
 
-## Tests
+## 测试
 
-Each subproject ships its own tests:
+仓库内各子项目均配备独立测试：
 
 ```bash
-npm --prefix 管理后端 test    # Vitest unit + integration
-npm --prefix 管理前端 test    # Vue component tests
-cd tts-service && pytest      # TTS service tests
+npm --prefix 管理后端 test    # Vitest 单元 + 集成测试
+npm --prefix 管理前端 test    # Vue 组件测试
+cd tts-service && pytest      # TTS 服务测试
 ```
 
 ---
 
-## Docs
+## 相关文档
 
 - [架构文档](docs/架构文档.md) ｜ [API 文档](docs/API文档.md) ｜ [部署手册](docs/部署手册.md)
 - [运维手册](docs/运维手册.md) ｜ [故障排查手册](docs/故障排查手册.md) ｜ [FAQ](docs/FAQ.md)
-- Main app: [HeWoLianAiBa](https://github.com/XuanRuiMu/HeWoLianAiBa)
+- 主应用：[和我恋爱吧](https://github.com/XuanRuiMu/HeWoLianAiBa)
 
 ---
 
-## License
+## 许可证
 
-Open-source showcase repository. **Made with ❤️ — operating every AI romance well.**
+[MIT](LICENSE) —— 本仓库仅作项目开源展示。**Made with ❤️ —— 运营好每一段 AI 恋爱。**
