@@ -69,7 +69,6 @@ export const 审计事件白名单: readonly string[] = [
   'guan_li_shen_he_shi_yan',
   'guan_li_pi_liang_shen_he',
 ];
-export const 健康就绪态白名单: readonly string[] = ['jiu_xu', 'jiang_ji', 'bu_ke_yong'];
 
 export function 参数错误提示(字段标识: string): string {
   const 显示名 = 取字段显示名(字段标识);

@@ -1,9 +1,18 @@
 import { describe, it, expect } from 'vitest';
+import fs from 'node:fs';
+import path from 'node:path';
 import bcrypt from 'bcryptjs';
 import request from 'supertest';
 import { 创建测试应用, 创建模拟池, 测试用户编号, 签发管理令牌, 授权头 } from './测试辅助';
 import { 当前配置, 折算时长秒, 默认访问令牌秒 } from '../../src/配置';
-import { 令牌黑名单前缀, 持久会话缓存前缀, 刷新令牌缓存前缀 } from '../../src/会话';
+import {
+  访问令牌Cookie名,
+  刷新令牌Cookie名,
+  令牌黑名单前缀,
+  按用户吊销前缀,
+  持久会话缓存前缀,
+  刷新令牌缓存前缀,
+} from '../../src/会话';
 
 const 登录路径 = '/api/guan-li/deng-lu';
 const 刷新路径 = '/api/guan-li/shua-xin';
@@ -266,4 +275,49 @@ describe('FP-03 刷新号缓存键前缀单源', () => {
     const 键清单 = [...缓存表.keys()].filter((键) => 键.startsWith(刷新令牌缓存前缀));
     expect(键清单).toEqual([`${刷新令牌缓存前缀}${刷新编号(响应)}`]);
   });
+});
+
+describe('FP-07 会话线路键与缓存前缀单源', () => {
+  const 单源字面量 = [
+    访问令牌Cookie名,
+    刷新令牌Cookie名,
+    令牌黑名单前缀,
+    按用户吊销前缀,
+    持久会话缓存前缀,
+    刷新令牌缓存前缀,
+  ];
+  const 真源文件 = 'src/会话.ts';
+
+  function 判定(相对: string, 源: string): string[] {
+    if (相对 === 真源文件) {
+      return [];
+    }
+    return 单源字面量.filter((字面) => 源.includes(`'${字面}'`)).map((字面) => `${相对}:${字面}`);
+  }
+
+  function 扫描面(): string[] {
+    const 根 = path.resolve(__dirname, '../..');
+    const 命中: string[] = [];
+    for (const 项 of fs.readdirSync(path.join(根, 'src'), { recursive: true, withFileTypes: true })) {
+      if (!项.isFile() || !项.name.endsWith('.ts')) continue;
+      const 全 = path.join(项.parentPath, 项.name);
+      命中.push(...判定(path.relative(根, 全).replace(/\\/g, '/'), fs.readFileSync(全, 'utf8')));
+    }
+    return 命中;
+  }
+
+  it('六枚会话线路键/前缀的字面量只出现在 会话.ts，其它文件必须引常量', () => {
+    expect(扫描面()).toEqual([]);
+  });
+
+  it('反证：别处再抄一份前缀字面量必须判红，守卫不空跑', () => {
+    expect(判定('src/路由/示例.ts', `await 缓存.set(\`'${按用户吊销前缀}'\${用户编号}\`);`)).toEqual([
+      `src/路由/示例.ts:${按用户吊销前缀}`,
+    ]);
+    expect(判定(真源文件, `export const 按用户吊销前缀 = '${按用户吊销前缀}';`)).toEqual([]);
+    expect(fs.readFileSync(path.resolve(__dirname, '../../src/路由/封禁.ts'), 'utf8')).toContain(
+      '按用户吊销前缀',
+    );
+  });
+
 });

@@ -95,6 +95,23 @@ function axios引用清单(目录 = 'src', 命中: string[] = []): string[] {
   return 命中;
 }
 
+/** 依赖回流的两条来路都在扫描面内：装依赖声明的 package.json 与锁死解析结果的 package-lock.json */
+function 依赖回流清单(): string[] {
+  const 命中: string[] = [];
+  const 清单 = JSON.parse(fs.readFileSync('package.json', 'utf8')) as {
+    dependencies?: Record<string, string>;
+    devDependencies?: Record<string, string>;
+  };
+  for (const 表 of [清单.dependencies ?? {}, 清单.devDependencies ?? {}]) {
+    命中.push(...Object.keys(表).filter((名) => /axios/i.test(名)).map((名) => `package.json:${名}`));
+  }
+  const 锁 = fs.readFileSync('package-lock.json', 'utf8');
+  if (/axios/i.test(锁)) {
+    命中.push('package-lock.json:存在 axios 条目');
+  }
+  return 命中;
+}
+
 beforeEach(() => {
   setActivePinia(createPinia());
   window.localStorage.clear();
@@ -136,6 +153,7 @@ describe('登录态存储', () => {
 
   it('请求层零第三方 HTTP 依赖，错误归一三分流各按语义落地', () => {
     expect(axios引用清单()).toEqual([]);
+    expect(依赖回流清单()).toEqual([]);
     const 未达 = 归一请求错误(new 传输错误('Failed to fetch', null, undefined, false));
     expect(取错误展示(未达)).toEqual({ 提示: 文案.通用.请求失败, 错误码: '' });
     const 过期 = 归一请求错误(new 传输错误('Request failed with status code 401', 401, '', false));

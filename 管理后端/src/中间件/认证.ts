@@ -6,7 +6,7 @@ import { 失败响应 } from '../响应';
 import { 错误码 } from '../错误码';
 import type { 缓存客户端 } from '../缓存';
 import { 响应依赖缺失, 响应缓存不可用, 响应鉴权或归一 } from '../错误归一化';
-import { 访问令牌Cookie名, 令牌黑名单前缀 } from '../会话';
+import { 访问令牌Cookie名, 令牌黑名单前缀, 按用户吊销前缀 } from '../会话';
 
 export interface 令牌载荷 {
   yongHuId: string;
@@ -64,7 +64,7 @@ export async function 认证中间件(请求: Request, 响应: Response, 下一�
       if (令牌编号) {
         已拉黑 = await 缓存.get(`${令牌黑名单前缀}${令牌编号}`);
       }
-      吊销值 = await 缓存.get(`jwt_yong_hu_cheXiao:${用户编号}`);
+      吊销值 = await 缓存.get(`${按用户吊销前缀}${用户编号}`);
     } catch (错误) {
       响应缓存不可用(响应, '认证', 错误, 请求);
       return;

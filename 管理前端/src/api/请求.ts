@@ -21,8 +21,6 @@ export type 包络失败 = {
   cuo_wu_ma: string;
 };
 
-export type 包络<数据类型> = 包络成功<数据类型> | 包络失败;
-
 export type 解析结果<数据类型> = {
   数据: 数据类型;
   分页?: 分页信息;
@@ -116,13 +114,6 @@ export function 解析包络<数据类型>(响应体: unknown): 解析结果<数
   }
   记原始错误('响应体不是包络结构', typeof 响应体 === 'object' ? JSON.stringify(响应体).slice(0, 200) : String(响应体));
   throw new 业务错误(通用文案.请求失败, '');
-}
-
-export function 取鉴权头(令牌: string | null): Record<string, string> {
-  if (令牌 === null || 令牌.length === 0) {
-    return {};
-  }
-  return { Authorization: `Bearer ${令牌}` };
 }
 
 /** 传输层失败的唯一形态：状态码为 null 即「请求未到达服务端」（网络抖动、超时到点、读体中断），带状态码的失败（含 429）才走包络与状态码分流 */

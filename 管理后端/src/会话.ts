@@ -16,6 +16,7 @@ export const 刷新令牌作用路径 = '/api/guan-li/shua-xin';
 export const 刷新令牌缓存前缀 = 'guan_li_shua_xin:';
 export const 持久会话缓存前缀 = 'guan_li_shua_xin_chi_jiu:';
 export const 令牌黑名单前缀 = 'jwt_blacklist:';
+export const 按用户吊销前缀 = 'jwt_yong_hu_cheXiao:';
 
 interface Cookie骨架 {
   httpOnly: boolean;

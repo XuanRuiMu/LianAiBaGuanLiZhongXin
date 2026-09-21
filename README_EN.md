@@ -44,13 +44,23 @@
 
 | Subproject | Technology |
 | --- | --- |
-| **Admin frontend** (`管理前端/`) | Vue 3 + Vite + TypeScript + Pinia + Vue Router (7 business pages) |
+| **Admin frontend** (`管理前端/`) | Vue 3 + Vite + TypeScript + Pinia + Vue Router (8 business pages = 7 navigation panels + account detail); the request layer uses the browser-native `fetch`, zero third-party HTTP libraries (no axios / echarts / three) |
 | **Admin backend** (`管理后端/`) | Node.js ≥20 + Express 5 + TypeScript + PostgreSQL (pg) + Redis (ioredis) + JWT + Helmet + rate limiting |
 | **TTS service** (`tts-service/`) | Python + FastAPI — voice synthesis (auth / voices / cache) |
 | **n8n nodes** (`n8n-nodes-liaolian/`) | Custom n8n nodes: daily ops stats / orchestration workflows |
 | **Infrastructure** (`infra/`) | Docker Compose, systemd, backup / restore / deploy scripts, multi-env config |
 
 Backend security design: JWT auth + admin-permission middleware + global rate limiting + real-IP resolution + whitelist-based input validation.
+
+### Sign-in and session
+
+- Three sign-in options: **Remember account** (only the phone number is kept locally for autofill, never a password) / **Remember password** (= a server-side persistence flag that decides the `Max-Age` of the persistent refresh cookie, so re-opening the browser still signs you in without a password; when unchecked it falls back to a browser-session cookie that dies with the window) / **Auto sign-in** (depends on **Remember password**; unchecking the latter unchecks it too). **The password itself is never persisted anywhere** — what is persisted is a session credential minted by the server.
+- The token travels only as an httpOnly secure cookie; the browser keeps nothing but a session marker. Refresh is a one-time rotation and the client uses a single-flight promise so one browser issues at most one refresh in flight.
+- **Sign out** calls `POST /api/guan-li/tui-chu`: the server revokes the current token by writing `jwt_blacklist` for its `jti`, deletes the current refresh id, clears both cookies, then the client wipes its local markers and returns to the sign-in page. After signing out you are not silently signed back in, and revisiting a protected endpoint returns 401.
+
+### Bundle size and browser baseline
+
+Vite measures the artifacts in memory at build time and writes `dist/build-stats.json`; `体积预算.test.ts` binds the measurement to the current sources via a source fingerprint: first-screen index gzip **48,670 B** (budget 49,160 B), first-screen raw **125,639 B** (budget 126,070 B), site-wide js+css gzip **84,046 B** (budget 84,530 B). On the browser side only `fetch` with `credentials:'include'` and `AbortSignal.timeout` are required (thresholds: [deploy manual §1.2](docs/部署手册.md)).
 
 ---
 
@@ -87,11 +97,12 @@ LianAiBaGuanLiZhongXin/
 ├── tts-service/             # FastAPI voice synthesis (Python)
 ├── n8n-nodes-liaolian/      # n8n custom nodes + workflows (daily ops stats, etc.)
 ├── infra/                   # docker-compose / systemd / backup & restore / env config
-├── docs/                    # architecture · deploy · ops · API · tests · troubleshooting · FAQ
+├── docs/                    # architecture · contract · deploy · ops · user · tests · troubleshooting · FAQ
 │   └── archive/             # archived docs
-├── tests                    # unit (frontend+backend) + pytest (tts) + integration
 └── start.ps1 / 本地启动.ps1  # one-click launch
 ```
+
+Tests live next to the sources in the same repository: `管理前端/src/__tests__/` for the frontend, `管理后端/tests/{单元,集成}/` for the backend, and the seed-script test under `管理后端/scripts/`.
 
 ---
 
@@ -101,9 +112,11 @@ Each subproject ships its own tests:
 
 ```bash
 npm --prefix 管理后端 test    # Vitest unit + integration
-npm --prefix 管理前端 test    # Vue component tests
+npm --prefix 管理前端 test    # Vitest component + guard tests
 cd tts-service && pytest      # TTS service tests
 ```
+
+Scale (matches the per-file counts of `npm run test`, only ever growing): **admin frontend 12 files / 293 cases**, **admin backend 28 files / 282 cases**, plus the pytest suite under `tts-service/tests/`. Most frontend cases are guards — cross-stack literal sameness, three-way terminology sync, the motion ledger, the size budget and the character-exact query string of the request layer are all locked by mechanical assertions. Details: [test case document](docs/测试用例文档.md).
 
 ---
 

@@ -44,13 +44,23 @@
 
 | 子项目 | 技术 |
 | --- | --- |
-| **管理前端**（`管理前端/`）| Vue 3 + Vite + TypeScript + Pinia + Vue Router（7 个业务页面）|
+| **管理前端**（`管理前端/`）| Vue 3 + Vite + TypeScript + Pinia + Vue Router（8 个业务页面 = 7 个导航面板 + 账号详情）；请求层用浏览器原生 `fetch`，零第三方 HTTP 库（无 axios / echarts / three）|
 | **管理后端**（`管理后端/`）| Node.js ≥20 + Express 5 + TypeScript + PostgreSQL（pg）+ Redis（ioredis）+ JWT + Helmet + 限流 |
 | **TTS 服务**（`tts-service/`）| Python + FastAPI，语音合成服务（鉴权 / 音色 / 缓存）|
 | **n8n 节点**（`n8n-nodes-liaolian/`）| 自定义 n8n 节点：每日运营统计 / 编排触发等自动化工作流 |
 | **基础设施**（`infra/`）| Docker Compose、systemd 服务、备份 / 恢复 / 部署脚本、多环境配置 |
 
 后端安全设计：JWT 认证 + 管理员权限中间件 + 全局限流 + 真实 IP 解析 + 参数白名单校验。
+
+### 登录与会话
+
+- 登录三选项：**记住账号**（本地只留手机号回填，不留任何口令）／**记住密码**（= 服务端持久标记决定的持久刷新 Cookie，`Max-Age` 由该持久位决定，关浏览器重开仍免密续上；未勾则回落为浏览器会话级 Cookie，关窗即失效）／**自动登录**（依赖「记住密码」，取消后者会联动取消它）。**口令任何情况下都不落盘**，落的是服务端签发的会话凭证。
+- 令牌只走 httpOnly 安全 Cookie，前端本地只留会话标记；续期是一次性轮换，前端单飞保证同一浏览器只发一次。
+- 「退出登录」调 `POST /api/guan-li/tui-chu`：服务端按 `jti` 写 `jwt_blacklist` 吊销当前令牌 ＋ 删当前刷新号 ＋ 清发双 Cookie，随后本地清空并回登录页；退出后不会被自动登回，回访受保护接口为 401。
+
+### 体积与浏览器基线
+
+构建产物由 vite 在 build 期内存度量并写进 `dist/build-stats.json`，`体积预算.test.ts` 用源码指纹绑定当前源码：首屏 index gzip **48,670 B**（裁定值 49,160 B）、首屏原始 **125,639 B**（裁定值 126,070 B）、全站 js+css gzip **84,046 B**（裁定值 84,530 B）。浏览器侧只依赖 `fetch` 的 `credentials:'include'` 与 `AbortSignal.timeout`（门槛见 [部署手册 1.2](docs/部署手册.md)）。
 
 ---
 
@@ -87,11 +97,12 @@ LianAiBaGuanLiZhongXin/
 ├── tts-service/            # FastAPI 语音合成服务（Python）
 ├── n8n-nodes-liaolian/     # n8n 自定义节点 + 工作流（每日运营统计等）
 ├── infra/                  # docker-compose / systemd / 备份恢复 / 多环境配置
-├── docs/                   # 架构 · 部署 · 运维 · API · 测试 · 故障排查 · FAQ
+├── docs/                   # 架构 · 契约 · 部署 · 运维 · 用户 · 测试 · 故障排查 · FAQ
 │   └── archive/            # 归档文档
-├── database/· 测试资产       # 单测(前后端) + pytest(tts) + 集成测试
 └── start.ps1 / 本地启动.ps1 # 一键启动脚本
 ```
+
+测试与源码同仓同目录：前端在 `管理前端/src/__tests__/`，后端在 `管理后端/tests/{单元,集成}/`，建号脚本测试在 `管理后端/scripts/`。
 
 ---
 
@@ -101,9 +112,11 @@ LianAiBaGuanLiZhongXin/
 
 ```bash
 npm --prefix 管理后端 test    # Vitest 单元 + 集成测试
-npm --prefix 管理前端 test    # Vue 组件测试
+npm --prefix 管理前端 test    # Vitest 组件 + 守卫测试
 cd tts-service && pytest      # TTS 服务测试
 ```
+
+规模（与 `npm run test` 逐文件计数一致，只增不减）：**管理前端 12 个文件 293 例**、**管理后端 28 个文件 282 例**，另有 `tts-service/tests/` 的 pytest 用例。前端 293 例里守卫类占大头——跨端字面同源、术语三向同步、动效台账、体积预算、请求层逐字符查询串都由机械断言锁死。用例明细见 [测试用例文档](docs/测试用例文档.md)。
 
 ---
 

@@ -19,7 +19,6 @@ export const 错误码 = {
   内部错误: 'NEI_BU_CUO_WU',
 } as const;
 
-export type 错误码名 = keyof typeof 错误码;
 export type 错误码值 = (typeof 错误码)[keyof typeof 错误码];
 
 export const 全部错误码: readonly 错误码值[] = Object.values(错误码);

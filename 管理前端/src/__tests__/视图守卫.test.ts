@@ -578,7 +578,11 @@ describe('FP-04 错误码上屏', () => {
   });
 
   it('无失败包络的英文错误不得上屏，渲染文本除错误码括号外不含拉丁字母', () => {
-    for (const 原文 of ['Network Error', 'timeout of 15000ms exceeded', 'Request failed with status code 500']) {
+    for (const 原文 of [
+      'Network Error',
+      'The operation was aborted due to timeout',
+      'Request failed with status code 500',
+    ]) {
       const 裸英文 = new Error(原文);
       const 展示 = 取错误展示(裸英文);
       expect(展示.提示).toBe(取文案('通用', '请求失败'));
@@ -597,7 +601,7 @@ describe('FP-04 错误码上屏', () => {
       expect(带码包装.text()).toBe(`${取文案('通用', '请求失败')}（NEI_BU_CUO_WU）`);
     }
     expect(取错误展示(new Error('请填写用户编号或 IP 地址')).提示).toBe('请填写用户编号或 IP 地址');
-    for (const 原文 of ['Network Error', 'timeout of 15000ms exceeded']) {
+    for (const 原文 of ['Network Error', 'The operation was aborted due to timeout']) {
       const 展示 = 取错误展示(归一请求错误(new 传输错误(原文, null, undefined, false)));
       expect(展示).toEqual({ 提示: 取文案('通用', '请求失败'), 错误码: '' });
       const 包装 = mount(XiaoXiTiao, { props: { xingTai: 'cuo-wu', wenBen: 展示.提示, cuoWuMa: 展示.错误码 } });
@@ -605,7 +609,7 @@ describe('FP-04 错误码上屏', () => {
       expect(包装.text()).not.toContain(原文);
     }
     const 网关 = 归一请求错误(
-      new 传输错误('timeout of 15000ms exceeded', 504, '<html>Gateway Time-out</html>', false),
+      new 传输错误('Request failed with status code 504', 504, '<html>Gateway Time-out</html>', false),
     );
     expect(取错误展示(网关)).toEqual({ 提示: 取文案('通用', '请求失败'), 错误码: '' });
     const 过期 = 归一请求错误(new 传输错误('Request failed with status code 401', 401, '', false));

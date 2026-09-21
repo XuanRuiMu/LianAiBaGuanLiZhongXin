@@ -2,6 +2,7 @@ import { Router, type Request, type Response, type RequestHandler } from 'expres
 import { 取文案 } from '../文案';
 import { 成功响应, 失败响应 } from '../响应';
 import { 错误码 } from '../错误码';
+import { 按用户吊销前缀 } from '../会话';
 import { 日志 } from '../日志';
 import {
   校验UUID,
@@ -195,7 +196,7 @@ export function 创建管理写路由(写限流: RequestHandler): Router {
     const 缓存 = 取缓存(请求);
     if (缓存) {
       // YH-108 任一角色回收即吊销既有会话：改完权限不等令牌自然过期
-      await 缓存.set(`jwt_yong_hu_cheXiao:${用户编号}`, String(Date.now()), 7 * 24 * 60 * 60);
+      await 缓存.set(`${按用户吊销前缀}${用户编号}`, String(Date.now()), 7 * 24 * 60 * 60);
     }
     日志.信息('管理写操作', '回收管理角色', { 目标用户: 用户编号, 角色 });
     成功响应(响应, { yi_chu_li: true });

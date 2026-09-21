@@ -2,6 +2,7 @@ import { Router, type Request, type Response, type RequestHandler } from 'expres
 import { 取文案 } from '../文案';
 import { 成功响应, 失败响应 } from '../响应';
 import { 错误码 } from '../错误码';
+import { 按用户吊销前缀 } from '../会话';
 import { 日志 } from '../日志';
 import {
   校验UUID,
@@ -150,7 +151,7 @@ export function 创建封禁路由(写限流: RequestHandler): Router {
     if (用户编号 !== undefined) {
       await 广播管理员失效(取缓存(请求), 用户编号);
       const 缓存 = 取缓存(请求);
-      await 缓存?.set(`jwt_yong_hu_cheXiao:${用户编号}`, String(Date.now()), 7 * 24 * 60 * 60);
+      await 缓存?.set(`${按用户吊销前缀}${用户编号}`, String(Date.now()), 7 * 24 * 60 * 60);
     }
     日志.信息('封禁操作', '管理员执行封禁', { 目标用户: 用户编号 ?? '', 目标IP: 地址 ?? '' });
     成功响应(响应, { yi_chu_li: true }, undefined, 201);
