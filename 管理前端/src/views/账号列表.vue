@@ -232,7 +232,6 @@ onMounted(() => {
       :xian-shi="!加载中 && 行列表.length === 0"
     />
     <ShuJuBiaoGe
-      v-if="行列表.length > 0"
       :lie="列定义登记.账号列表"
       :hang="行列表"
       :qu-lian-jie="详情链接"
@@ -297,13 +296,15 @@ onMounted(() => {
         {{ 账号文案.结束接管按钮 }}
       </button>
     </div>
-    <FenYeTiao
-      v-if="分页"
-      :zong-shu="总数"
-      :dang-qian-ye="当前页"
-      :shi-fou-shou-ye="当前页 <= 1"
-      @shang-ye="上一页"
-      @xia-ye="下一页"
-    />
+    <Transition name="块">
+      <FenYeTiao
+        v-if="分页"
+        :zong-shu="总数"
+        :dang-qian-ye="当前页"
+        :shi-fou-shou-ye="当前页 <= 1"
+        @shang-ye="上一页"
+        @xia-ye="下一页"
+      />
+    </Transition>
   </section>
 </template>

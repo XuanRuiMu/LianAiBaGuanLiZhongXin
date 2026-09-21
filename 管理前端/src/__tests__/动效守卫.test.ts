@@ -530,6 +530,350 @@ describe('FP-04 方向判定纯函数', () => {
   });
 });
 
+type 条件节点 = { 文件: string; 行: number; 标签: string; 指令: string; 表达式: string; 祖先族: string; 链主判据: string; 直接子: boolean };
+
+const 动效族 = ['条', '块', '组'];
+
+const 动效后缀 = ['enter-active', 'leave-active', 'enter-from', 'leave-to'];
+
+const 内建过渡组件: Record<string, string> = { XiaoXiTiao: '条', ShuJuBiaoGe: '块' };
+
+function 分选择器(选择器: string): string[] {
+  return 选择器.split(',').map((段) => 段.trim()).filter((段) => 段.length > 0);
+}
+
+function 选择器全集聚(文本: string): Set<string> {
+  const 出 = new Set<string>();
+  for (const 则 of 规则列表(去关键帧(文本))) {
+    for (const 段 of 分选择器(则.选择器)) {
+      出.add(段);
+    }
+  }
+  return 出;
+}
+
+function 标签结束(文本: string, 起: number): number {
+  let 引号 = '';
+  for (let 下标 = 起; 下标 < 文本.length; 下标++) {
+    const 符 = 文本[下标];
+    if (引号 !== '') {
+      if (符 === 引号) {
+        引号 = '';
+      }
+      continue;
+    }
+    if (符 === '"' || 符 === "'") {
+      引号 = 符;
+      continue;
+    }
+    if (符 === '>') {
+      return 下标;
+    }
+  }
+  return -1;
+}
+
+function 条件节点扫描(源: string, 路径: string): 条件节点[] {
+  const 起 = 源.indexOf('<template');
+  const 止 = 源.lastIndexOf('</template>');
+  if (起 < 0 || 止 < 0) {
+    return [];
+  }
+  const 模板 = 源.slice(起, 止);
+  const 出: 条件节点[] = [];
+  const 栈: { 标签: string; 族: string }[] = [];
+  const 上父 = new Map<string, 条件节点>();
+  const 断了 = new Set<string>();
+  let 游标 = 0;
+  while (游标 < 模板.length) {
+    游标 = 模板.indexOf('<', 游标);
+    if (游标 < 0) {
+      break;
+    }
+    if (模板.startsWith('<!--', 游标)) {
+      游标 = 模板.indexOf('-->', 游标) + 3;
+      continue;
+    }
+    if (模板.startsWith('</', 游标)) {
+      const 闭名 = /^<\/([a-zA-Z0-9-]+)/.exec(模板.slice(游标))?.[1] ?? '';
+      const 弹 = 栈.map((项) => 项.标签).lastIndexOf(闭名);
+      if (弹 >= 0) {
+        栈.length = 弹;
+      }
+      游标 = 模板.indexOf('>', 游标) + 1;
+      continue;
+    }
+    const 开 = /^<([a-zA-Z0-9-]+)/.exec(模板.slice(游标));
+    if (开 === null) {
+      游标 += 1;
+      continue;
+    }
+    const 结 = 标签结束(模板, 游标);
+    if (结 < 0) {
+      break;
+    }
+    const 属性 = 模板.slice(游标, 结);
+    const 匹 = /\sv-(if|else-if|else|show)(?:="([^"]*)")?/.exec(属性);
+    const 父 = 栈.map((项) => 项.标签).join('>');
+    if (匹) {
+      const 祖先 = 栈.filter((项) => 项.族.length > 0);
+      const 前 = 上父.get(父);
+      const 节点: 条件节点 = {
+        文件: 路径,
+        行: 源.slice(0, 起 + 游标).split('\n').length,
+        标签: 开[1],
+        指令: 匹[1],
+        表达式: (匹[2] ?? '').trim(),
+        祖先族: 祖先.length > 0 ? 祖先[祖先.length - 1].族 : '',
+        链主判据: 匹[1] === 'if' || 匹[1] === 'show' || 前 === undefined || 断了.has(父) ? '' : 前.链主判据 || 归类(前),
+        直接子: 栈.length > 0 && 栈[栈.length - 1].标签 === 'Transition',
+      };
+      上父.set(父, 节点);
+      断了.delete(父);
+      出.push(节点);
+    } else {
+      断了.add(父);
+    }
+    if (!属性.endsWith('/')) {
+      栈.push({ 标签: 开[1], 族: 开[1] === 'Transition' ? /name="([^"]+)"/.exec(属性)?.[1] ?? '' : '' });
+    }
+    游标 = 结 + 1;
+  }
+  return 出;
+}
+
+function 条件节点清单(目录清单 = ['src/views', 'src/components']): 条件节点[] {
+  const 出: 条件节点[] = [];
+  function 走(目录: string): void {
+    for (const 名 of fs.readdirSync(目录)) {
+      const 全 = `${目录}/${名}`;
+      if (fs.statSync(全).isDirectory()) {
+        走(全);
+      } else if (名.endsWith('.vue')) {
+        出.push(...条件节点扫描(读(全), 全));
+      }
+    }
+  }
+  for (const 目录 of 目录清单) {
+    走(目录);
+  }
+  return 出;
+}
+
+function 挂名族清单(路径: string): string[] {
+  const 出: string[] = [];
+  if (fs.statSync(路径).isDirectory()) {
+    for (const 名 of fs.readdirSync(路径)) {
+      出.push(...挂名族清单(`${路径}/${名}`));
+    }
+    return 出;
+  }
+  if (!路径.endsWith('.vue')) {
+    return 出;
+  }
+  const 源 = 读(路径);
+  return [...源.matchAll(/<Transition\s+name="([^"]+)"/g)].map((匹) => 匹[1]);
+}
+
+function 内建过渡根族表(): Record<string, string> {
+  const 出: Record<string, string> = {};
+  for (const 名 of Object.keys(内建过渡组件)) {
+    const 源 = 读(`src/components/${名}.vue`).replace(/\n\s*/g, ' ');
+    出[名] = /<template> <Transition name="([^"]+)"> <\w+ v-if=/.exec(源)?.[1] ?? '';
+  }
+  return 出;
+}
+
+const 权限位前提 = (): boolean => {
+  const 仓库 = 读('src/stores/登录.ts');
+  const 路由 = 读('src/router/index.ts');
+  return /const 能力列表 = ref<管理能力名\[\]>\(读能力\(\)\)/.test(仓库) && /路由实例\.beforeEach\(\(目标\) => \{/.test(路由) && !/beforeEach\(async/.test(路由);
+};
+
+function 随行前提(文件: string): boolean {
+  const 源 = 读(文件).replace(/\r/g, '');
+  const 切换 = [...源.matchAll(/function 切换(?:标签|模式)[^)]*\)\s*:\s*void\s*\{([\s\S]*?)\n\}/g)].map((匹) => 匹[1]);
+  return 切换.length > 0 && 切换.every((体) => /行列表\.value = \[\]/.test(体));
+}
+
+const 恒定判据: { 码: string; 判定: (节点: 条件节点) => boolean; 理由: string }[] = [
+  {
+    码: '恒定:权限位',
+    判定: (节点) => /^登录仓库\.可/.test(节点.表达式) && 权限位前提(),
+    理由: '能力位在 stores/登录.ts 由 读能力() 同步初始化，视图挂载后只在退出登录/身份复核时翻转，而那两刻整页正在走 页-* 离场',
+  },
+  {
+    码: '恒定:分支',
+    判定: (节点) => /^(?:渲染为(?:徽标|链接)\(|quLianJie$|项\.插槽$|mingCheng === )/.test(节点.表达式) || 节点.链主判据 === '恒定:分支',
+    理由: '互斥渲染分支由列定义/图标名静态选定，同一提交周期内只选一条，不存在同一节点出入场',
+  },
+  {
+    码: '恒定:随行',
+    判定: (节点) => /^(?:当前标签|模式) === /.test(节点.表达式) && 节点.祖先族.length > 0 && 随行前提(节点.文件),
+    理由: '页签门控的行内节点，切换时父级 块 族整块离场再进场，行内节点不会单独被看见',
+  },
+  {
+    码: '恒定:内建过渡',
+    判定: (节点) => Object.prototype.hasOwnProperty.call(内建过渡组件, 节点.标签),
+    理由: '该组件根节点自带登记族过渡，调用点无须再包一层',
+  },
+  {
+    码: '恒定:装载属性',
+    判定: (节点) => /^[a-zA-Z]+$/.test(节点.表达式) && 属性门控(节点),
+    理由: '门控位是 defineProps 的静态属性且组件内无同名 ref，挂载期恒定',
+  },
+];
+
+function 属性门控(节点: 条件节点): boolean {
+  const 源 = 读(节点.文件);
+  const 声明 = /defineProps<\{([^}]*)\}>/.exec(源)?.[1] ?? '';
+  return 声明.includes(`${节点.表达式}?`) || 声明.includes(`${节点.表达式}:`) ? !new RegExp(`const ${节点.表达式}\\s*=`).test(源) : false;
+}
+
+function 归类(节点: 条件节点): string {
+  if (节点.直接子 && 动效族.includes(节点.祖先族)) {
+    return `族:${节点.祖先族}`;
+  }
+  for (const 条 of 恒定判据) {
+    if (条.判定(节点)) {
+      return 条.码;
+    }
+  }
+  return '';
+}
+
+function 恒定归类的结果(站点: 条件节点[]): { 违例: string[]; 已用: Set<string> } {
+  const 违例: string[] = [];
+  const 已用 = new Set<string>();
+  for (const 节点 of 站点) {
+    const 码 = 归类(节点);
+    if (码 === '') {
+      违例.push(`${节点.文件}:${节点.行} <${节点.标签} v-${节点.指令}="${节点.表达式}"> 未接登记族过渡，也不属于任何恒定判据`);
+      continue;
+    }
+    if (码.startsWith('恒定:')) {
+      已用.add(码);
+    }
+  }
+  return { 违例, 已用 };
+}
+
+function 族使用者数(站点: 条件节点[], 族: string): number {
+  return 站点.filter((节点) => 归类(节点) === `族:${族}`).length;
+}
+
+function 按判据计数(站点: 条件节点[], 判据: string): number {
+  const 目标 = 判据.trim();
+  return 站点.filter((节点) => 归类(节点) === 目标 || `族:${目标}` === 归类(节点)).length;
+}
+
+describe('FP-05 组件级动效与瞬时面穷尽', () => {
+  it('三族各自齐 enter-active/leave-active/enter-from/leave-to，只动 transform/opacity 且全部引用 token', () => {
+    const 则 = 规则列表(去关键帧(主题样式));
+    for (const 族 of 动效族) {
+      const 缺 = 动效后缀.filter((后缀) => !选择器全集聚(主题样式).has(`.${族}-${后缀}`));
+      expect(缺, `${族} 族缺类：${缺.join(', ')}`).toEqual([]);
+      for (const 后缀 of ['enter-active', 'leave-active']) {
+        const 命 = 则.filter((项) => 分选择器(项.选择器).includes(`.${族}-${后缀}`));
+        expect(命.length, `${族}-${后缀} 未声明`).toBe(1);
+        for (const 声明 of 声明列表(命[0].体内)) {
+          expect(声明.属性).toBe('transition');
+          for (const 段 of 声明.值.split(',')) {
+            expect(['transform', 'opacity'], `${族}-${后缀} 混进了非合成层属性 ${段}`).toContain(首词(段));
+            expect(段).toMatch(/var\(--时长(?:微|短|中)\)/);
+            expect(段).toMatch(/var\(--缓(?:出|入)\)/);
+          }
+        }
+      }
+      const 起 = 则.filter((项) => 分选择器(项.选择器).includes(`.${族}-enter-from`));
+      expect(起.length).toBe(1);
+      for (const 声明 of 声明列表(起[0].体内)) {
+        if (声明.属性 === 'transform') {
+          expect(声明.值).toMatch(/var\(--位移(?:近|中)\)/);
+        }
+      }
+    }
+  });
+
+  it('每个登记族都有真实使用者，模板里挂的族名一律在登记表内（僵尸族与野族名都判红）', () => {
+    const 站点 = 条件节点清单();
+    for (const 族 of 动效族) {
+      expect(族使用者数(站点, 族), `${族} 族已无使用者`).toBeGreaterThan(0);
+    }
+    const 野 = new Set<string>();
+    for (const 目录 of ['src/views', 'src/components', 'src/App.vue']) {
+      for (const 项 of 挂名族清单(目录)) {
+        if (!动效族.includes(项 as '条') && 项 !== '栏') {
+          野.add(`${项}`);
+        }
+      }
+    }
+    expect([...野], '模板里出现未登记的过渡族名').toEqual([]);
+  });
+
+  it('穷尽性：视图与组件的每一个条件节点都必须落到登记族或封闭的恒定判据，落不到即判红', () => {
+    const { 违例, 已用 } = 恒定归类的结果(条件节点清单());
+    expect(违例, '瞬时面未接过渡：\n' + 违例.join('\n')).toEqual([]);
+    for (const 条 of 恒定判据) {
+      expect(已用.has(条.码), `恒定判据「${条.码}」已无站点，必须从守卫删除`).toBe(true);
+    }
+  });
+
+  it('内建过渡组件的根必须真的挂着登记族，否则按 v-if 站点判红（防组件侧偷偷摘掉 Transition）', () => {
+    const 根族 = 内建过渡根族表();
+    for (const 组件 of Object.keys(内建过渡组件)) {
+      expect(根族[组件], `${组件}.vue 的根节点不再有 <Transition> 包裹`).toBe(内建过渡组件[组件]);
+    }
+  });
+
+  it('reduced-motion 通配必须覆盖新族：族类名不得出现在 reduce 块或任何 !important 绕过位', () => {
+    const 块 = 减少动效块(主题样式);
+    expect(块).toMatch(/transition: none !important;/);
+    for (const 族 of 动效族) {
+      expect(块, `${族} 族被塞进 reduce 块，回退成手工枚举`).not.toContain(`.${族}-`);
+      const 绕过 = 规则列表(去关键帧(主题样式)).filter((项) => 项.选择器.includes(`${族}-`) && /!important/.test(项.体内));
+      expect(绕过.map((项) => 项.选择器), `${族} 族用 !important 绕开通配`).toEqual([]);
+    }
+    const 全站规则 = 全表.flatMap((项) => 规则列表(去关键帧(项.文本)));
+    const 带强制 = 全站规则.filter((项) => 声明列表(项.体内).some((声) => /^(?:transition|animation)$/.test(声.属性) && /!important/.test(声.值)));
+    expect(带强制.map((项) => 项.选择器.replace(/\s+/g, ' ').trim()).sort(), '!important 动效声明只能有 reduce 通配与主题翻转两处').toEqual([
+      '*, *::before, *::after',
+      'html.主题过渡 *, html.主题过渡 *::before, html.主题过渡 *::after',
+    ]);
+  });
+
+  it('动效规范的模式台账必须与源码实测逐行相等（文档不得与实现分叉）', () => {
+    const 文档 = 读('../docs/动效规范.md').replace(/\r/g, '');
+    const 站点 = 条件节点清单();
+    const 行清单 = [...文档.matchAll(/^\|\s*(P\d+)\s*\|\s*([^|]+?)\s*\|\s*(\d+)\s*\|\s*([^|]+?)\s*\|$/gm)];
+    expect(行清单.length).toBe(恒定判据.length + 动效族.length);
+    let 合计 = 0;
+    for (const 匹 of 行清单) {
+      const [, 编号, 判据, 数量, 模式名] = 匹;
+      const 实 = 按判据计数(站点, 判据);
+      合计 += 实;
+      expect(`${模式名}|${判据}|${实}`, `台账 ${编号} 的站点数与实测不符`).toBe(`${模式名}|${判据}|${数量}`);
+    }
+    expect(合计, '台账合计与扫描到的条件节点数不等，说明有站点没进台账').toBe(站点.length);
+  });
+
+  it('反证：撤掉时间线包裹、伪造未接过渡的瞬时面、拿掉 leave-to、族里写裸时长，四项都必须判红', () => {
+    const 站点 = 条件节点清单();
+    const 时间线 = 站点.filter((项) => 项.文件 === 'src/views/思考链.vue' && 项.表达式 === '行列表.length > 0');
+    expect(时间线.length).toBe(1);
+    const 脏源 = 读('src/views/思考链.vue').replace(/<Transition name="块">(\s*)<ol/, '<ol$1');
+    const 脏模板 = 条件节点扫描(脏源, 'src/views/思考链.vue');
+    expect(恒定归类的结果(脏模板).违例.some((项) => 项.includes('行列表.length > 0'))).toBe(true);
+    const 伪造: 条件节点[] = [...站点, { 文件: 'src/views/伪造.vue', 行: 1, 标签: 'div', 指令: 'if', 表达式: '某流水.length > 0', 祖先族: '', 链主判据: '', 直接子: false }];
+    expect(恒定归类的结果(伪造).违例.length).toBe(1);
+    const 脏样式 = 主题样式.replace(/\.块-enter-from,\s\.块-leave-to \{/, '.块-enter-from {');
+    expect(选择器全集聚(主题样式).has('.块-leave-to')).toBe(true);
+    expect(动效后缀.filter((后缀) => !选择器全集聚(脏样式).has(`.块-${后缀}`))).toEqual(['leave-to']);
+    const 脏节奏 = 扫描裸节奏([{ 路径: '脏.css', 文本: '.条-enter-active { transition: opacity 200ms ease-out; }' }], 节奏例外);
+    expect(脏节奏.违例.length).toBe(2);
+  });
+});
+
 const 探针甲 = { render: () => h('section', '甲页') };
 
 const 探针乙 = { render: () => h('section', '乙页') };

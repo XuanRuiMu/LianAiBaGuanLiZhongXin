@@ -238,7 +238,7 @@ input.输入:-webkit-autofill {
   border: 1px solid transparent;
   cursor: pointer;
   font-weight: 700;
-  transition: transform var(--时长短) var(--缓匀), background-color var(--时长短) var(--缓匀), box-shadow var(--时长短) var(--缓匀);
+  transition: transform var(--时长短) var(--缓匀), opacity var(--时长短) var(--缓匀), background-color var(--时长短) var(--缓匀), box-shadow var(--时长短) var(--缓匀);
 }
 
 .按钮主 {
@@ -948,4 +948,35 @@ html.主题过渡 *,
 html.主题过渡 *::before,
 html.主题过渡 *::after {
   transition: background-color var(--时长短) var(--缓匀), color var(--时长短) var(--缓匀), border-color var(--时长短) var(--缓匀), fill var(--时长短) var(--缓匀), stroke var(--时长短) var(--缓匀), box-shadow var(--时长短) var(--缓匀) !important;
+}
+
+.条-enter-active,
+.组-enter-active {
+  transition: opacity var(--时长短) var(--缓出), transform var(--时长短) var(--缓出);
+}
+
+.条-enter-from,
+.条-leave-to,
+.组-enter-from,
+.组-leave-to {
+  opacity: 0;
+  transform: translateY(var(--位移近));
+}
+
+.条-leave-active,
+.组-leave-active {
+  transition: opacity var(--时长微) var(--缓入), transform var(--时长微) var(--缓入);
+}
+
+.块-enter-active {
+  transition: opacity var(--时长中) var(--缓出);
+}
+
+.块-leave-active {
+  transition: opacity var(--时长微) var(--缓入);
+}
+
+.块-enter-from,
+.块-leave-to {
+  opacity: 0;
 }

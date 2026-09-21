@@ -18,6 +18,8 @@ const 路由链接桩插件 = {
 
 config.global.plugins = [...config.global.plugins, 路由链接桩插件];
 
+config.global.stubs = { ...config.global.stubs, transition: false, 'transition-group': false };
+
 class NeiCunCunChu implements Storage {
   private 数据 = new Map<string, string>();
 

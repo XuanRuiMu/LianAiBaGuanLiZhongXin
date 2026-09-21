@@ -269,18 +269,19 @@ onMounted(() => {
           :xian-shi="!加载中 && 行列表.length === 0"
         />
         <ShuJuBiaoGe
-          v-if="行列表.length > 0"
           :lie="列定义登记.封禁记录"
           :hang="行列表"
         />
-        <FenYeTiao
-          v-if="分页"
-          :zong-shu="分页.zong_shu"
-          :dang-qian-ye="分页.ye_ma"
-          :shi-fou-shou-ye="(分页.ye_ma ?? 默认页码) <= 1"
-          @shang-ye="上一页"
-          @xia-ye="下一页"
-        />
+        <Transition name="块">
+          <FenYeTiao
+            v-if="分页"
+            :zong-shu="分页.zong_shu"
+            :dang-qian-ye="分页.ye_ma"
+            :shi-fou-shou-ye="(分页.ye_ma ?? 默认页码) <= 1"
+            @shang-ye="上一页"
+            @xia-ye="下一页"
+          />
+        </Transition>
       </div>
     </div>
     <h3 class="记录题">
@@ -291,7 +292,6 @@ onMounted(() => {
       :xian-shi="账号封禁行.length === 0"
     />
     <ShuJuBiaoGe
-      v-if="账号封禁行.length > 0"
       :lie="列定义登记.账号封禁"
       :hang="账号封禁行"
       hang-jian="用户ID"
@@ -327,14 +327,16 @@ onMounted(() => {
         </button>
       </template>
     </ShuJuBiaoGe>
-    <FenYeTiao
-      v-if="账号封禁分页"
-      :zong-shu="账号封禁分页.zong_shu"
-      :dang-qian-ye="账号封禁分页.ye_ma"
-      :shi-fou-shou-ye="(账号封禁分页.ye_ma ?? 默认页码) <= 1"
-      @shang-ye="查询账号封禁((账号封禁分页?.ye_ma ?? 默认页码) > 1 ? (账号封禁分页?.ye_ma ?? 默认页码) - 1 : 默认页码)"
-      @xia-ye="查询账号封禁((账号封禁分页?.ye_ma ?? 默认页码) + 1)"
-    />
+    <Transition name="块">
+      <FenYeTiao
+        v-if="账号封禁分页"
+        :zong-shu="账号封禁分页.zong_shu"
+        :dang-qian-ye="账号封禁分页.ye_ma"
+        :shi-fou-shou-ye="(账号封禁分页.ye_ma ?? 默认页码) <= 1"
+        @shang-ye="查询账号封禁((账号封禁分页?.ye_ma ?? 默认页码) > 1 ? (账号封禁分页?.ye_ma ?? 默认页码) - 1 : 默认页码)"
+        @xia-ye="查询账号封禁((账号封禁分页?.ye_ma ?? 默认页码) + 1)"
+      />
+    </Transition>
   </section>
 </template>
 

@@ -145,76 +145,88 @@ onMounted(() => {
       </button>
     </div>
     <div class="账簿">
-      <label
-        v-if="模式 === 'dan-liao'"
-        class="字段"
-      >
-        {{ 账号文案.用户编号 }}
-        <input
-          v-model="用户编号"
-          class="输入"
+      <Transition name="组">
+        <label
+          v-if="模式 === 'dan-liao'"
+          class="字段"
         >
-      </label>
-      <label
-        v-if="模式 === 'dan-liao'"
-        class="字段"
-      >
-        {{ 账号文案.角色编号标签 }}
-        <input
-          v-model="角色编号"
-          class="输入"
+          {{ 账号文案.用户编号 }}
+          <input
+            v-model="用户编号"
+            class="输入"
+          >
+        </label>
+      </Transition>
+      <Transition name="组">
+        <label
+          v-if="模式 === 'dan-liao'"
+          class="字段"
         >
-      </label>
-      <label
-        v-if="模式 === 'hao-you'"
-        class="字段"
-      >
-        {{ 聊天文案.发送者编号标签 }}
-        <input
-          v-model="发送者编号"
-          class="输入"
+          {{ 账号文案.角色编号标签 }}
+          <input
+            v-model="角色编号"
+            class="输入"
+          >
+        </label>
+      </Transition>
+      <Transition name="组">
+        <label
+          v-if="模式 === 'hao-you'"
+          class="字段"
         >
-      </label>
-      <label
-        v-if="模式 === 'hao-you'"
-        class="字段"
-      >
-        {{ 聊天文案.接收者编号标签 }}
-        <input
-          v-model="接收者编号"
-          class="输入"
+          {{ 聊天文案.发送者编号标签 }}
+          <input
+            v-model="发送者编号"
+            class="输入"
+          >
+        </label>
+      </Transition>
+      <Transition name="组">
+        <label
+          v-if="模式 === 'hao-you'"
+          class="字段"
         >
-      </label>
-      <label
-        v-if="模式 === 'dan-liao'"
-        class="字段"
-      >
-        {{ 聊天文案.发送方标签 }}
-        <select
-          v-model="发送方"
-          class="选择"
+          {{ 聊天文案.接收者编号标签 }}
+          <input
+            v-model="接收者编号"
+            class="输入"
+          >
+        </label>
+      </Transition>
+      <Transition name="组">
+        <label
+          v-if="模式 === 'dan-liao'"
+          class="字段"
         >
-          <option value="">{{ 聊天文案.发送方全部 }}</option>
-          <option
-            v-for="项 in 发送方选项"
-            :key="项.值"
-            :value="项.值"
-          >{{ 项.文案 }}</option>
-        </select>
-      </label>
-      <label
-        v-if="模式 === 'dan-liao'"
-        class="字段"
-      >
-        {{ 聊天文案.排序标签 }}
-        <select
-          v-model="排序"
-          class="选择"
+          {{ 聊天文案.发送方标签 }}
+          <select
+            v-model="发送方"
+            class="选择"
+          >
+            <option value="">{{ 聊天文案.发送方全部 }}</option>
+            <option
+              v-for="项 in 发送方选项"
+              :key="项.值"
+              :value="项.值"
+            >{{ 项.文案 }}</option>
+          </select>
+        </label>
+      </Transition>
+      <Transition name="组">
+        <label
+          v-if="模式 === 'dan-liao'"
+          class="字段"
         >
-          <option value="desc">{{ 聊天文案.倒序 }}</option>
-          <option value="asc">{{ 聊天文案.正序 }}</option>
-        </select>
-      </label>
+          {{ 聊天文案.排序标签 }}
+          <select
+            v-model="排序"
+            class="选择"
+          >
+            <option value="desc">{{ 聊天文案.倒序 }}</option>
+            <option value="asc">{{ 聊天文案.正序 }}</option>
+          </select>
+        </label>
+      </Transition>
       <label class="字段">
         {{ 聊天文案.开始时间标签 }}
         <input
@@ -253,33 +265,37 @@ onMounted(() => {
       xing-tai="kong"
       :xian-shi="!加载中 && 行列表.length === 0"
     />
-    <div
-      v-if="行列表.length > 0"
-      class="气泡列"
-    >
-      <article
-        v-for="(行, 序号) in 行列表"
-        :key="String(行[响应行键.ID] ?? '')"
-        :class="['气泡', 气泡方位(行)]"
-        :style="{ '--位': Math.min(序号, 7) }"
+    <Transition name="块">
+      <div
+        v-if="行列表.length > 0"
+        class="气泡列"
       >
-        <div class="气泡头">
-          <span class="徽标 墨">{{ 发送方显示(行) }}</span>
-          <span>{{ 单元格文本(当前列.类型, 行) }}</span>
-          <time>{{ 单元格文本(当前列.创建时间, 行) }}</time>
-        </div>
-        <p class="气泡身">
-          {{ 单元格文本(当前列.内容, 行) }}
-        </p>
-      </article>
-    </div>
-    <FenYeTiao
-      v-if="分页"
-      :zong-shu="分页.zong_shu"
-      :dang-qian-ye="分页.ye_ma"
-      :shi-fou-shou-ye="(分页.ye_ma ?? 默认页码) <= 1"
-      @shang-ye="上一页"
-      @xia-ye="下一页"
-    />
+        <article
+          v-for="(行, 序号) in 行列表"
+          :key="String(行[响应行键.ID] ?? '')"
+          :class="['气泡', 气泡方位(行)]"
+          :style="{ '--位': Math.min(序号, 7) }"
+        >
+          <div class="气泡头">
+            <span class="徽标 墨">{{ 发送方显示(行) }}</span>
+            <span>{{ 单元格文本(当前列.类型, 行) }}</span>
+            <time>{{ 单元格文本(当前列.创建时间, 行) }}</time>
+          </div>
+          <p class="气泡身">
+            {{ 单元格文本(当前列.内容, 行) }}
+          </p>
+        </article>
+      </div>
+    </Transition>
+    <Transition name="块">
+      <FenYeTiao
+        v-if="分页"
+        :zong-shu="分页.zong_shu"
+        :dang-qian-ye="分页.ye_ma"
+        :shi-fou-shou-ye="(分页.ye_ma ?? 默认页码) <= 1"
+        @shang-ye="上一页"
+        @xia-ye="下一页"
+      />
+    </Transition>
   </section>
 </template>

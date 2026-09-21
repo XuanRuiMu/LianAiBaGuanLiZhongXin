@@ -33,13 +33,15 @@ const 出现 = computed(() => {
 </script>
 
 <template>
-  <p
-    v-if="出现"
-    :class="类名"
-    :data-testid="ceShiBiaoShi"
-    :role="xingTai === 'cuo-wu' ? 'alert' : 'status'"
-    aria-live="polite"
-  >
-    {{ 文本 }}
-  </p>
+  <Transition name="条">
+    <p
+      v-if="出现"
+      :class="类名"
+      :data-testid="ceShiBiaoShi"
+      :role="xingTai === 'cuo-wu' ? 'alert' : 'status'"
+      aria-live="polite"
+    >
+      {{ 文本 }}
+    </p>
+  </Transition>
 </template>

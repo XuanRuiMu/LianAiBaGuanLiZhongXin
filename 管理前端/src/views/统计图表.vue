@@ -227,86 +227,15 @@ onMounted(() => {
       xing-tai="kong"
       :xian-shi="注册行.length === 0"
     />
-    <div
-      v-if="注册行.length > 0"
-      class="图框"
-    >
-      <svg
-        :viewBox="`0 0 ${图宽} ${图高}`"
-        role="img"
-        :aria-label="统计文案.注册趋势"
+    <Transition name="块">
+      <div
+        v-if="注册行.length > 0"
+        class="图框"
       >
-        <line
-          :x1="图左"
-          :y1="图底"
-          :x2="图宽 - 10"
-          :y2="图底"
-          stroke="var(--线)"
-          stroke-width="1.5"
-        />
-        <text
-          :x="图左 - 6"
-          :y="图上 + 4"
-          text-anchor="end"
-          font-size="11"
-          fill="var(--淡墨)"
-        >
-          {{ 注册峰值 }}
-        </text>
-        <path
-          :d="面积(注册值列)"
-          fill="var(--印)"
-          opacity="0.14"
-        />
-        <polyline
-          :points="折线(注册值列)"
-          fill="none"
-          stroke="var(--印)"
-          stroke-width="2.5"
-          stroke-linejoin="round"
-          stroke-linecap="round"
-          pathLength="1"
-          class="描线"
-        />
-        <g
-          v-for="(行, 序号) in 注册行"
-          :key="序号"
-        >
-          <circle
-            :cx="横坐标(序号, 注册行.length)"
-            :cy="纵坐标(取数值(行, 注册列.数量.数据键), 注册峰值)"
-            r="4"
-            fill="var(--面)"
-            stroke="var(--印)"
-            stroke-width="2.5"
-            class="图点"
-            :style="{ '--位': Math.min(序号, 7) }"
-          />
-          <text
-            :x="横坐标(序号, 注册行.length)"
-            :y="图底 + 18"
-            text-anchor="middle"
-            font-size="11"
-            fill="var(--淡墨)"
-          >
-            {{ 日期短标(行, 序号, 注册行.length) }}
-          </text>
-        </g>
-      </svg>
-    </div>
-    <h3 class="图题">
-      {{ 统计文案.消息趋势 }}
-    </h3>
-    <XiaoXiTiao
-      xing-tai="kong"
-      :xian-shi="消息行.length === 0"
-    />
-    <div v-if="消息行.length > 0">
-      <div class="图框">
         <svg
           :viewBox="`0 0 ${图宽} ${图高}`"
           role="img"
-          :aria-label="统计文案.消息趋势"
+          :aria-label="统计文案.注册趋势"
         >
           <line
             :x1="图左"
@@ -316,15 +245,24 @@ onMounted(() => {
             stroke="var(--线)"
             stroke-width="1.5"
           />
+          <text
+            :x="图左 - 6"
+            :y="图上 + 4"
+            text-anchor="end"
+            font-size="11"
+            fill="var(--淡墨)"
+          >
+            {{ 注册峰值 }}
+          </text>
           <path
-            :d="面积(消息值列)"
-            fill="var(--黛)"
-            opacity="0.16"
+            :d="面积(注册值列)"
+            fill="var(--印)"
+            opacity="0.14"
           />
           <polyline
-            :points="折线(消息值列)"
+            :points="折线(注册值列)"
             fill="none"
-            stroke="var(--黛)"
+            stroke="var(--印)"
             stroke-width="2.5"
             stroke-linejoin="round"
             stroke-linecap="round"
@@ -332,42 +270,108 @@ onMounted(() => {
             class="描线"
           />
           <g
-            v-for="([日期, 值], 序号) in 消息按日"
-            :key="日期"
+            v-for="(行, 序号) in 注册行"
+            :key="序号"
           >
             <circle
-              :cx="横坐标(序号, 消息按日.length)"
-              :cy="纵坐标(值, Math.max(...消息值列, 1))"
+              :cx="横坐标(序号, 注册行.length)"
+              :cy="纵坐标(取数值(行, 注册列.数量.数据键), 注册峰值)"
               r="4"
               fill="var(--面)"
-              stroke="var(--黛)"
+              stroke="var(--印)"
               stroke-width="2.5"
               class="图点"
               :style="{ '--位': Math.min(序号, 7) }"
-            >
-              <title>{{ 数据点提示(日期, 值) }}</title>
-            </circle>
+            />
             <text
-              :x="横坐标(序号, 消息按日.length)"
+              :x="横坐标(序号, 注册行.length)"
               :y="图底 + 18"
               text-anchor="middle"
               font-size="11"
               fill="var(--淡墨)"
             >
-              {{ 序号 % 标签步长(消息按日.length) === 0 ? (日期.length > 10 ? 日期.slice(5, 10) : 日期) : '' }}
+              {{ 日期短标(行, 序号, 注册行.length) }}
             </text>
           </g>
         </svg>
-        <p class="图注">
-          <span><i style="background: var(--黛)" />{{ 统计文案.消息数 }}</span>
-        </p>
       </div>
-      <ShuJuBiaoGe
-        :lie="列定义登记.消息统计"
-        :hang="消息行"
-        :hang-jian="null"
-      />
-    </div>
+    </Transition>
+    <h3 class="图题">
+      {{ 统计文案.消息趋势 }}
+    </h3>
+    <XiaoXiTiao
+      xing-tai="kong"
+      :xian-shi="消息行.length === 0"
+    />
+    <Transition name="块">
+      <div v-if="消息行.length > 0">
+        <div class="图框">
+          <svg
+            :viewBox="`0 0 ${图宽} ${图高}`"
+            role="img"
+            :aria-label="统计文案.消息趋势"
+          >
+            <line
+              :x1="图左"
+              :y1="图底"
+              :x2="图宽 - 10"
+              :y2="图底"
+              stroke="var(--线)"
+              stroke-width="1.5"
+            />
+            <path
+              :d="面积(消息值列)"
+              fill="var(--黛)"
+              opacity="0.16"
+            />
+            <polyline
+              :points="折线(消息值列)"
+              fill="none"
+              stroke="var(--黛)"
+              stroke-width="2.5"
+              stroke-linejoin="round"
+              stroke-linecap="round"
+              pathLength="1"
+              class="描线"
+            />
+            <g
+              v-for="([日期, 值], 序号) in 消息按日"
+              :key="日期"
+            >
+              <circle
+                :cx="横坐标(序号, 消息按日.length)"
+                :cy="纵坐标(值, Math.max(...消息值列, 1))"
+                r="4"
+                fill="var(--面)"
+                stroke="var(--黛)"
+                stroke-width="2.5"
+                class="图点"
+                :style="{ '--位': Math.min(序号, 7) }"
+              >
+                <title>{{ 数据点提示(日期, 值) }}</title>
+              </circle>
+              <text
+                :x="横坐标(序号, 消息按日.length)"
+                :y="图底 + 18"
+                text-anchor="middle"
+                font-size="11"
+                fill="var(--淡墨)"
+              >
+                {{ 序号 % 标签步长(消息按日.length) === 0 ? (日期.length > 10 ? 日期.slice(5, 10) : 日期) : '' }}
+              </text>
+            </g>
+          </svg>
+          <p class="图注">
+            <span><i style="background: var(--黛)" />{{ 统计文案.消息数 }}</span>
+          </p>
+        </div>
+        <ShuJuBiaoGe
+          :lie="列定义登记.消息统计"
+          :hang="消息行"
+          :hang-jian="null"
+        />
+      </div>
+    </Transition>
     <h3 class="图题">
       {{ 统计文案.好感度总览 }}
     </h3>
@@ -375,43 +379,45 @@ onMounted(() => {
       xing-tai="kong"
       :xian-shi="好感总览 === null"
     />
-    <div
-      v-if="好感总览 !== null"
-      class="统计卡组"
-    >
-      <div class="统计卡">
-        <p class="卡名">
-          {{ 统计文案.总数列 }}
-        </p>
-        <p class="卡值">
-          {{ 好感总览 === null ? 通用文案.暂无数据 : 取分数(好感总览, 总览列.总数.数据键) }}
-        </p>
+    <Transition name="块">
+      <div
+        v-if="好感总览 !== null"
+        class="统计卡组"
+      >
+        <div class="统计卡">
+          <p class="卡名">
+            {{ 统计文案.总数列 }}
+          </p>
+          <p class="卡值">
+            {{ 好感总览 === null ? 通用文案.暂无数据 : 取分数(好感总览, 总览列.总数.数据键) }}
+          </p>
+        </div>
+        <div class="统计卡 黛">
+          <p class="卡名">
+            {{ 统计文案.平均分列 }}
+          </p>
+          <p class="卡值">
+            {{ 好感总览 === null ? 通用文案.暂无数据 : 取分数(好感总览, 总览列.平均分.数据键) }}
+          </p>
+        </div>
+        <div class="统计卡 安">
+          <p class="卡名">
+            {{ 统计文案.最高分列 }}
+          </p>
+          <p class="卡值">
+            {{ 好感总览 === null ? 通用文案.暂无数据 : 取分数(好感总览, 总览列.最高分.数据键) }}
+          </p>
+        </div>
+        <div class="统计卡">
+          <p class="卡名">
+            {{ 统计文案.最低分列 }}
+          </p>
+          <p class="卡值">
+            {{ 好感总览 === null ? 通用文案.暂无数据 : 取分数(好感总览, 总览列.最低分.数据键) }}
+          </p>
+        </div>
       </div>
-      <div class="统计卡 黛">
-        <p class="卡名">
-          {{ 统计文案.平均分列 }}
-        </p>
-        <p class="卡值">
-          {{ 好感总览 === null ? 通用文案.暂无数据 : 取分数(好感总览, 总览列.平均分.数据键) }}
-        </p>
-      </div>
-      <div class="统计卡 安">
-        <p class="卡名">
-          {{ 统计文案.最高分列 }}
-        </p>
-        <p class="卡值">
-          {{ 好感总览 === null ? 通用文案.暂无数据 : 取分数(好感总览, 总览列.最高分.数据键) }}
-        </p>
-      </div>
-      <div class="统计卡">
-        <p class="卡名">
-          {{ 统计文案.最低分列 }}
-        </p>
-        <p class="卡值">
-          {{ 好感总览 === null ? 通用文案.暂无数据 : 取分数(好感总览, 总览列.最低分.数据键) }}
-        </p>
-      </div>
-    </div>
+    </Transition>
     <h3 class="图题">
       {{ 统计文案.好感度分阶段 }}
     </h3>
@@ -419,23 +425,25 @@ onMounted(() => {
       xing-tai="kong"
       :xian-shi="好感分阶段.length === 0"
     />
-    <div
-      v-if="好感分阶段.length > 0"
-      class="卡片 条组"
-    >
+    <Transition name="块">
       <div
-        v-for="(行, 序号) in 好感分阶段"
-        :key="序号"
-        class="条行"
+        v-if="好感分阶段.length > 0"
+        class="卡片 条组"
       >
-        <span>{{ 单元格文本(阶段列.阶段, 行) }}</span>
-        <span class="条轨"><span
-          class="条充"
-          :style="{ width: `${阶段条宽(行)}%` }"
-        /></span>
-        <span class="条值">{{ 单元格文本(阶段列.数量, 行) }} · {{ 取分数(行, 阶段列.平均分.数据键) }}</span>
+        <div
+          v-for="(行, 序号) in 好感分阶段"
+          :key="序号"
+          class="条行"
+        >
+          <span>{{ 单元格文本(阶段列.阶段, 行) }}</span>
+          <span class="条轨"><span
+            class="条充"
+            :style="{ width: `${阶段条宽(行)}%` }"
+          /></span>
+          <span class="条值">{{ 单元格文本(阶段列.数量, 行) }} · {{ 取分数(行, 阶段列.平均分.数据键) }}</span>
+        </div>
       </div>
-    </div>
+    </Transition>
     <h3 class="图题">
       {{ 统计文案.注册总数 }}
     </h3>
@@ -450,7 +458,6 @@ onMounted(() => {
       :xian-shi="留存行.length === 0"
     />
     <ShuJuBiaoGe
-      v-if="留存行.length > 0"
       :lie="列定义登记.留存统计"
       :hang="留存行"
       :hang-jian="null"
@@ -463,7 +470,6 @@ onMounted(() => {
       :xian-shi="用量行.length === 0"
     />
     <ShuJuBiaoGe
-      v-if="用量行.length > 0"
       :lie="列定义登记.用量统计"
       :hang="用量行"
       :hang-jian="null"

@@ -179,27 +179,33 @@ onMounted(() => {
       data-testid="shi-shi-shuo-ming"
     >
       <h3>{{ 思考文案.实时说明标签 }}</h3>
-      <p v-if="说明">
-        {{ 说明.sheng_ming }}
-      </p>
-      <p v-if="说明">
-        {{ 说明.shi_shi_shuo_ming }}
-      </p>
-      <div v-if="说明 && 说明.dai_bu_chong.length > 0">
-        <span class="待补题">{{ 思考文案.待补充项标签 }}</span>
-        <ul class="待补列">
-          <li
-            v-for="项 in 说明.dai_bu_chong"
-            :key="项"
-            data-testid="dai-bu-chong"
-          >
-            <span class="徽标 警">{{ 通用文案.待补充 }}</span>
-            {{ 项 }}
-          </li>
-        </ul>
-      </div>
+      <Transition name="块">
+        <p v-if="说明">
+          {{ 说明.sheng_ming }}
+        </p>
+      </Transition>
+      <Transition name="块">
+        <p v-if="说明">
+          {{ 说明.shi_shi_shuo_ming }}
+        </p>
+      </Transition>
+      <Transition name="块">
+        <div v-if="说明 && 说明.dai_bu_chong.length > 0">
+          <span class="待补题">{{ 思考文案.待补充项标签 }}</span>
+          <ul class="待补列">
+            <li
+              v-for="项 in 说明.dai_bu_chong"
+              :key="项"
+              data-testid="dai-bu-chong"
+            >
+              <span class="徽标 警">{{ 通用文案.待补充 }}</span>
+              {{ 项 }}
+            </li>
+          </ul>
+        </div>
+      </Transition>
       <XiaoXiTiao
-        v-else
+        v-if="!说明 || 说明.dai_bu_chong.length === 0"
         xing-tai="kong"
         :wen-ben="通用文案.待补充"
         ce-shi-biao-shi="kong-tai-dai-bu-chong"
@@ -231,34 +237,38 @@ onMounted(() => {
           class="输入"
         >
       </label>
-      <label
-        v-if="当前标签 === 'duo-she-ri-zhi'"
-        class="字段"
-      >
-        {{ 思考文案.管理员编号标签 }}
-        <input
-          v-model="管理员编号"
-          class="输入"
+      <Transition name="组">
+        <label
+          v-if="当前标签 === 'duo-she-ri-zhi'"
+          class="字段"
         >
-      </label>
-      <label
-        v-if="当前标签 === 'si-kao-ji-lu'"
-        class="字段"
-      >
-        {{ 思考文案.事件标签 }}
-        <select
-          v-model="事件筛选"
-          class="选择"
-          data-testid="lv-xuan-si-kao-shi-jian"
+          {{ 思考文案.管理员编号标签 }}
+          <input
+            v-model="管理员编号"
+            class="输入"
+          >
+        </label>
+      </Transition>
+      <Transition name="组">
+        <label
+          v-if="当前标签 === 'si-kao-ji-lu'"
+          class="字段"
         >
-          <option value="">{{ 通用文案.全部 }}</option>
-          <option
-            v-for="项 in 思考事件选项"
-            :key="项.值"
-            :value="项.值"
-          >{{ 项.文案 }}</option>
-        </select>
-      </label>
+          {{ 思考文案.事件标签 }}
+          <select
+            v-model="事件筛选"
+            class="选择"
+            data-testid="lv-xuan-si-kao-shi-jian"
+          >
+            <option value="">{{ 通用文案.全部 }}</option>
+            <option
+              v-for="项 in 思考事件选项"
+              :key="项.值"
+              :value="项.值"
+            >{{ 项.文案 }}</option>
+          </select>
+        </label>
+      </Transition>
       <button
         type="button"
         class="按钮主"
@@ -281,55 +291,61 @@ onMounted(() => {
       xing-tai="kong"
       :xian-shi="!加载中 && 行列表.length === 0"
     />
-    <ol
-      v-if="行列表.length > 0"
-      class="时间线"
-    >
-      <li
-        v-for="(行, 序号) in 行列表"
-        :key="序号"
-        :style="{ '--位': Math.min(序号, 7) }"
+    <Transition name="块">
+      <ol
+        v-if="行列表.length > 0"
+        class="时间线"
       >
-        <div class="节点卡">
-          <div class="节点元">
-            <span class="徽标 墨">{{ 思考文案.序号列 }} {{ 序号 + 1 }}</span>
-            <time>{{ 单元格文本(记录列.创建时间, 行) }}</time>
-            <span
+        <li
+          v-for="(行, 序号) in 行列表"
+          :key="序号"
+          :style="{ '--位': Math.min(序号, 7) }"
+        >
+          <div class="节点卡">
+            <div class="节点元">
+              <span class="徽标 墨">{{ 思考文案.序号列 }} {{ 序号 + 1 }}</span>
+              <time>{{ 单元格文本(记录列.创建时间, 行) }}</time>
+              <span
+                v-if="当前标签 === 'si-kao-ji-lu'"
+                class="徽标"
+                :class="单元格色调(记录列.事件, 行)"
+              >{{ 单元格文本(记录列.事件, 行) }}</span>
+            </div>
+            <p v-if="当前标签 === 'si-kao-ji-lu'">
+              {{ 单元格文本(记录列.摘要, 行) }}
+            </p>
+            <button
               v-if="当前标签 === 'si-kao-ji-lu'"
-              class="徽标"
-              :class="单元格色调(记录列.事件, 行)"
-            >{{ 单元格文本(记录列.事件, 行) }}</span>
+              type="button"
+              class="按钮次"
+              @click="展开思考记录(行[响应行键.ID])"
+            >
+              {{ 通用文案.详情 }}
+            </button>
+            <Transition name="组">
+              <p
+                v-if="原文内容[String(行[响应行键.ID] ?? '')]"
+                class="原文行"
+              >
+                <span class="原文名">{{ 思考文案.内容标签 }}</span>
+                <span>{{ 原文内容[String(行[响应行键.ID] ?? '')] }}</span>
+              </p>
+            </Transition>
+            <pre class="快照码">{{ 行快照(行) }}</pre>
           </div>
-          <p v-if="当前标签 === 'si-kao-ji-lu'">
-            {{ 单元格文本(记录列.摘要, 行) }}
-          </p>
-          <button
-            v-if="当前标签 === 'si-kao-ji-lu'"
-            type="button"
-            class="按钮次"
-            @click="展开思考记录(行[响应行键.ID])"
-          >
-            {{ 通用文案.详情 }}
-          </button>
-          <p
-            v-if="原文内容[String(行[响应行键.ID] ?? '')]"
-            class="原文行"
-          >
-            <span class="原文名">{{ 思考文案.内容标签 }}</span>
-            <span>{{ 原文内容[String(行[响应行键.ID] ?? '')] }}</span>
-          </p>
-          <pre class="快照码">{{ 行快照(行) }}</pre>
-        </div>
-      </li>
-    </ol>
-    <FenYeTiao
-      v-if="分页"
-      :zong-shu="分页.zong_shu"
-      :dang-qian-ye="分页.ye_ma"
-      :shi-fou-shou-ye="(分页.ye_ma ?? 默认页码) <= 1"
-      @shang-ye="上一页"
-      @xia-ye="下一页"
-    />
+        </li>
+      </ol>
+    </Transition>
+    <Transition name="块">
+      <FenYeTiao
+        v-if="分页"
+        :zong-shu="分页.zong_shu"
+        :dang-qian-ye="分页.ye_ma"
+        :shi-fou-shou-ye="(分页.ye_ma ?? 默认页码) <= 1"
+        @shang-ye="上一页"
+        @xia-ye="下一页"
+      />
+    </Transition>
   </section>
 </template>
 

@@ -148,12 +148,14 @@ onMounted(() => {
         {{ 通用文案.查询 }}
       </button>
     </div>
-    <p
-      v-if="保留信息"
-      class="加载条"
-    >
-      {{ 命名值文本(审计文案.保留标题, 保留信息['zong_shu']) }}
-    </p>
+    <Transition name="条">
+      <p
+        v-if="保留信息"
+        class="加载条"
+      >
+        {{ 命名值文本(审计文案.保留标题, 保留信息['zong_shu']) }}
+      </p>
+    </Transition>
     <XiaoXiTiao
       xing-tai="jia-zai"
       :xian-shi="加载中"
@@ -168,17 +170,18 @@ onMounted(() => {
       :xian-shi="!加载中 && 行列表.length === 0"
     />
     <ShuJuBiaoGe
-      v-if="行列表.length > 0"
       :lie="列定义登记.审计日志"
       :hang="行列表"
     />
-    <FenYeTiao
-      v-if="分页"
-      :zong-shu="分页.zong_shu"
-      :dang-qian-ye="分页.ye_ma"
-      :shi-fou-shou-ye="(分页.ye_ma ?? 默认页码) <= 1"
-      @shang-ye="上一页"
-      @xia-ye="下一页"
-    />
+    <Transition name="块">
+      <FenYeTiao
+        v-if="分页"
+        :zong-shu="分页.zong_shu"
+        :dang-qian-ye="分页.ye_ma"
+        :shi-fou-shou-ye="(分页.ye_ma ?? 默认页码) <= 1"
+        @shang-ye="上一页"
+        @xia-ye="下一页"
+      />
+    </Transition>
   </section>
 </template>

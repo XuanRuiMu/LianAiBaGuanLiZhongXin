@@ -66,42 +66,44 @@ onMounted(() => {
       :wen-ben="错误提示"
       :cuo-wu-ma="错误码"
     />
-    <div
-      v-if="详情"
-      class="双栏 反"
-    >
-      <div class="卡片 人物卡">
-        <h3 class="人物名">
-          {{ 单元格文本(概览列.昵称, 详情行) }}
-        </h3>
-        <p class="人物号">
-          {{ 单元格文本(概览列.用户名, 详情行) }}
-        </p>
-        <span
-          class="徽标"
-          :class="取管理角色色调(详情[响应行键.角色])"
-          data-testid="jiao-se-hui"
-        >{{ 取管理角色文案(详情[响应行键.角色]) }}</span>
-      </div>
-      <dl class="卷宗">
-        <div
-          v-for="项 in 列定义登记.账号详情"
-          :key="String(项.数据键)"
-        >
-          <dt>{{ 表头文本(项) }}</dt>
-          <dd>
-            <span
-              v-if="渲染为徽标(项)"
-              class="徽标"
-              :class="单元格色调(项, 详情行)"
-            >{{ 单元格文本(项, 详情行) }}</span>
-            <template v-else>
-              {{ 单元格文本(项, 详情行) }}
-            </template>
-          </dd>
+    <Transition name="块">
+      <div
+        v-if="详情"
+        class="双栏 反"
+      >
+        <div class="卡片 人物卡">
+          <h3 class="人物名">
+            {{ 单元格文本(概览列.昵称, 详情行) }}
+          </h3>
+          <p class="人物号">
+            {{ 单元格文本(概览列.用户名, 详情行) }}
+          </p>
+          <span
+            class="徽标"
+            :class="取管理角色色调(详情[响应行键.角色])"
+            data-testid="jiao-se-hui"
+          >{{ 取管理角色文案(详情[响应行键.角色]) }}</span>
         </div>
-      </dl>
-    </div>
+        <dl class="卷宗">
+          <div
+            v-for="项 in 列定义登记.账号详情"
+            :key="String(项.数据键)"
+          >
+            <dt>{{ 表头文本(项) }}</dt>
+            <dd>
+              <span
+                v-if="渲染为徽标(项)"
+                class="徽标"
+                :class="单元格色调(项, 详情行)"
+              >{{ 单元格文本(项, 详情行) }}</span>
+              <template v-else>
+                {{ 单元格文本(项, 详情行) }}
+              </template>
+            </dd>
+          </div>
+        </dl>
+      </div>
+    </Transition>
     <button
       type="button"
       class="按钮次"

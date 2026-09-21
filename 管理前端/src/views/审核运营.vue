@@ -229,18 +229,19 @@ onMounted(() => {
       :xian-shi="!加载中 && 行列表.length === 0"
     />
     <ShuJuBiaoGe
-      v-if="行列表.length > 0"
       :lie="列定义登记.审核列表"
       :hang="行列表"
     />
-    <FenYeTiao
-      v-if="分页"
-      :zong-shu="分页.zong_shu"
-      :dang-qian-ye="分页.ye_ma"
-      :shi-fou-shou-ye="(分页.ye_ma ?? 默认页码) <= 1"
-      @shang-ye="上一页"
-      @xia-ye="下一页"
-    />
+    <Transition name="块">
+      <FenYeTiao
+        v-if="分页"
+        :zong-shu="分页.zong_shu"
+        :dang-qian-ye="分页.ye_ma"
+        :shi-fou-shou-ye="(分页.ye_ma ?? 默认页码) <= 1"
+        @shang-ye="上一页"
+        @xia-ye="下一页"
+      />
+    </Transition>
     <XiaoXiTiao
       xing-tai="kong"
       :xian-shi="!登录仓库.可高危"
@@ -413,7 +414,6 @@ onMounted(() => {
       :xian-shi="处理记录行.length === 0"
     />
     <ShuJuBiaoGe
-      v-if="处理记录行.length > 0"
       :lie="列定义登记.审核留痕"
       :hang="处理记录行"
       :hang-jian="null"
