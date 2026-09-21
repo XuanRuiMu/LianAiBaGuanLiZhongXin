@@ -1,3 +1,7 @@
+<script lang="ts">
+let 层实例计数 = 0;
+</script>
+
 <script setup lang="ts">
 import { nextTick, ref, watch } from 'vue';
 import { 通用文案 } from '../文案/通用';
@@ -17,12 +21,21 @@ const props = withDefaults(
 
 const 发射 = defineEmits<{ (事件: 'queRen' | 'quXiao'): void }>();
 
+层实例计数 += 1;
+const 本层序号 = 层实例计数;
+const 标题锚 = `que-ren-ceng-biao-ti-${本层序号}`;
+const 正文锚 = `que-ren-ceng-zheng-wen-${本层序号}`;
 const 层本体 = ref<HTMLElement | null>(null);
 const 默认动作 = ref<HTMLElement | null>(null);
+const 取消动作 = ref<HTMLElement | null>(null);
 let 触发元素: HTMLElement | null = null;
 
 function 层内按钮(): HTMLElement[] {
   return [...(层本体.value?.querySelectorAll<HTMLElement>('button') ?? [])];
+}
+
+function 开窗落点(): HTMLElement | null {
+  return props.weiXian ? 取消动作.value : 默认动作.value;
 }
 
 watch(
@@ -32,7 +45,7 @@ watch(
       const 当前 = document.activeElement;
       触发元素 = 当前 instanceof HTMLElement && 当前 !== document.body ? 当前 : null;
       await nextTick();
-      默认动作.value?.focus();
+      开窗落点()?.focus();
     } else {
       触发元素?.focus();
       触发元素 = null;
@@ -87,18 +100,19 @@ function 遮罩点击(事件: MouseEvent): void {
         class="确认框"
         role="dialog"
         aria-modal="true"
-        aria-labelledby="que-ren-ceng-biao-ti"
-        aria-describedby="que-ren-ceng-zheng-wen"
+        :aria-labelledby="标题锚"
+        :aria-describedby="正文锚"
         @keydown="键控"
       >
-        <h3 id="que-ren-ceng-biao-ti">
+        <h3 :id="标题锚">
           {{ biaoTi }}
         </h3>
-        <p id="que-ren-ceng-zheng-wen">
+        <p :id="正文锚">
           {{ zhengWen }}
         </p>
         <div class="确认操作">
           <button
+            ref="取消动作"
             type="button"
             class="按钮次"
             data-testid="que-ren-qu-xiao"

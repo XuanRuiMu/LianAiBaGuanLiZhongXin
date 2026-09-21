@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createPinia, setActivePinia } from 'pinia';
-import { createMemoryHistory, createRouter } from 'vue-router';
+import { createMemoryHistory, createRouter, type RouteRecordRaw } from 'vue-router';
 import { flushPromises, mount } from '@vue/test-utils';
 import {
   使用登录仓库,
@@ -18,9 +18,11 @@ import {
 } from '../stores/登录';
 import { 守卫判定, 注册守卫, 路由表 } from '../router';
 import { 业务错误 } from '../api/请求';
-import { 管理登录, 管理登出, 刷新管理令牌, type 管理登录结果 } from '../api/管理';
+import { 我的身份, 管理登录, 管理登出, 刷新管理令牌, type 当前身份, type 管理登录结果 } from '../api/管理';
 import { 登录选项存储键, 记住账号存储键, 会话续期间隔毫秒 } from '../配置';
 import { 取文案 } from '../文案/聚合';
+import { 过渡前进 } from '../动效';
+import App from '../App.vue';
 
 vi.mock('../api/管理', () => ({
   管理登录: vi.fn(),
@@ -585,5 +587,77 @@ describe('FP-08 冷启动自动登录的权限视图就绪', () => {
     await 路由器.push('/zhang-hao');
     expect(路由器.currentRoute.value.path).toBe('/zhang-hao');
     expect(刷新管理令牌, '非冷启动不得被守卫触发轮换').not.toHaveBeenCalled();
+  });
+});
+
+describe('FP-10 DEF-1 外壳首帧权限视图', () => {
+  const 外壳探针 = { render: () => null };
+
+  const 全能力: string[] = ['cha_kan', 'tong_ji_xie', 'gao_we'];
+
+  const 全能力回包: 管理登录结果 = {
+    yong_hu_id: 'yi',
+    yong_hu_ming: null,
+    jiao_se: 'chao_guan',
+    neng_li: 全能力,
+  };
+
+  const 全能力身份: 当前身份 = { yong_hu_id: 'yi', jiao_se: 'chao_guan', neng_li: 全能力 };
+
+  function 持久标记冷启动(): void {
+    window.localStorage.setItem('guan_li_hui_hua', 'yi_deng_lu');
+    写登录选项({ 记住账号: false, 记住密码: true, 自动登录: true });
+  }
+
+  const 取过渡档 = (包装: ReturnType<typeof mount>): string => (包装.vm as unknown as { 页面过渡: string }).页面过渡;
+
+  /** 冷启动的真实时序：外壳先渲染，初始导航还在途中；路径表沿用真源但把视图换成探针，避免把测点变成整页装载 */
+  const 探针路由表: RouteRecordRaw[] = 路由表.map((项): RouteRecordRaw => ('component' in 项 ? { path: 项.path, component: 外壳探针 } : 项));
+
+  function 挂外壳(目标: string): { 包装: ReturnType<typeof mount>; 路由器: ReturnType<typeof createRouter> } {
+    const 路由器 = createRouter({ history: createMemoryHistory(), routes: 探针路由表 });
+    注册守卫(路由器);
+    const 包装 = mount(App, { global: { plugins: [路由器], stubs: { RouterView: true } } });
+    void 路由器.push(目标);
+    return { 包装, 路由器 };
+  }
+
+  function 冷启动挂外壳(目标 = '/zhang-hao'): ReturnType<typeof mount> {
+    持久标记冷启动();
+    return 挂外壳(目标).包装;
+  }
+
+  it('冷启动首帧侧栏不塌成空：未就绪渲染等高占位，行数与身份解析完成后一致', async () => {
+    vi.mocked(刷新管理令牌).mockResolvedValue(全能力回包);
+    vi.mocked(我的身份).mockResolvedValue(全能力身份);
+    const 包装 = 冷启动挂外壳();
+    expect(使用登录仓库().能力列表, '前置：外壳首帧那一刻能力位确实是空的').toEqual([]);
+    const 首帧行数 = 包装.findAll('nav a').length + 包装.findAll('.栏占位').length;
+    expect(首帧行数, '冷启动首帧侧栏条目数不得从 0 起步（DEF-1 的 pop-in 就是这次跳变）').toBe(7);
+    await flushPromises();
+    expect(包装.findAll('nav a'), '身份落地后必须是七项真导航').toHaveLength(7);
+    expect(包装.findAll('.栏占位'), '身份落地后占位必须摘净').toHaveLength(0);
+    expect(包装.find('[data-testid="dang-qian-jiao-se"]').text()).not.toBe(取文案('通用', '加载中'));
+    包装.unmount();
+  });
+
+  it('身份复核收口后占位不得常驻：复核失败按空权限如实渲染', async () => {
+    vi.mocked(刷新管理令牌).mockRejectedValue(new 业务错误('请求过于频繁，请稍后再试', 'XIAN_LIU'));
+    vi.mocked(我的身份).mockRejectedValue(new 业务错误('请求过于频繁，请稍后再试', 'XIAN_LIU'));
+    const 包装 = 冷启动挂外壳();
+    expect(包装.findAll('.栏占位'), '前置：未就绪期间是占位而不是空窗').toHaveLength(7);
+    await flushPromises();
+    expect(使用登录仓库().已登录, '限流不清会话标记（FP-03 口径）').toBe(true);
+    expect(包装.findAll('.栏占位'), '复核已定论还亮骨架就是永远卡在加载中').toHaveLength(0);
+    expect(包装.findAll('nav a')).toHaveLength(0);
+    包装.unmount();
+  });
+
+  it('FP-10 DEF-2 外壳真实接线：冷启动直连登录页的首帧方向是中性前进而不是后退', async () => {
+    const { 包装, 路由器 } = 挂外壳('/deng-lu');
+    await flushPromises();
+    expect(路由器.currentRoute.value.path, '前置：未登录直连免登录页照旧放行').toBe('/deng-lu');
+    expect(取过渡档(包装), 'vue-router 的起始占位路由不是一页，与它没有导航序关系').toBe(过渡前进);
+    包装.unmount();
   });
 });

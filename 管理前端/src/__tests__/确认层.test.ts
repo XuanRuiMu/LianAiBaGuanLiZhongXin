@@ -149,6 +149,45 @@ describe('FP-05b 站内确认层组件', () => {
     expect(document.activeElement).toBe(触发);
   });
 
+  it('FP-10 DEF-3 高危层初始焦点落在取消按钮，确认钮不得是开窗落点', async () => {
+    const 包装 = 挂确认层({ weiXian: true });
+    在挂包装 = 包装;
+    await nextTick();
+    await flushPromises();
+    expect(document.activeElement).toBe(包装.find('[data-testid="que-ren-qu-xiao"]').element);
+    expect(document.activeElement).not.toBe(包装.find('[data-testid="que-ren-que-ren"]').element);
+  });
+
+  it('FP-10 DEF-3 非高危层初始焦点不变，仍是默认动作（确认按钮）', async () => {
+    const 包装 = 挂确认层({ weiXian: false });
+    在挂包装 = 包装;
+    await nextTick();
+    await flushPromises();
+    expect(document.activeElement).toBe(包装.find('[data-testid="que-ren-que-ren"]').element);
+  });
+
+  it('FP-10 DEF-7 两个实例并存时 aria 锚点各自唯一，标题与正文互不串指', async () => {
+    const 甲 = 挂确认层();
+    在挂包装 = 甲;
+    const 乙 = 挂确认层({ biaoTi: 通用文案.详情, zhengWen: 通用文案.操作列 });
+    await nextTick();
+    await flushPromises();
+    const 框甲 = 甲.find('[role="dialog"]');
+    const 框乙 = 乙.find('[role="dialog"]');
+    const 锚甲 = [框甲.attributes('aria-labelledby') ?? '', 框甲.attributes('aria-describedby') ?? ''];
+    const 锚乙 = [框乙.attributes('aria-labelledby') ?? '', 框乙.attributes('aria-describedby') ?? ''];
+    for (const 锚 of 锚甲) {
+      expect(锚.length).toBeGreaterThan(0);
+      expect(锚乙).not.toContain(锚);
+      expect(document.querySelectorAll(`[id="${锚}"]`)).toHaveLength(1);
+    }
+    expect(document.getElementById(锚甲[0])?.textContent?.trim()).toBe(通用文案.二次确认);
+    expect(document.getElementById(锚甲[1])?.textContent?.trim()).toBe(账号文案.高危二次确认);
+    expect(document.getElementById(锚乙[0])?.textContent?.trim()).toBe(通用文案.详情);
+    expect(document.getElementById(锚乙[1])?.textContent?.trim()).toBe(通用文案.操作列);
+    乙.unmount();
+  });
+
   it('焦点圈定：Tab 从末位按钮回到首位，Shift+Tab 从首位绕到末位，始终留在层内', async () => {
     const 包装 = 挂确认层();
     await nextTick();

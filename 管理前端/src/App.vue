@@ -16,7 +16,9 @@ const 路由器 = useRouter();
 const 是否登录页 = computed(() => 当前路由.path === '/deng-lu');
 const 主题 = ref<主题名>(浅色);
 const 身份请求中 = ref(false);
+const 身份已复核 = ref(false);
 const 页面过渡 = ref<过渡名>(过渡前进);
+const 已提交端点 = ref<页面端点 | null>(null);
 
 const 导航 = [
   { 路径: '/zhang-hao', 文案键: '账号管理', 图标名: 'zhang-hao', 需能力: 'cha_kan' },
@@ -31,6 +33,10 @@ const 导航 = [
 // YH-108 菜单条目按服务端下发的能力位过滤，条目→能力的对应关系只有这一份
 const 可见导航 = computed(() => 导航.filter((项) => 登录仓库.能力列表.includes(项.需能力)));
 
+const 身份待解析 = computed(() => 登录仓库.已登录 && 登录仓库.管理角色 === null && !身份已复核.value);
+
+const 占位导航 = computed(() => (身份待解析.value ? 导航 : []));
+
 const 导航序 = 导航.map((项) => 项.路径);
 
 const 当前端点 = computed<页面端点>(() => ({
@@ -40,8 +46,11 @@ const 当前端点 = computed<页面端点>(() => ({
 
 watch(
   当前端点,
-  (新端点, 旧端点) => {
-    页面过渡.value = 页面过渡名(导航序, 旧端点 ?? null, 新端点);
+  (新端点) => {
+    页面过渡.value = 页面过渡名(导航序, 已提交端点.value, 新端点);
+    if (当前路由.matched.length > 0) {
+      已提交端点.value = 新端点;
+    }
   },
   { immediate: true },
 );
@@ -59,6 +68,7 @@ async function 同步身份(强制 = false): Promise<void> {
     return;
   } finally {
     身份请求中.value = false;
+    身份已复核.value = true;
   }
 }
 
@@ -121,6 +131,12 @@ onBeforeUnmount(() => {
           class="栏导航"
           :aria-label="导航文案.管理导航"
         >
+          <span
+            v-for="项 in 占位导航"
+            :key="项.路径"
+            class="栏占位"
+            aria-hidden="true"
+          />
           <router-link
             v-for="项 in 可见导航"
             :key="项.路径"
@@ -206,7 +222,8 @@ onBeforeUnmount(() => {
   padding: 14px 12px;
 }
 
-.栏导航 a {
+.栏导航 a,
+.栏占位 {
   display: flex;
   align-items: center;
   gap: 11px;
@@ -218,6 +235,14 @@ onBeforeUnmount(() => {
   font-weight: 700;
   font-size: 14.5px;
   transition: background-color var(--时长短) var(--缓匀), border-color var(--时长短) var(--缓匀), color var(--时长短) var(--缓匀);
+}
+
+.栏占位 {
+  background: var(--面二);
+}
+
+.栏占位::before {
+  content: '\00a0';
 }
 
 .栏导航 a:hover {

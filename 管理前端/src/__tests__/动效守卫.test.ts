@@ -1169,11 +1169,17 @@ describe('FP-08 离场语义与站点归类修正', () => {
     expect(离场屏蔽缺陷(拆掉)).toHaveLength(1);
   });
 
-  it('QueRenCeng 的 aria id 是静态的，全站只能有一个挂载点', () => {
+  it('QueRenCeng 的 aria 锚点实例内唯一，全站挂载点仍按台账登记为一处', () => {
     const 挂载点 = vue源清单().filter((文件) => 文件 !== 'src/components/QueRenCeng.vue' && /<QueRenCeng[\s>]/.test(读(文件)));
-    expect(挂载点, '第二个实例会让静态 aria-labelledby/describedby 指向错节点，须改实例唯一 id 后再登记').toEqual(['src/views/账号列表.vue']);
+    expect(挂载点, '台账 P8 只登记一处挂载点；新增站点要先同步 §十 台账与站点数').toEqual(['src/views/账号列表.vue']);
     const 声明 = 读('src/components/QueRenCeng.vue');
-    expect([...声明.matchAll(/id="que-ren-ceng-[\w-]+"/g)].map((匹) => 匹[0])).toHaveLength(2);
+    const 锚点 = [...声明.matchAll(/(:?)aria-(?:labelledby|describedby)="([^"]+)"/g)].map((匹) => ({ 静态: 匹[1] === '', 值: 匹[2] }));
+    expect(锚点).toHaveLength(2);
+    expect(锚点.filter((项) => 项.静态).map((项) => 项.值), '静态 aria 锚点会让同页第二个实例互相指错节点，必须绑实例内唯一 id').toEqual([]);
+    expect([...声明.matchAll(/\sid="/g)].length, '组件内不得再留静态 id 字面量').toBe(0);
+    const 声明的id = [...声明.matchAll(/:id="([^"]+)"/g)].map((匹) => 匹[1]).sort();
+    expect(声明的id).toHaveLength(2);
+    expect(锚点.map((项) => 项.值).sort()).toEqual(声明的id);
   });
 
   it('恒定:内建过渡判据已废除：组件根自带族过渡不再为调用点的 v-if 免做', () => {
@@ -1266,10 +1272,14 @@ describe('FP-04 路由过渡落地时序', () => {
         需登录: (当前路由.meta as { xuYaoDengLu?: boolean }).xuYaoDengLu ?? true,
       }));
       const 名 = ref<过渡名>(过渡前进);
+      const 已提交端点 = ref<页面端点 | null>(null);
       watch(
         端点流,
-        (新端点, 旧端点) => {
-          名.value = 页面过渡名(探针序, 旧端点 ?? null, 新端点);
+        (新端点) => {
+          名.value = 页面过渡名(探针序, 已提交端点.value, 新端点);
+          if (当前路由.matched.length > 0) {
+            已提交端点.value = 新端点;
+          }
         },
         { immediate: true },
       );
@@ -1319,5 +1329,33 @@ describe('FP-04 路由过渡落地时序', () => {
     expect(包装.text()).toContain('甲页');
     expect(包装.text()).not.toContain('乙页');
     包装.unmount();
+  });
+
+  it('FP-10 DEF-2 冷启动首个页面判为中性前进：无导航序关系的路径不得判成后退', async () => {
+    const 路由器 = createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        { path: '/lu', component: 探针乙, meta: { xuYaoDengLu: false } },
+        { path: '/tan', component: 探针甲, meta: { xuYaoDengLu: true } },
+      ],
+    });
+    const 包装 = mount(探针宿主, { global: { plugins: [路由器] }, attachTo: document.body });
+    expect(档(包装), '初始导航尚未落地时仍是中性前进').toBe(过渡前进);
+    void 路由器.push('/lu');
+    await 等帧();
+    expect(包装.text()).toContain('乙页');
+    expect(档(包装), '冷启动进入免登录页与首屏之间没有导航序关系，判后退等于把「进入应用」演成「退回上一页」').toBe(过渡前进);
+    await 路由器.push('/tan');
+    await nextTick();
+    expect(档(包装), '真进需登录页照旧前进（§二 判据 2 不退化）').toBe(过渡前进);
+    await 路由器.push('/lu');
+    await nextTick();
+    expect(档(包装), '站内回免登录页照旧后退（本修只改无导航序关系的首屏）').toBe(过渡后退);
+    包装.unmount();
+  });
+
+  it('外壳的方向接线以「已提交端点」为唯一上一页真源，不把 START_LOCATION 占位路由当上一页', () => {
+    expect(外壳源, '首帧方向改由 已提交端点 承载后，探针宿主与外壳必须同源').toMatch(/页面过渡\.value = 页面过渡名\(导航序, 已提交端点\.value, 新端点\)/);
+    expect(外壳源, '把 vue-router 的占位起始路由当「上一页」就是 DEF-2 的根因').not.toMatch(/旧端点 \?\? null/);
   });
 });
