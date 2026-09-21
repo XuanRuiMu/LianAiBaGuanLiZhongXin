@@ -40,8 +40,12 @@ async function 建路由(路径: string): Promise<Router> {
 
 async function 等离场(): Promise<void> {
   await flushPromises();
-  await new Promise((resolve) => setTimeout(resolve, 50));
-  await nextTick();
+  const 截止 = Date.now() + 1000;
+  while (document.querySelector('[data-testid="que-ren-ceng"]') !== null && Date.now() < 截止) {
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    await nextTick();
+  }
+  await flushPromises();
 }
 
 async function 挂账号列表(): Promise<VueWrapper> {

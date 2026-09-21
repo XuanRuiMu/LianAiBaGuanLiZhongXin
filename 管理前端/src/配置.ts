@@ -1,6 +1,9 @@
 export const 接口基地址: string =
   (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? 'http://localhost:3100';
 
+/** 请求层唯一超时档：到点即「请求未到达服务端」，不清会话、不带错误码 */
+export const 请求超时毫秒 = 15000;
+
 export const 令牌存储键 = 'guan_li_ling_pai';
 
 export const 默认页码 = 1;

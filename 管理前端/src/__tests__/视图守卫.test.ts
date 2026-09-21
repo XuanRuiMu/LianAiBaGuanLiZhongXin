@@ -14,7 +14,7 @@ import {
 } from '../枚举映射';
 import { 通用文案 } from '../文案/通用';
 import { 单元格文本, 列定义登记, 表头文本, type 列, type 表名 } from '../列定义';
-import { 业务错误, 取错误展示, 归一请求错误, 解析包络 } from '../api/请求';
+import { 业务错误, 取错误展示, 归一请求错误, 解析包络, 传输错误 } from '../api/请求';
 import { 使用登录仓库 } from '../stores/登录';
 import { 路由表 } from '../router';
 import XiaoXiTiao from '../components/XiaoXiTiao.vue';
@@ -598,35 +598,26 @@ describe('FP-04 错误码上屏', () => {
     }
     expect(取错误展示(new Error('请填写用户编号或 IP 地址')).提示).toBe('请填写用户编号或 IP 地址');
     for (const 原文 of ['Network Error', 'timeout of 15000ms exceeded']) {
-      const 展示 = 取错误展示(归一请求错误(Object.assign(new Error(原文), { isAxiosError: true })));
+      const 展示 = 取错误展示(归一请求错误(new 传输错误(原文, null, undefined, false)));
       expect(展示).toEqual({ 提示: 取文案('通用', '请求失败'), 错误码: '' });
       const 包装 = mount(XiaoXiTiao, { props: { xingTai: 'cuo-wu', wenBen: 展示.提示, cuoWuMa: 展示.错误码 } });
       expect(包装.text()).not.toMatch(/[A-Za-z]/);
       expect(包装.text()).not.toContain(原文);
     }
-    const 网关 = 归一请求错误({
-      isAxiosError: true,
-      config: {},
-      response: { status: 504, data: '<html>Gateway Time-out</html>' },
-      message: 'timeout of 15000ms exceeded',
-    });
+    const 网关 = 归一请求错误(
+      new 传输错误('timeout of 15000ms exceeded', 504, '<html>Gateway Time-out</html>', false),
+    );
     expect(取错误展示(网关)).toEqual({ 提示: 取文案('通用', '请求失败'), 错误码: '' });
-    const 过期 = 归一请求错误({
-      isAxiosError: true,
-      config: {},
-      response: { status: 401, data: '' },
-      message: 'Request failed with status code 401',
-    });
+    const 过期 = 归一请求错误(new 传输错误('Request failed with status code 401', 401, '', false));
     expect(取错误展示(过期)).toEqual({ 提示: 取文案('通用', '登录过期'), 错误码: '' });
-    const 带包络 = 归一请求错误({
-      isAxiosError: true,
-      config: {},
-      response: {
-        status: 403,
-        data: { cheng_gong: false, shu_ju: null, ti_shi: '当前账号没有管理身份', cuo_wu_ma: 'WU_GUAN_LI_QUAN_XIAN' },
-      },
-      message: 'Request failed with status code 403',
-    });
+    const 带包络 = 归一请求错误(
+      new 传输错误('Request failed with status code 403', 403, {
+        cheng_gong: false,
+        shu_ju: null,
+        ti_shi: '当前账号没有管理身份',
+        cuo_wu_ma: 'WU_GUAN_LI_QUAN_XIAN',
+      }, false),
+    );
     expect(取错误展示(带包络)).toEqual({ 提示: '当前账号没有管理身份', 错误码: 'WU_GUAN_LI_QUAN_XIAN' });
   });
 

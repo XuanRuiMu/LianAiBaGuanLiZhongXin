@@ -1,9 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import fs from 'node:fs';
 import { createPinia, setActivePinia } from 'pinia';
 import { createMemoryHistory, createRouter } from 'vue-router';
 import { flushPromises, mount } from '@vue/test-utils';
 import { 使用登录仓库, 清除令牌, 规范令牌, 规范角色, 规范能力 } from '../stores/登录';
-import { 解析包络, 业务错误, 请求实例 } from '../api/请求';
+import {
+  解析包络,
+  业务错误,
+  请求实例,
+  归一请求错误,
+  取错误展示,
+  传输错误,
+} from '../api/请求';
 import {
   思考说明 as 获取思考说明,
   封禁记录 as 封禁记录接口,
@@ -73,6 +81,20 @@ vi.mock('../api/管理', () => ({
   处理记录列表: vi.fn().mockResolvedValue({ 行: [] }),
 }));
 
+const 线路说明符 = /from\s*['"]axios['"]|import\(['"]axios['"]\)/;
+
+function axios引用清单(目录 = 'src', 命中: string[] = []): string[] {
+  for (const 名 of fs.readdirSync(目录)) {
+    const 全 = `${目录}/${名}`;
+    if (fs.statSync(全).isDirectory()) {
+      axios引用清单(全, 命中);
+    } else if (/\.(ts|vue)$/.test(名) && 线路说明符.test(fs.readFileSync(全, 'utf8'))) {
+      命中.push(全);
+    }
+  }
+  return 命中;
+}
+
 beforeEach(() => {
   setActivePinia(createPinia());
   window.localStorage.clear();
@@ -112,10 +134,21 @@ describe('登录态存储', () => {
     expect(window.sessionStorage.getItem('guan_li_hui_hua')).toBeNull();
   });
 
-  it('401过期统一跳登录', async () => {
-    expect(请求实例.defaults.withCredentials).toBe(true);
-    const { default: axios } = await import('axios');
-    expect(typeof axios.isAxiosError).toBe('function');
+  it('请求层零第三方 HTTP 依赖，错误归一三分流各按语义落地', () => {
+    expect(axios引用清单()).toEqual([]);
+    const 未达 = 归一请求错误(new 传输错误('Failed to fetch', null, undefined, false));
+    expect(取错误展示(未达)).toEqual({ 提示: 文案.通用.请求失败, 错误码: '' });
+    const 过期 = 归一请求错误(new 传输错误('Request failed with status code 401', 401, '', false));
+    expect(取错误展示(过期)).toEqual({ 提示: 文案.通用.登录过期, 错误码: '' });
+    const 带包络 = 归一请求错误(
+      new 传输错误(
+        'Request failed with status code 403',
+        403,
+        { cheng_gong: false, shu_ju: null, ti_shi: '无管理身份，请联系超级管理员授予角色', cuo_wu_ma: 'WU_GUAN_LI_QUAN_XIAN' },
+        false,
+      ),
+    );
+    expect(取错误展示(带包络)).toEqual({ 提示: '无管理身份，请联系超级管理员授予角色', 错误码: 'WU_GUAN_LI_QUAN_XIAN' });
   });
 });
 
@@ -153,7 +186,20 @@ describe('包络解析', () => {
   });
 
   it('请求凭据走安全Cookie不拼鉴权头', async () => {
-    expect(请求实例.defaults.withCredentials).toBe(true);
+    const 记录: { 地址: string; 选项: RequestInit }[] = [];
+    const 原请求函数 = globalThis.fetch;
+    globalThis.fetch = (async (地址: string, 选项: RequestInit): Promise<Response> => {
+      记录.push({ 地址, 选项 });
+      return { ok: true, status: 200, text: async () => '{"cheng_gong":true,"shu_ju":null}' } as unknown as Response;
+    }) as unknown as typeof fetch;
+    try {
+      await 请求实例.get('/api/jian-kang');
+    } finally {
+      globalThis.fetch = 原请求函数;
+    }
+    expect(记录).toHaveLength(1);
+    expect(记录[0].选项.credentials).toBe('include');
+    expect(记录[0].选项.headers).not.toHaveProperty('Authorization');
   });
 });
 

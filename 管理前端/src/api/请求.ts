@@ -1,5 +1,4 @@
-import axios, { type AxiosInstance, type AxiosResponse } from 'axios';
-import { 接口基地址 } from '../配置';
+import { 接口基地址, 请求超时毫秒 } from '../配置';
 import { 清除令牌 } from '../stores/登录';
 import { 通用文案 } from '../文案/通用';
 
@@ -42,6 +41,23 @@ export class 业务错误 extends Error {
 export type 错误展示 = {
   提示: string;
   错误码: string;
+};
+
+export type 查询值 =
+  | string
+  | number
+  | boolean
+  | undefined
+  | ReadonlyArray<string | number | boolean | undefined>;
+
+export type 请求配置 = {
+  params?: Record<string, 查询值>;
+  /** 续期与注销自身的 401 由调用方处置，不得触发「清令牌并跳登录」的全局兜底 */
+  buTuiDengLu?: boolean;
+};
+
+export type 响应包装 = {
+  data: unknown;
 };
 
 const 可见拉丁词元 = new Set(['IP', 'AI']);
@@ -109,30 +125,20 @@ export function 取鉴权头(令牌: string | null): Record<string, string> {
   return { Authorization: `Bearer ${令牌}` };
 }
 
-export const 请求实例: AxiosInstance = axios.create({
-  baseURL: 接口基地址,
-  timeout: 15000,
-  headers: { 'Content-Type': 'application/json' },
-  withCredentials: true,
-});
+/** 传输层失败的唯一形态：状态码为 null 即「请求未到达服务端」（网络抖动、超时到点、读体中断），带状态码的失败（含 429）才走包络与状态码分流 */
+export class 传输错误 extends Error {
+  readonly 状态码: number | null;
+  readonly 响应体: unknown;
+  readonly buTuiDengLu: boolean;
 
-declare module 'axios' {
-  interface AxiosRequestConfig {
-    /** 续期与注销自身的 401 由调用方处置，不得触发「清令牌并跳登录」的全局兜底 */
-    buTuiDengLu?: boolean;
+  constructor(原文: string, 状态码: number | null, 响应体: unknown, buTuiDengLu: boolean) {
+    super(原文);
+    this.name = 传输错误.name;
+    this.状态码 = 状态码;
+    this.响应体 = 响应体;
+    this.buTuiDengLu = buTuiDengLu;
   }
 }
-
-请求实例.interceptors.request.use((配置) => {
-  try {
-    const 请求编号 = `qian-duan-${Date.now().toString(36)}-${Math.floor(Math.random() * 46656).toString(36)}`;
-    配置.headers.set('X-Request-Id', 请求编号);
-    配置.headers.set('X-Trace-Id', 请求编号);
-  } catch {
-    return 配置;
-  }
-  return 配置;
-});
 
 const 凭证失效码: readonly string[] = ['WEI_SHOU_QUAN', 'LING_PAI_WU_XIAO'];
 
@@ -143,16 +149,16 @@ export function 是凭证失效错误(错误: unknown): boolean {
 
 export function 归一请求错误(错误: unknown): 业务错误 {
   const 原文 = 错误原文(错误);
-  if (axios.isAxiosError(错误) && 错误.response) {
-    const 状态码 = 错误.response.status;
-    const 响应体 = 错误.response.data as Partial<包络失败> | undefined;
-    if (状态码 === 401 && 错误.config?.buTuiDengLu !== true) {
+  if (错误 instanceof 传输错误 && 错误.状态码 !== null) {
+    const 状态码 = 错误.状态码;
+    if (状态码 === 401 && 错误.buTuiDengLu !== true) {
       清除令牌();
       if (typeof window !== 'undefined' && window.location.pathname !== '/deng-lu') {
         window.location.assign('/deng-lu');
       }
     }
-    if (响应体 !== undefined && 响应体.cheng_gong === false) {
+    const 响应体 = 错误.响应体 as Partial<包络失败> | null | undefined;
+    if (响应体 !== undefined && 响应体 !== null && 响应体.cheng_gong === false) {
       return new 业务错误(响应体.ti_shi ?? 通用文案.请求失败, 响应体.cuo_wu_ma ?? '');
     }
     记原始错误('HTTP 层无失败包络', 原文, 状态码);
@@ -162,14 +168,105 @@ export function 归一请求错误(错误: unknown): 业务错误 {
   return new 业务错误(通用文案.请求失败, '');
 }
 
-请求实例.interceptors.response.use(
-  (响应: AxiosResponse) => {
-    if (是否失败包络(响应.data)) {
-      return Promise.reject(
-        new 业务错误(响应.data.ti_shi || 通用文案.请求失败, 响应.data.cuo_wu_ma || ''),
-      );
+function 编码线路值(值: string): string {
+  return encodeURIComponent(值)
+    .replace(/%3A/gi, ':')
+    .replace(/%24/g, '$')
+    .replace(/%2C/gi, ',')
+    .replace(/%20/g, '+');
+}
+
+function 拼查询串(路径: string, 参数: Record<string, 查询值> | undefined): string {
+  const 片段: string[] = [];
+  for (const [键, 原始值] of Object.entries(参数 ?? {})) {
+    if (Array.isArray(原始值)) {
+      for (const 项 of 原始值) {
+        if (项 !== undefined && 项 !== null && 项 !== '') {
+          片段.push(`${编码线路值(`${键}[]`)}=${编码线路值(String(项))}`);
+        }
+      }
+      continue;
     }
-    return 响应;
+    if (原始值 === undefined || 原始值 === null || 原始值 === '') {
+      continue;
+    }
+    片段.push(`${编码线路值(键)}=${编码线路值(String(原始值))}`);
+  }
+  if (片段.length === 0) {
+    return 路径;
+  }
+  return `${路径}${路径.includes('?') ? '&' : '?'}${片段.join('&')}`;
+}
+
+function 取完整地址(路径: string, 参数: Record<string, 查询值> | undefined): string {
+  const 查询 = 拼查询串(路径, 参数);
+  return 接口基地址.length === 0 ? 查询 : `${接口基地址.replace(/\/+$/, '')}${查询}`;
+}
+
+function 取追踪头(): Record<string, string> {
+  const 请求编号 = `qian-duan-${Date.now().toString(36)}-${Math.floor(Math.random() * 46656).toString(36)}`;
+  return { 'X-Request-Id': 请求编号, 'X-Trace-Id': 请求编号 };
+}
+
+async function 读响应体(响应: Response): Promise<unknown> {
+  const 文本 = await 响应.text();
+  try {
+    return JSON.parse(文本) as unknown;
+  } catch {
+    return 文本;
+  }
+}
+
+async function 发起请求(
+  方法: 'GET' | 'POST',
+  路径: string,
+  正文: unknown,
+  配置: 请求配置,
+): Promise<响应包装> {
+  const 头: Record<string, string> = 取追踪头();
+  const 选项: RequestInit = {
+    method: 方法,
+    credentials: 'include',
+    headers: 头,
+    signal: AbortSignal.timeout(请求超时毫秒),
+  };
+  if (正文 !== undefined) {
+    头['Content-Type'] = 'application/json';
+    选项.body = JSON.stringify(正文);
+  }
+  let 响应: Response;
+  try {
+    响应 = await fetch(取完整地址(路径, 配置.params), 选项);
+  } catch (错误) {
+    throw 归一请求错误(new 传输错误(错误原文(错误), null, undefined, 配置.buTuiDengLu === true));
+  }
+  let 响应体: unknown;
+  try {
+    响应体 = await 读响应体(响应);
+  } catch (错误) {
+    throw 归一请求错误(new 传输错误(错误原文(错误), null, undefined, 配置.buTuiDengLu === true));
+  }
+  if (!响应.ok) {
+    throw 归一请求错误(
+      new 传输错误(
+        `Request failed with status code ${响应.status}`,
+        响应.status,
+        响应体,
+        配置.buTuiDengLu === true,
+      ),
+    );
+  }
+  if (是否失败包络(响应体)) {
+    throw new 业务错误(响应体.ti_shi || 通用文案.请求失败, 响应体.cuo_wu_ma || '');
+  }
+  return { data: 响应体 };
+}
+
+export const 请求实例 = {
+  get(路径: string, 配置: 请求配置 = {}): Promise<响应包装> {
+    return 发起请求('GET', 路径, undefined, 配置);
   },
-  (错误: unknown) => Promise.reject(归一请求错误(错误)),
-);
+  post(路径: string, 正文?: unknown, 配置: 请求配置 = {}): Promise<响应包装> {
+    return 发起请求('POST', 路径, 正文, 配置);
+  },
+};

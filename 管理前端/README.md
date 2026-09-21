@@ -1,6 +1,6 @@
 # 恋爱吧管理中心 · 管理前端（跑用户本地的专属前端）
 
-Vue3 + Vite + TypeScript 轻量管理前端，与和我恋爱吧前端同栈（Vue3 / vue-router / pinia / axios），无 echarts / three 重型依赖。
+Vue3 + Vite + TypeScript 轻量管理前端，与和我恋爱吧前端同栈（Vue3 / vue-router / pinia），请求层用浏览器原生 `fetch`，无 axios / echarts / three 等重型依赖。
 不进服务器镜像，省服务器资源；管理后端 CORS 只放行本专属前端来源。
 
 ## 端口
@@ -26,7 +26,7 @@ Vue3 + Vite + TypeScript 轻量管理前端，与和我恋爱吧前端同栈（V
 
 ## 登录方式
 
-账号密码登录：管理后端直连同库验密后签发管理令牌，存入 pinia + localStorage，axios 请求拦截器自动携带 `Authorization: Bearer` 头；后端返回 401 时清理本地令牌并由响应拦截器直跳 `/deng-lu`，路由守卫只负责「未登录访问受保护页」与「已登录访问登录页」两种重定向。
+账号密码登录：管理后端直连同库验密后签发管理令牌，令牌由 httpOnly 安全 Cookie 承载（本地只在 sessionStorage / localStorage 留会话标记，令牌零落盘），请求层用原生 `fetch` 的 `credentials: 'include'` 携带凭证，不拼 `Authorization` 头。后端返回 401 时由错误归一（`src/api/请求.ts` 的 `归一请求错误`）清理本地会话标记并直跳 `/deng-lu`；续期与注销自身的 401 由调用方处置（`buTuiDengLu` 开关），429 与网络抖动不清会话。路由守卫只负责「未登录访问受保护页」与「已登录访问登录页」两种重定向。
 
 ## 页面路由
 

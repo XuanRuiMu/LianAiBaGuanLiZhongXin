@@ -1,5 +1,4 @@
-import type { AxiosResponse } from 'axios';
-import { 解析包络, 请求实例, type 分页信息 } from './请求';
+import { 解析包络, 请求实例, type 分页信息, type 响应包装 } from './请求';
 
 export type 分页查询 = {
   ye_ma?: number;
@@ -147,13 +146,13 @@ async function 取列表<行>(
   路径: string,
   查询: Record<string, string | number | boolean | undefined> = {},
 ): Promise<列表结果<行>> {
-  const 响应: AxiosResponse = await 请求实例.get(路径, { params: 查询 });
+  const 响应: 响应包装 = await 请求实例.get(路径, { params: 查询 });
   const 解析 = 解析包络<行[]>(响应.data);
   return { 行: 解析.数据, 分页: 解析.分页 };
 }
 
 async function 取详情<行>(路径: string, 查询: Record<string, string | number | boolean | undefined> = {}): Promise<行> {
-  const 响应: AxiosResponse = await 请求实例.get(路径, { params: 查询 });
+  const 响应: 响应包装 = await 请求实例.get(路径, { params: 查询 });
   return 解析包络<行>(响应.data).数据;
 }
 
@@ -214,7 +213,7 @@ export function 封禁记录(查询: 封禁记录查询 = {}): Promise<列表结
 }
 
 export async function 写入封禁(正文: 封禁写入): Promise<封禁写入结果> {
-  const 响应: AxiosResponse = await 请求实例.post('/api/guan-li/feng-jin', 正文);
+  const 响应: 响应包装 = await 请求实例.post('/api/guan-li/feng-jin', 正文);
   return 解析包络<封禁写入结果>(响应.data).数据;
 }
 
@@ -246,19 +245,19 @@ export type 当前身份 = {
 };
 
 export async function 管理登录(正文: 管理登录请求): Promise<管理登录结果> {
-  const 响应: AxiosResponse = await 请求实例.post('/api/guan-li/deng-lu', 正文);
+  const 响应: 响应包装 = await 请求实例.post('/api/guan-li/deng-lu', 正文);
   return 解析包络<管理登录结果>(响应.data).数据;
 }
 
 /** YH-108 身份以服务端查库结果为准，供刷新页面后重建权限视图 */
 export async function 我的身份(): Promise<当前身份> {
-  const 响应: AxiosResponse = await 请求实例.get('/api/guan-li/wo-de-jiao-se');
+  const 响应: 响应包装 = await 请求实例.get('/api/guan-li/wo-de-jiao-se');
   return 解析包络<当前身份>(响应.data).数据;
 }
 
 /** 刷新号在 httpOnly Cookie 里，前端读不到：缺省不发正文键，由 Cookie 承载 */
 export async function 刷新管理令牌(刷新令牌?: string): Promise<管理登录结果> {
-  const 响应: AxiosResponse = await 请求实例.post(
+  const 响应: 响应包装 = await 请求实例.post(
     '/api/guan-li/shua-xin',
     刷新令牌 === undefined ? {} : { shua_xin_ling_pai: 刷新令牌 },
     { buTuiDengLu: true },
@@ -267,7 +266,7 @@ export async function 刷新管理令牌(刷新令牌?: string): Promise<管理�
 }
 
 export async function 管理登出(): Promise<注销结果> {
-  const 响应: AxiosResponse = await 请求实例.post('/api/guan-li/tui-chu', {}, { buTuiDengLu: true });
+  const 响应: 响应包装 = await 请求实例.post('/api/guan-li/tui-chu', {}, { buTuiDengLu: true });
   return 解析包络<注销结果>(响应.data).数据;
 }
 
@@ -282,22 +281,22 @@ export type 角色请求 = {
 };
 
 export async function 授予角色(正文: 编号请求): Promise<封禁写入结果> {
-  const 响应: AxiosResponse = await 请求实例.post('/api/guan-li/shou-quan', 正文);
+  const 响应: 响应包装 = await 请求实例.post('/api/guan-li/shou-quan', 正文);
   return 解析包络<封禁写入结果>(响应.data).数据;
 }
 
 export async function 回收角色(正文: 编号请求): Promise<封禁写入结果> {
-  const 响应: AxiosResponse = await 请求实例.post('/api/guan-li/hui-shou', 正文);
+  const 响应: 响应包装 = await 请求实例.post('/api/guan-li/hui-shou', 正文);
   return 解析包络<封禁写入结果>(响应.data).数据;
 }
 
 export async function 接管角色(正文: 角色请求): Promise<封禁写入结果> {
-  const 响应: AxiosResponse = await 请求实例.post('/api/guan-li/duo-she', 正文);
+  const 响应: 响应包装 = await 请求实例.post('/api/guan-li/duo-she', 正文);
   return 解析包络<封禁写入结果>(响应.data).数据;
 }
 
 export async function 结束接管(正文: 角色请求): Promise<封禁写入结果> {
-  const 响应: AxiosResponse = await 请求实例.post('/api/guan-li/gui-huan', 正文);
+  const 响应: 响应包装 = await 请求实例.post('/api/guan-li/gui-huan', 正文);
   return 解析包络<封禁写入结果>(响应.data).数据;
 }
 
@@ -306,12 +305,12 @@ export async function 账号封禁列表(查询: 分页查询 & { ji_bie?: strin
 }
 
 export async function 解封账号(正文: 编号请求): Promise<封禁写入结果> {
-  const 响应: AxiosResponse = await 请求实例.post('/api/guan-li/zhang-hao-feng-jin/jie-feng', 正文);
+  const 响应: 响应包装 = await 请求实例.post('/api/guan-li/zhang-hao-feng-jin/jie-feng', 正文);
   return 解析包络<封禁写入结果>(响应.data).数据;
 }
 
 export async function 审核申诉(正文: 编号请求 & { tong_guo: boolean }): Promise<封禁写入结果> {
-  const 响应: AxiosResponse = await 请求实例.post('/api/guan-li/shen-su/shen-he', 正文);
+  const 响应: 响应包装 = await 请求实例.post('/api/guan-li/shen-su/shen-he', 正文);
   return 解析包络<封禁写入结果>(响应.data).数据;
 }
 
@@ -370,25 +369,25 @@ export function 审核列表(目标类型: string, 查询: 审核查询 = {}): P
 
 export async function 审核新建(目标类型: string, 正文: 审核新建): Promise<表格行> {
   const 路径段 = 审核路径段[目标类型] ?? 目标类型;
-  const 响应: AxiosResponse = await 请求实例.post(`/api/guan-li/${路径段}-xin-jian`, 正文);
+  const 响应: 响应包装 = await 请求实例.post(`/api/guan-li/${路径段}-xin-jian`, 正文);
   return 解析包络<表格行>(响应.data).数据;
 }
 
 export async function 审核初审(目标类型: string, 正文: 审核评审): Promise<封禁写入结果> {
   const 路径段 = 审核路径段[目标类型] ?? 目标类型;
-  const 响应: AxiosResponse = await 请求实例.post(`/api/guan-li/${路径段}-yi-shen`, 正文);
+  const 响应: 响应包装 = await 请求实例.post(`/api/guan-li/${路径段}-yi-shen`, 正文);
   return 解析包络<封禁写入结果>(响应.data).数据;
 }
 
 export async function 审核复审(目标类型: string, 正文: 审核评审): Promise<封禁写入结果> {
   const 路径段 = 审核路径段[目标类型] ?? 目标类型;
-  const 响应: AxiosResponse = await 请求实例.post(`/api/guan-li/${路径段}-er-shen`, 正文);
+  const 响应: 响应包装 = await 请求实例.post(`/api/guan-li/${路径段}-er-shen`, 正文);
   return 解析包络<封禁写入结果>(响应.data).数据;
 }
 
 export async function 审核多项处理(目标类型: string, 正文: 审核多项处理): Promise<表格行> {
   const 路径段 = 审核路径段[目标类型] ?? 目标类型;
-  const 响应: AxiosResponse = await 请求实例.post(`/api/guan-li/${路径段}-pi-liang`, 正文);
+  const 响应: 响应包装 = await 请求实例.post(`/api/guan-li/${路径段}-pi-liang`, 正文);
   return 解析包络<表格行>(响应.data).数据;
 }
 
