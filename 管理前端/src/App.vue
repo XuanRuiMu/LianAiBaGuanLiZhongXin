@@ -5,6 +5,7 @@ import { 使用登录仓库 } from './stores/登录';
 import { 取管理角色文案 } from './枚举映射/管理角色';
 import { 我的身份 } from './api/管理';
 import { 应用主题, 深色, 浅色, 读初始主题, type 主题名 } from './主题模式';
+import { 页面过渡名, 过渡前进, type 过渡名, type 页面端点 } from './动效';
 import TuBiao from './components/TuBiao.vue';
 import { 通用文案 } from './文案/通用';
 import { 导航文案 } from './文案/导航';
@@ -15,6 +16,7 @@ const 路由器 = useRouter();
 const 是否登录页 = computed(() => 当前路由.path === '/deng-lu');
 const 主题 = ref<主题名>(浅色);
 const 身份请求中 = ref(false);
+const 页面过渡 = ref<过渡名>(过渡前进);
 
 const 导航 = [
   { 路径: '/zhang-hao', 文案键: '账号管理', 图标名: 'zhang-hao', 需能力: 'cha_kan' },
@@ -28,6 +30,21 @@ const 导航 = [
 
 // YH-108 菜单条目按服务端下发的能力位过滤，条目→能力的对应关系只有这一份
 const 可见导航 = computed(() => 导航.filter((项) => 登录仓库.能力列表.includes(项.需能力)));
+
+const 导航序 = 导航.map((项) => 项.路径);
+
+const 当前端点 = computed<页面端点>(() => ({
+  路径: 当前路由.path,
+  需登录: (当前路由.meta as { xuYaoDengLu?: boolean }).xuYaoDengLu ?? true,
+}));
+
+watch(
+  当前端点,
+  (新端点, 旧端点) => {
+    页面过渡.value = 页面过渡名(导航序, 旧端点 ?? null, 新端点);
+  },
+  { immediate: true },
+);
 
 /** YH-108 权限视图重建：角色与能力只取服务端身份接口，前端隐藏入口不是安全边界 */
 async function 同步身份(强制 = false): Promise<void> {
@@ -90,56 +107,66 @@ onBeforeUnmount(() => {
     class="外壳"
     :class="[登录仓库.已登录 && !是否登录页 ? '有栏' : '', 是否登录页 ? '登录页' : '']"
   >
-    <aside
-      v-if="登录仓库.已登录 && !是否登录页"
-      class="侧栏"
-    >
-      <div class="栏头">
-        <p class="栏题">
-          {{ 通用文案.应用标题 }}
-        </p>
-      </div>
-      <nav
-        class="栏导航"
-        :aria-label="导航文案.管理导航"
+    <Transition name="栏">
+      <aside
+        v-if="登录仓库.已登录 && !是否登录页"
+        class="侧栏"
       >
-        <router-link
-          v-for="项 in 可见导航"
-          :key="项.路径"
-          :to="项.路径"
+        <div class="栏头">
+          <p class="栏题">
+            {{ 通用文案.应用标题 }}
+          </p>
+        </div>
+        <nav
+          class="栏导航"
+          :aria-label="导航文案.管理导航"
         >
-          <TuBiao :ming-cheng="项.图标名" />
-          {{ 导航文案[项.文案键] }}
-        </router-link>
-      </nav>
-      <div class="栏尾">
-        <p
-          class="栏角色"
-          data-testid="dang-qian-jiao-se"
-        >
-          {{ 登录仓库.管理角色 === null ? 通用文案.加载中 : 取管理角色文案(登录仓库.管理角色) }}
-        </p>
-        <button
-          type="button"
-          class="栏按钮"
-          @click="切换主题"
-        >
-          <TuBiao :ming-cheng="主题 === 浅色 ? 'yue-liang' : 'tai-yang'" />
-          {{ 主题 === 浅色 ? 导航文案.深色主题 : 导航文案.浅色主题 }}
-        </button>
-        <button
-          type="button"
-          class="栏按钮"
-          @click="退出"
-        >
-          <TuBiao ming-cheng="tui-chu" />
-          {{ 导航文案.退出登录 }}
-        </button>
-      </div>
-    </aside>
+          <router-link
+            v-for="项 in 可见导航"
+            :key="项.路径"
+            :to="项.路径"
+          >
+            <TuBiao :ming-cheng="项.图标名" />
+            {{ 导航文案[项.文案键] }}
+          </router-link>
+        </nav>
+        <div class="栏尾">
+          <p
+            class="栏角色"
+            data-testid="dang-qian-jiao-se"
+          >
+            {{ 登录仓库.管理角色 === null ? 通用文案.加载中 : 取管理角色文案(登录仓库.管理角色) }}
+          </p>
+          <button
+            type="button"
+            class="栏按钮"
+            @click="切换主题"
+          >
+            <TuBiao :ming-cheng="主题 === 浅色 ? 'yue-liang' : 'tai-yang'" />
+            {{ 主题 === 浅色 ? 导航文案.深色主题 : 导航文案.浅色主题 }}
+          </button>
+          <button
+            type="button"
+            class="栏按钮"
+            @click="退出"
+          >
+            <TuBiao ming-cheng="tui-chu" />
+            {{ 导航文案.退出登录 }}
+          </button>
+        </div>
+      </aside>
+    </Transition>
     <div class="正文区">
       <main class="正文">
-        <router-view />
+        <router-view v-slot="{ Component }">
+          <Transition
+            :name="页面过渡"
+            mode="out-in"
+            appear
+          >
+            <component :is="Component" />
+          </Transition>
+        </router-view>
       </main>
     </div>
   </div>
@@ -153,6 +180,7 @@ onBeforeUnmount(() => {
 .侧栏 {
   background: var(--面);
   border-right: 1px solid var(--线);
+  overflow: hidden;
 }
 
 .栏头 {
@@ -189,7 +217,7 @@ onBeforeUnmount(() => {
   text-decoration: none;
   font-weight: 700;
   font-size: 14.5px;
-  transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease;
+  transition: background-color var(--时长短) var(--缓匀), border-color var(--时长短) var(--缓匀), color var(--时长短) var(--缓匀);
 }
 
 .栏导航 a:hover {
@@ -231,7 +259,7 @@ onBeforeUnmount(() => {
   cursor: pointer;
   color: var(--淡墨);
   font-size: 14px;
-  transition: border-color 160ms ease, color 160ms ease;
+  transition: border-color var(--时长短) var(--缓匀), color var(--时长短) var(--缓匀);
 }
 
 .栏按钮:hover {
@@ -257,10 +285,19 @@ onBeforeUnmount(() => {
 }
 
 @media (min-width: 960px) {
-  .外壳.有栏 {
+  .外壳 {
     display: grid;
-    grid-template-columns: 248px minmax(0, 1fr);
+    grid-template-columns: 0px minmax(0, 1fr);
     align-items: start;
+    transition: grid-template-columns var(--时长微) var(--缓匀);
+  }
+
+  .外壳.有栏 {
+    grid-template-columns: var(--栏宽) minmax(0, 1fr);
+  }
+
+  .正文区 {
+    grid-column: 2;
   }
 
   .侧栏 {
@@ -269,6 +306,10 @@ onBeforeUnmount(() => {
     min-height: 100vh;
     display: flex;
     flex-direction: column;
+  }
+
+  .侧栏 > * {
+    min-width: var(--栏宽);
   }
 
   .栏导航 {

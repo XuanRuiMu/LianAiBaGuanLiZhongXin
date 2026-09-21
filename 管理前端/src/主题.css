@@ -22,6 +22,19 @@
   --圆中: 10px;
   --圆大: 16px;
   --滚动条宽: 10px;
+  --时长微: 120ms;
+  --时长短: 160ms;
+  --时长中: 240ms;
+  --时长描: 800ms;
+  --时长环: 1300ms;
+  --步进差: 55ms;
+  --缓出: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --缓入: cubic-bezier(0.4, 0, 0.63, 1);
+  --缓匀: cubic-bezier(0.4, 0, 0.2, 1);
+  --缓往返: cubic-bezier(0.37, 0, 0.63, 1);
+  --位移近: 8px;
+  --位移中: 14px;
+  --栏宽: 248px;
   color-scheme: light;
 }
 
@@ -194,7 +207,7 @@ select {
   border-radius: var(--圆小);
   padding: 9px 12px;
   min-height: 42px;
-  transition: border-color 160ms ease, box-shadow 160ms ease;
+  transition: border-color var(--时长短) var(--缓匀), box-shadow var(--时长短) var(--缓匀);
 }
 
 input.输入:not([type='number'], [type='datetime-local']) {
@@ -225,7 +238,7 @@ input.输入:-webkit-autofill {
   border: 1px solid transparent;
   cursor: pointer;
   font-weight: 700;
-  transition: transform 160ms ease, background-color 160ms ease, box-shadow 160ms ease;
+  transition: transform var(--时长短) var(--缓匀), background-color var(--时长短) var(--缓匀), box-shadow var(--时长短) var(--缓匀);
 }
 
 .按钮主 {
@@ -303,7 +316,7 @@ input.输入:-webkit-autofill {
 }
 
 .账簿表 tbody tr {
-  transition: background-color 150ms ease;
+  transition: background-color var(--时长短) var(--缓匀);
 }
 
 .账簿表 tbody tr:hover {
@@ -428,7 +441,7 @@ input.输入:-webkit-autofill {
   padding: 8px 18px;
   cursor: pointer;
   font-weight: 700;
-  transition: background-color 160ms ease, color 160ms ease, border-color 160ms ease;
+  transition: background-color var(--时长短) var(--缓匀), color var(--时长短) var(--缓匀), border-color var(--时长短) var(--缓匀);
 }
 
 .标签页 button:hover {
@@ -639,7 +652,7 @@ input.输入:-webkit-autofill {
   height: 100%;
   background: var(--印);
   border-radius: 999px;
-  transition: width 300ms ease;
+  transition: width var(--时长中) var(--缓匀);
 }
 
 .条值 {
@@ -751,20 +764,6 @@ input.输入:-webkit-autofill {
   *::before,
   *::after {
     transition: none !important;
-  }
-
-  .条充 {
-    transition: none;
-  }
-
-  .正文 > section,
-  .气泡列 .气泡,
-  .时间线 li,
-  .账簿表 tbody tr,
-  .条组 .条行,
-  .统计卡组 .统计卡,
-  .描线,
-  .图点 {
     animation: none !important;
   }
 
@@ -776,7 +775,7 @@ input.输入:-webkit-autofill {
 @keyframes 上浮入场 {
   from {
     opacity: 0;
-    transform: translateY(14px);
+    transform: translateY(var(--位移中));
   }
 
   to {
@@ -817,17 +816,13 @@ input.输入:-webkit-autofill {
   }
 }
 
-.正文 > section {
-  animation: 上浮入场 360ms ease-out both;
-}
-
 .气泡列 .气泡,
 .时间线 li,
 .账簿表 tbody tr,
 .条组 .条行,
 .统计卡组 .统计卡 {
-  animation: 上浮入场 300ms ease-out backwards;
-  animation-delay: calc(var(--位, 0) * 55ms);
+  animation: 上浮入场 var(--时长中) var(--缓出) backwards;
+  animation-delay: calc(var(--位, 0) * var(--步进差));
 }
 
 .统计卡组 .统计卡:nth-child(2) {
@@ -845,21 +840,21 @@ input.输入:-webkit-autofill {
 .描线 {
   stroke-dasharray: 1;
   stroke-dashoffset: 1;
-  animation: 描线现 800ms ease-out 150ms both;
+  animation: 描线现 var(--时长描) var(--缓出) var(--时长短) both;
 }
 
 .图点 {
   transform-box: fill-box;
   transform-origin: center;
-  animation: 点现 320ms ease-out backwards;
-  animation-delay: calc(220ms + var(--位, 0) * 60ms);
+  animation: 点现 var(--时长中) var(--缓出) backwards;
+  animation-delay: calc(var(--时长中) + var(--位, 0) * var(--步进差));
 }
 
 .统计卡,
 .人物卡,
 .时间线 .节点卡,
 .气泡 {
-  transition: transform 180ms ease, box-shadow 180ms ease;
+  transition: transform var(--时长短) var(--缓匀), box-shadow var(--时长短) var(--缓匀);
 }
 
 .统计卡:hover,
@@ -877,7 +872,7 @@ input.输入:-webkit-autofill {
 
 .按钮次,
 .标签页 button {
-  transition: transform 120ms ease, background-color 160ms ease, color 160ms ease, border-color 160ms ease;
+  transition: transform var(--时长微) var(--缓匀), background-color var(--时长短) var(--缓匀), color var(--时长短) var(--缓匀), border-color var(--时长短) var(--缓匀);
 }
 
 .加载条 {
@@ -893,5 +888,64 @@ input.输入:-webkit-autofill {
   left: 0;
   width: 45%;
   background: linear-gradient(100deg, transparent, var(--印淡), transparent);
-  animation: 微光扫 1.3s ease-in-out infinite;
+  animation: 微光扫 var(--时长环) var(--缓往返) infinite;
+}
+
+.页-qian-jin-enter-active {
+  transition: opacity var(--时长中) var(--缓出), transform var(--时长中) var(--缓出);
+}
+
+.页-qian-jin-leave-active {
+  transition: opacity var(--时长微) var(--缓入), transform var(--时长微) var(--缓入);
+}
+
+.页-qian-jin-enter-from {
+  opacity: 0;
+  transform: translateX(var(--位移近));
+}
+
+.页-qian-jin-leave-to {
+  opacity: 0;
+  transform: translateX(calc(var(--位移近) * -1));
+}
+
+.页-hou-tui-enter-active {
+  transition: opacity var(--时长中) var(--缓出), transform var(--时长中) var(--缓出);
+}
+
+.页-hou-tui-leave-active {
+  transition: opacity var(--时长微) var(--缓入), transform var(--时长微) var(--缓入);
+}
+
+.页-hou-tui-enter-from {
+  opacity: 0;
+  transform: translateX(calc(var(--位移近) * -1));
+}
+
+.页-hou-tui-leave-to {
+  opacity: 0;
+  transform: translateX(var(--位移近));
+}
+
+.栏-enter-active {
+  transition: opacity var(--时长短) var(--缓出), transform var(--时长短) var(--缓出);
+}
+
+.栏-leave-active {
+  transition: opacity var(--时长微) var(--缓入);
+}
+
+.栏-enter-from {
+  opacity: 0;
+  transform: translateX(calc(var(--位移近) * -1));
+}
+
+.栏-leave-to {
+  opacity: 0;
+}
+
+html.主题过渡 *,
+html.主题过渡 *::before,
+html.主题过渡 *::after {
+  transition: background-color var(--时长短) var(--缓匀), color var(--时长短) var(--缓匀), border-color var(--时长短) var(--缓匀), fill var(--时长短) var(--缓匀), stroke var(--时长短) var(--缓匀), box-shadow var(--时长短) var(--缓匀) !important;
 }
