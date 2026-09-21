@@ -726,7 +726,14 @@ function 条件节点扫描(源: string, 路径: string): 条件节点[] {
   return 出;
 }
 
+const 站点缓存 = new Map<string, 条件节点[]>();
+
 function 条件节点清单(目录清单 = ['src/views', 'src/components']): 条件节点[] {
+  const 缓存键 = 目录清单.join('|');
+  const 已缓存 = 站点缓存.get(缓存键);
+  if (已缓存 !== undefined) {
+    return 已缓存;
+  }
   const 出: 条件节点[] = [];
   function 走(目录: string): void {
     for (const 名 of fs.readdirSync(目录)) {
@@ -741,6 +748,7 @@ function 条件节点清单(目录清单 = ['src/views', 'src/components']): 条
   for (const 目录 of 目录清单) {
     走(目录);
   }
+  站点缓存.set(缓存键, 出);
   return 出;
 }
 
