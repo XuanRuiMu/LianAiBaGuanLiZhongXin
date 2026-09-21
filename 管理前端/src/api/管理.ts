@@ -221,6 +221,12 @@ export async function 写入封禁(正文: 封禁写入): Promise<封禁写入�
 export type 管理登录请求 = {
   shou_ji_hao: string;
   mi_ma: string;
+  /** FP-03「记住密码」：true 时服务端签发持久刷新 Cookie，会话跨浏览器重开仍然有效 */
+  chi_jiu_hui_hua: boolean;
+};
+
+export type 注销结果 = {
+  yi_tui_chu: boolean;
 };
 
 export type 管理登录结果 = {
@@ -250,9 +256,19 @@ export async function 我的身份(): Promise<当前身份> {
   return 解析包络<当前身份>(响应.data).数据;
 }
 
-export async function 刷新管理令牌(刷新令牌: string): Promise<管理登录结果> {
-  const 响应: AxiosResponse = await 请求实例.post('/api/guan-li/shua-xin', { shua_xin_ling_pai: 刷新令牌 });
+/** 刷新号在 httpOnly Cookie 里，前端读不到：缺省不发正文键，由 Cookie 承载 */
+export async function 刷新管理令牌(刷新令牌?: string): Promise<管理登录结果> {
+  const 响应: AxiosResponse = await 请求实例.post(
+    '/api/guan-li/shua-xin',
+    刷新令牌 === undefined ? {} : { shua_xin_ling_pai: 刷新令牌 },
+    { buTuiDengLu: true },
+  );
   return 解析包络<管理登录结果>(响应.data).数据;
+}
+
+export async function 管理登出(): Promise<注销结果> {
+  const 响应: AxiosResponse = await 请求实例.post('/api/guan-li/tui-chu', {}, { buTuiDengLu: true });
+  return 解析包络<注销结果>(响应.data).数据;
 }
 
 export type 编号请求 = {

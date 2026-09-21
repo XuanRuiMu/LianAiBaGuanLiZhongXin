@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { 使用登录仓库 } from './stores/登录';
 import { 取管理角色文案 } from './枚举映射/管理角色';
@@ -61,17 +61,27 @@ function 切换主题(): void {
   主题.value = 主题.value === 浅色 ? 深色 : 浅色;
 }
 
-function 退出(): void {
+async function 退出(): Promise<void> {
+  if (登录仓库.已登录) {
+    await 登录仓库.注销会话();
+  }
   登录仓库.退出登录();
   void 路由器.push('/deng-lu');
 }
 
-onMounted(() => {
+onMounted(async () => {
   主题.value = 读初始主题();
   应用主题(主题.value);
   登录仓库.同步存储();
+  // FP-03 冷启动一律先续期再复核身份：跨浏览器重开时访问令牌是否还有效只有服务端知道
+  await 登录仓库.续期会话();
   // 每次装载都向服务端复核身份，本地缓存的角色只作首屏提示
   void 同步身份(true);
+  登录仓库.启动续期巡查();
+});
+
+onBeforeUnmount(() => {
+  登录仓库.停止续期巡查();
 });
 </script>
 

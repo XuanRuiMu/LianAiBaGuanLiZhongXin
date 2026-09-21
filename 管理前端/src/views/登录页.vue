@@ -1,7 +1,15 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
-import { 使用登录仓库 } from '../stores/登录';
+import {
+  使用登录仓库,
+  归一登录选项,
+  读登录选项,
+  读记住账号,
+  写登录选项,
+  写记住账号,
+  type 登录选项,
+} from '../stores/登录';
 import { 管理登录 } from '../api/管理';
 import { 取错误展示 } from '../api/请求';
 import XiaoXiTiao from '../components/XiaoXiTiao.vue';
@@ -9,11 +17,27 @@ import { 登录文案 } from '../文案/登录';
 
 const 登录仓库 = 使用登录仓库();
 const 路由器 = useRouter();
-const 手机号 = ref('');
+const 手机号 = ref(读记住账号());
 const 密码 = ref('');
+const 草稿选项 = ref<登录选项>(读登录选项());
 const 错误提示 = ref('');
 const 错误码 = ref('');
 const 提交中 = ref(false);
+
+/** 生效值只由唯一归一点派生，勾选/取消/回读三条路径共用同一条不变量 */
+const 选项 = computed(() => 归一登录选项(草稿选项.value));
+
+watch(
+  草稿选项,
+  (值) => {
+    const 规范 = 归一登录选项(值);
+    写登录选项(规范);
+    if (规范.自动登录 !== 值.自动登录) {
+      草稿选项.value = 规范;
+    }
+  },
+  { deep: true },
+);
 
 async function 提交(): Promise<void> {
   if (手机号.value.trim().length === 0 || 密码.value.length === 0) {
@@ -25,12 +49,17 @@ async function 提交(): Promise<void> {
   错误提示.value = '';
   错误码.value = '';
   try {
-    const 结果 = await 管理登录({ shou_ji_hao: 手机号.value.trim(), mi_ma: 密码.value });
-    if (!登录仓库.设置令牌('yi_deng_lu')) {
+    const 结果 = await 管理登录({
+      shou_ji_hao: 手机号.value.trim(),
+      mi_ma: 密码.value,
+      chi_jiu_hui_hua: 选项.value.记住密码,
+    });
+    if (!登录仓库.设置令牌('yi_deng_lu', 选项.value.记住密码)) {
       错误提示.value = 登录文案.令牌过长;
       错误码.value = '';
       return;
     }
+    写记住账号(选项.value.记住账号 ? 手机号.value : '');
     // YH-108 首屏权限视图直接取登录响应的服务端角色与能力，不等身份接口回来
     登录仓库.设置身份(结果.jiao_se, 结果.neng_li);
     密码.value = '';
@@ -71,6 +100,31 @@ async function 提交(): Promise<void> {
           autocomplete="current-password"
           data-testid="mi-ma-shu-ru"
           @keyup.enter="提交"
+        >
+      </label>
+      <label class="字段 选项">
+        {{ 登录文案.记住账号 }}
+        <input
+          v-model="草稿选项.记住账号"
+          type="checkbox"
+          data-testid="ji-zhu-zhang-hao-gou"
+        >
+      </label>
+      <label class="字段 选项">
+        {{ 登录文案.记住密码 }}
+        <input
+          v-model="草稿选项.记住密码"
+          type="checkbox"
+          data-testid="ji-zhu-mi-ma-gou"
+        >
+      </label>
+      <label class="字段 选项">
+        {{ 登录文案.自动登录 }}
+        <input
+          v-model="草稿选项.自动登录"
+          type="checkbox"
+          :disabled="!选项.记住密码"
+          data-testid="zi-dong-deng-lu-gou"
         >
       </label>
       <XiaoXiTiao
@@ -134,5 +188,12 @@ async function 提交(): Promise<void> {
 .印卡钮 {
   width: 100%;
   margin-top: 4px;
+}
+
+.选项 {
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
 }
 </style>

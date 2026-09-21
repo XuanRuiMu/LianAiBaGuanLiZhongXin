@@ -4,7 +4,7 @@ import {
   type Router,
   type RouteRecordRaw,
 } from 'vue-router';
-import { 读令牌 } from '../stores/登录';
+import { 可免登录进入, 读令牌 } from '../stores/登录';
 
 export const 路由表: RouteRecordRaw[] = [
   { path: '/', redirect: '/zhang-hao' },
@@ -65,8 +65,8 @@ export const 路由表: RouteRecordRaw[] = [
   { path: '/:pathMatch(.*)*', redirect: '/deng-lu' },
 ];
 
-export function 守卫判定(目标路径: string, 令牌: string | null): string | null {
-  const 已登录 = 令牌 !== null && 令牌.length > 0;
+export function 守卫判定(目标路径: string, 令牌: string | null, 可免登录 = true): string | null {
+  const 已登录 = 令牌 !== null && 令牌.length > 0 && 可免登录;
   if (目标路径 === '/deng-lu') {
     return 已登录 ? '/zhang-hao' : null;
   }
@@ -81,7 +81,7 @@ export function 守卫判定(目标路径: string, 令牌: string | null): strin
 
 export function 注册守卫(路由实例: Router): void {
   路由实例.beforeEach((目标) => {
-    const 跳转 = 守卫判定(目标.path, 读令牌());
+    const 跳转 = 守卫判定(目标.path, 读令牌(), 可免登录进入());
     if (跳转 !== null) {
       return 跳转;
     }

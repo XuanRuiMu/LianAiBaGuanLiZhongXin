@@ -15,6 +15,15 @@ import {
 import type { 查询池 } from '../数据库';
 import type { 缓存客户端 } from '../缓存';
 import { 响应依赖缺失, 响应缓存不可用 } from '../错误归一化';
+import {
+  下发会话Cookie,
+  是否持久会话,
+  登记持久会话,
+  读持久会话,
+  注销刷新令牌,
+  刷新令牌Cookie名,
+  刷新令牌缓存前缀,
+} from '../会话';
 import { 取管理角色, 取角色能力, type GuanLiJiaoSe } from '../中间件/管理员';
 import type { 认证请求 } from '../中间件/认证';
 
@@ -42,6 +51,8 @@ export function 创建登录路由(写限流: RequestHandler): Router {
     const 正文 = (请求.body ?? {}) as Record<string, unknown>;
     const 手机号 = 校验手机号('shou_ji_hao', 取可选字符串(正文['shou_ji_hao']));
     const 密码 = 取必填字符串(取可选字符串(正文['mi_ma']), 'mi_ma', 200);
+    // FP-03「记住密码」= 持久会话；布尔入参非法一律按会话级处理
+    const 持久会话 = 是否持久会话(正文);
     // YH-031 管理端密码复杂度收敛：与游戏端同口径8位加字母数字，禁弱口令黑名单
     if (密码.length < 8 || 密码.length > 200 || !/[A-Za-z]/.test(密码) || !/[0-9]/.test(密码)) {
       throw new 校验失败(取文案('登录', '账号或密码错误'));
@@ -74,7 +85,7 @@ export function 创建登录路由(写限流: RequestHandler): Router {
     const 缓存 = 取缓存(请求);
     if (缓存) {
       try {
-        await 缓存.set(`guan_li_deng_lu:${用户编号}`, String(Date.now()), 15 * 60);
+        await 缓存.set(`guan_li_deng_lu:${用户编号}`, String(Date.now()), 当前配置().访问令牌有效秒);
       } catch (错误) {
         日志.警告('管理登录', '登录留痕写入缓存失败', { 错误: 错误 instanceof Error ? 错误.message : String(错误) });
       }
@@ -83,27 +94,14 @@ export function 创建登录路由(写限流: RequestHandler): Router {
     const 刷新编号 = `guan-li-shua-xin-${Date.now()}-${用户编号.slice(0, 8)}`;
     if (缓存) {
       try {
-        await 缓存.set(`guan_li_shua_xin:${刷新编号}`, 用户编号, 刷新有效秒);
+        await 缓存.set(`${刷新令牌缓存前缀}${刷新编号}`, 用户编号, 刷新有效秒);
+        await 登记持久会话(缓存, 刷新编号, 持久会话);
       } catch (错误) {
         日志.警告('管理登录', '刷新令牌写入缓存失败', { 错误: 错误 instanceof Error ? 错误.message : String(错误) });
       }
     }
-    日志.信息('管理登录', '管理身份登录成功', { 用户编号, 角色 });
-    const 安全 = 请求.secure || 请求.headers['x-forwarded-proto'] === 'https' || 当前配置().运行环境 !== 'prod';
-    响应.cookie('guan_li_ling_pai', 令牌, {
-      httpOnly: true,
-      secure: 安全,
-      sameSite: 'strict',
-      maxAge: 15 * 60 * 1000,
-      path: '/api/guan-li',
-    });
-    响应.cookie('guan_li_shua_xin', 刷新编号, {
-      httpOnly: true,
-      secure: 安全,
-      sameSite: 'strict',
-      maxAge: 刷新有效秒 * 1000,
-      path: '/api/guan-li/shua-xin',
-    });
+    日志.信息('管理登录', '管理身份登录成功', { 用户编号, 角色, 持久会话 });
+    下发会话Cookie(请求, 响应, 令牌, 刷新编号, 持久会话);
     成功响应(响应, {
       yong_hu_id: 用户编号,
       yong_hu_ming: 目标['用户名'] === null ? null : String(目标['用户名']),
@@ -125,14 +123,16 @@ export function 创建登录路由(写限流: RequestHandler): Router {
       return;
     }
     const 正文 = (请求.body ?? {}) as Record<string, unknown>;
-    const 刷新令牌 = 取可选字符串(正文['shua_xin_ling_pai']) ?? (typeof 请求.cookies?.['guan_li_shua_xin'] === 'string' ? String(请求.cookies['guan_li_shua_xin']) : undefined);
+    const 刷新令牌 = 取可选字符串(正文['shua_xin_ling_pai']) ?? (typeof 请求.cookies?.[刷新令牌Cookie名] === 'string' ? String(请求.cookies[刷新令牌Cookie名]) : undefined);
     if (刷新令牌 === undefined) {
       失败响应(响应, 400, 取文案('通用', '参数错误'), 错误码.参数有误);
       return;
     }
     let 目标编号: string | null;
+    let 持久会话: boolean;
     try {
-      目标编号 = await 缓存.get(`guan_li_shua_xin:${刷新令牌}`);
+      目标编号 = await 缓存.get(`${刷新令牌缓存前缀}${刷新令牌}`);
+      持久会话 = await 读持久会话(缓存, 刷新令牌);
     } catch (错误) {
       响应缓存不可用(响应, '管理登录', 错误, 请求);
       return;
@@ -142,7 +142,7 @@ export function 创建登录路由(写限流: RequestHandler): Router {
       return;
     }
     try {
-      await 缓存.del(`guan_li_shua_xin:${刷新令牌}`);
+      await 注销刷新令牌(缓存, 刷新令牌);
     } catch (错误) {
       响应缓存不可用(响应, '管理登录', 错误, 请求);
       return;
@@ -162,27 +162,14 @@ export function 创建登录路由(写限流: RequestHandler): Router {
     );
     const 新刷新编号 = `guan-li-shua-xin-${Date.now()}-${目标编号.slice(0, 8)}`;
     try {
-      await 缓存.set(`guan_li_shua_xin:${新刷新编号}`, 目标编号, 当前配置().刷新有效秒);
+      await 缓存.set(`${刷新令牌缓存前缀}${新刷新编号}`, 目标编号, 当前配置().刷新有效秒);
+      await 登记持久会话(缓存, 新刷新编号, 持久会话);
     } catch (错误) {
       响应缓存不可用(响应, '管理登录', 错误, 请求);
       return;
     }
-    日志.信息('管理登录', '管理令牌轮换成功', { 用户编号: 目标编号, 角色 });
-    const 安全 = 请求.secure || 请求.headers['x-forwarded-proto'] === 'https' || 当前配置().运行环境 !== 'prod';
-    响应.cookie('guan_li_ling_pai', 新令牌, {
-      httpOnly: true,
-      secure: 安全,
-      sameSite: 'strict',
-      maxAge: 15 * 60 * 1000,
-      path: '/api/guan-li',
-    });
-    响应.cookie('guan_li_shua_xin', 新刷新编号, {
-      httpOnly: true,
-      secure: 安全,
-      sameSite: 'strict',
-      maxAge: 当前配置().刷新有效秒 * 1000,
-      path: '/api/guan-li/shua-xin',
-    });
+    日志.信息('管理登录', '管理令牌轮换成功', { 用户编号: 目标编号, 角色, 持久会话 });
+    下发会话Cookie(请求, 响应, 新令牌, 新刷新编号, 持久会话);
     成功响应(响应, { yong_hu_id: 目标编号, jiao_se: 角色, neng_li: [...取角色能力(角色)] });
   });
 

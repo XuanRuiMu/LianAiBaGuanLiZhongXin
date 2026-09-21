@@ -6,6 +6,7 @@ import { 失败响应 } from '../响应';
 import { 错误码 } from '../错误码';
 import type { 缓存客户端 } from '../缓存';
 import { 响应依赖缺失, 响应缓存不可用, 响应鉴权或归一 } from '../错误归一化';
+import { 访问令牌Cookie名, 令牌黑名单前缀 } from '../会话';
 
 export interface 令牌载荷 {
   yongHuId: string;
@@ -28,8 +29,8 @@ function 取缓存(请求: Request): 缓存客户端 | undefined {
 
 export async function 认证中间件(请求: Request, 响应: Response, 下一步: NextFunction): Promise<void> {
   const 授权头 = 请求.headers.authorization;
-  const 曲奇令牌 = typeof (请求.cookies as Record<string, unknown> | undefined)?.['guan_li_ling_pai'] === 'string'
-    ? String((请求.cookies as Record<string, unknown>)['guan_li_ling_pai']).trim()
+  const 曲奇令牌 = typeof (请求.cookies as Record<string, unknown> | undefined)?.[访问令牌Cookie名] === 'string'
+    ? String((请求.cookies as Record<string, unknown>)[访问令牌Cookie名]).trim()
     : '';
   const 头令牌 = 授权头 && 授权头.startsWith('Bearer ') ? 授权头.slice(7).trim() : '';
   const 令牌 = 曲奇令牌 || 头令牌;
@@ -61,7 +62,7 @@ export async function 认证中间件(请求: Request, 响应: Response, 下一�
     let 吊销值: string | null = null;
     try {
       if (令牌编号) {
-        已拉黑 = await 缓存.get(`jwt_blacklist:${令牌编号}`);
+        已拉黑 = await 缓存.get(`${令牌黑名单前缀}${令牌编号}`);
       }
       吊销值 = await 缓存.get(`jwt_yong_hu_cheXiao:${用户编号}`);
     } catch (错误) {

@@ -132,6 +132,24 @@ describe('YH-108 角色能力矩阵单源', () => {
     expect(高危门禁数).toBeGreaterThanOrEqual(11);
   });
 
+  // FP-03 注销是会话终结而非业务写：与只读路由同层（认证＋管理员门禁之后），
+  // 既不得挂业务能力门禁，也绝不允许落到登录/刷新那组免门禁公开入口里
+  it('登出端点挂在认证＋管理员门禁之后，且不在 src/路由 的免门禁写入口内', () => {
+    const 应用源 = fs.readFileSync(path.resolve(__dirname, '../../src/应用.ts'), 'utf8');
+    const 挂载点 = 应用源.indexOf('管理路由.use(创建登出路由');
+    expect(挂载点, 'src/应用.ts 未挂载登出路由').toBeGreaterThan(-1);
+    const 之前 = 应用源.slice(0, 挂载点);
+    expect(之前, '登出早于认证中间件挂载').toContain('管理路由.use(认证中间件)');
+    expect(之前, '登出早于管理员门禁挂载').toContain('管理路由.use(管理员门禁)');
+    const 目录 = path.resolve(__dirname, '../../src/路由');
+    for (const 文件 of fs.readdirSync(目录).filter((名) => 名.endsWith('.ts'))) {
+      expect(
+        fs.readFileSync(path.join(目录, 文件), 'utf8'),
+        `登出被写进免门禁的 src/路由/${文件}`,
+      ).not.toContain('tui-chu');
+    }
+  });
+
   // FP-17 统计族守卫：/tong-ji/* 每条 GET 必须挂统计门禁（tong_ji_xie），漏挂即扩权口径失守
   it('src/路由/统计.ts 每条统计 GET 都挂统计门禁', () => {
     const 源 = fs.readFileSync(path.resolve(__dirname, '../../src/路由/统计.ts'), 'utf8');
@@ -522,8 +540,8 @@ describe('YH-108 前端消费点与角色能力矩阵同源', () => {
 
   it('前端高危入口全部按可高危隐藏，缺该能力的角色拿不到按钮', () => {
     const 列表源 = 读前端('views/账号列表.vue');
-    const 高危入口 = ['shou-yu-an-niu', 'hui-shou-an-niu', 'duo-she-an-niu', 'gui-huan-an-niu'];
-    expect(高危入口).toContain('gui-huan-an-niu');
+    const 高危入口 = ['shou-yu-an-niu', 'hui-shou-an-niu', 'jie-guan-an-niu', 'jie-shu-jie-guan-an-niu'];
+    expect(高危入口).toContain('jie-shu-jie-guan-an-niu');
     for (const 标识 of 高危入口) {
       const 位置 = 列表源.indexOf(`data-testid="${标识}"`);
       expect(位置, `账号列表缺少高危入口 ${标识}`).toBeGreaterThan(-1);

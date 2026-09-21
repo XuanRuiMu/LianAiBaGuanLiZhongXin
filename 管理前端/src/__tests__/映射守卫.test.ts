@@ -440,6 +440,8 @@ vi.mock('../api/管理', () => ({
   结束接管: vi.fn(),
   我的身份: vi.fn().mockResolvedValue({ yong_hu_id: 'yi', jiao_se: 'chao_guan', neng_li: ['cha_kan'] }),
   管理登录: vi.fn(),
+  刷新管理令牌: vi.fn().mockRejectedValue(new Error('wei-deng-lu')),
+  管理登出: vi.fn().mockResolvedValue({ yi_tui_chu: true }),
   聊天消息: vi.fn().mockResolvedValue({ 行: [], 分页: undefined }),
   好友消息: vi.fn().mockResolvedValue({ 行: [], 分页: undefined }),
   记忆列表: vi.fn().mockResolvedValue({ 行: [], 分页: undefined }),

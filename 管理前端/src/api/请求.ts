@@ -116,6 +116,13 @@ export const 请求实例: AxiosInstance = axios.create({
   withCredentials: true,
 });
 
+declare module 'axios' {
+  interface AxiosRequestConfig {
+    /** 续期与注销自身的 401 由调用方处置，不得触发「清令牌并跳登录」的全局兜底 */
+    buTuiDengLu?: boolean;
+  }
+}
+
 请求实例.interceptors.request.use((配置) => {
   try {
     const 请求编号 = `qian-duan-${Date.now().toString(36)}-${Math.floor(Math.random() * 46656).toString(36)}`;
@@ -127,17 +134,24 @@ export const 请求实例: AxiosInstance = axios.create({
   return 配置;
 });
 
+const 凭证失效码: readonly string[] = ['WEI_SHOU_QUAN', 'LING_PAI_WU_XIAO'];
+
+/** 服务端已否定本次凭证：只有这一类失败才允许清本地会话，429 与网络抖动都不算 */
+export function 是凭证失效错误(错误: unknown): boolean {
+  return 错误 instanceof 业务错误 && 凭证失效码.includes(错误.cuo_wu_ma);
+}
+
 export function 归一请求错误(错误: unknown): 业务错误 {
   const 原文 = 错误原文(错误);
   if (axios.isAxiosError(错误) && 错误.response) {
     const 状态码 = 错误.response.status;
-    if (状态码 === 401) {
+    const 响应体 = 错误.response.data as Partial<包络失败> | undefined;
+    if (状态码 === 401 && 错误.config?.buTuiDengLu !== true) {
       清除令牌();
       if (typeof window !== 'undefined' && window.location.pathname !== '/deng-lu') {
         window.location.assign('/deng-lu');
       }
     }
-    const 响应体 = 错误.response.data as Partial<包络失败> | undefined;
     if (响应体 !== undefined && 响应体.cheng_gong === false) {
       return new 业务错误(响应体.ti_shi ?? 通用文案.请求失败, 响应体.cuo_wu_ma ?? '');
     }

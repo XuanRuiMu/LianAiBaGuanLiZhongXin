@@ -28,6 +28,8 @@ vi.mock('../api/管理', () => ({
   接管角色: vi.fn(),
   结束接管: vi.fn(),
   管理登录: vi.fn(),
+  刷新管理令牌: vi.fn().mockRejectedValue(new Error('wei-deng-lu')),
+  管理登出: vi.fn().mockResolvedValue({ yi_tui_chu: true }),
   聊天消息: vi.fn(),
   好友消息: vi.fn(),
   记忆列表: vi.fn().mockResolvedValue({ 行: [] }),

@@ -10,6 +10,7 @@ export interface 管理后端配置 {
   缓存连接串: string;
   令牌密钥: string;
   令牌有效期: string;
+  访问令牌有效秒: number;
   刷新有效秒: number;
   管理员手机号: string[];
   允许来源: string[];
@@ -52,13 +53,36 @@ function 取环境列表(键: string): string[] {
     .filter((项) => 项.length > 0);
 }
 
+/** 访问令牌 Cookie 与 JWT_EXPIRES_IN 同源折算秒数；无法折算时回落默认档，禁止各处再手写 15*60 */
+export const 默认访问令牌秒 = 15 * 60;
+
+const 时长单位秒: Record<string, number> = {
+  ms: 0.001,
+  s: 1,
+  m: 60,
+  h: 3600,
+  d: 86400,
+};
+
+export function 折算时长秒(文本: string, 默认秒: number): number {
+  const 匹配 = /^\s*(\d+(?:\.\d+)?)\s*(ms|s|m|h|d)?\s*$/.exec(文本 ?? '');
+  if (匹配 === null) {
+    return 默认秒;
+  }
+  const 数量 = Number(匹配[1]);
+  const 秒 = 数量 * (时长单位秒[匹配[2] ?? 's'] ?? 1);
+  return Number.isFinite(秒) && 秒 > 0 ? Math.round(秒) : 默认秒;
+}
+
 export function 当前配置(): 管理后端配置 {
+  const 令牌有效期 = process.env.JWT_EXPIRES_IN ?? '15m';
   return {
     端口: 取环境整数('MANAGEMENT_BACKEND_PORT', 3100),
     数据库连接串: process.env.DATABASE_URL ?? '',
     缓存连接串: process.env.REDIS_URL ?? '',
     令牌密钥: process.env.JWT_SECRET ?? '',
-    令牌有效期: process.env.JWT_EXPIRES_IN ?? '15m',
+    令牌有效期,
+    访问令牌有效秒: 折算时长秒(令牌有效期, 默认访问令牌秒),
     刷新有效秒: 取环境整数('GUAN_LI_SHUA_XIN_YOU_XIAO_MIAO', 7 * 24 * 60 * 60),
     管理员手机号: 取环境列表('ADMIN_PHONES'),
     允许来源: 取环境列表('ALLOWED_ORIGINS'),
