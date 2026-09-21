@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { parse } from 'vue/compiler-sfc';
 import fs from 'node:fs';
 import { mount } from '@vue/test-utils';
 import { createMemoryHistory, createRouter, useRoute } from 'vue-router';
@@ -258,6 +259,54 @@ const 关键帧布局例外: 例外[] = [
   { 选择器: /^描线现$/, 属性: /^stroke-dashoffset$/, 理由: 'SVG 描线的既有语义，dashoffset 不参与 HTML 布局' },
 ];
 
+const 填充模式位 = /(?:^|\s)(?:both|forwards)(?:\s|$)/;
+
+const 隐形基态: { 属性: RegExp; 隐藏: (值: string) => boolean; 说明: string }[] = [
+  { 属性: /^stroke-dashoffset$/, 隐藏: (值) => 值 !== '0' && 值 !== 'none', 说明: '描边偏移非零即整条路径被推到可视范围外' },
+  { 属性: /^opacity$/, 隐藏: (值) => Number.parseFloat(值) !== 1, 说明: '透明度不足 1 即基态半隐或全隐' },
+  { 属性: /^visibility$/, 隐藏: (值) => 值 === 'hidden' || 值 === 'collapse', 说明: 'visibility 隐藏值' },
+  { 属性: /^transform$/, 隐藏: (值) => /\bscale[xy]?\(\s*0\s*[,)]/.test(值), 说明: 'scale(0) 的 transform 是隐藏值' },
+];
+
+function 扫描填充依赖(样式表: { 路径: string; 文本: string }[]): string[] {
+  const 违例: string[] = [];
+  for (const 项 of 样式表) {
+    for (const 则 of 规则列表(去关键帧(项.文本))) {
+      const 声明们 = 声明列表(则.体内);
+      const 外包 = 声明们.some(
+        (声) => /^(?:animation|animation-fill-mode)$/.test(声.属性) && 填充模式位.test(声.值) && 声.值 !== 'none',
+      );
+      if (!外包) {
+        continue;
+      }
+      for (const 声明 of 声明们) {
+        const 判 = 隐形基态.find((条) => 条.属性.test(声明.属性));
+        if (判 !== undefined && 判.隐藏(声明.值)) {
+          违例.push(`${项.路径} → ${则.选择器} { ${声明.属性}: ${声明.值} } 把可见终态外包给了 animation 填充（${判.说明}），reduce 通配关掉动画后该节点永久隐形`);
+        }
+      }
+    }
+  }
+  return 违例;
+}
+
+function 减少动效块全表(样式表: { 路径: string; 文本: string }[]): { 路径: string; 选择器: string }[] {
+  const 出: { 路径: string; 选择器: string }[] = [];
+  for (const 项 of 样式表) {
+    let 源 = 项.文本;
+    for (let 定位 = 源.indexOf('@media (prefers-reduced-motion'); 定位 >= 0; 定位 = 源.indexOf('@media (prefers-reduced-motion')) {
+      const 块 = 括号块从(源, 源.indexOf('{', 定位));
+      for (const 则 of 规则列表(块)) {
+        if (!/^\*, \*::before, \*::after$/.test(则.选择器) && 声明列表(则.体内).some((声) => /^(?:transition|animation)/.test(声.属性))) {
+          出.push({ 路径: 项.路径, 选择器: 则.选择器 });
+        }
+      }
+      源 = 源.slice(定位 + 1);
+    }
+  }
+  return 出;
+}
+
 const 全表 = 样式清单();
 
 const 主题样式 = 读('src/主题.css');
@@ -363,6 +412,23 @@ describe('FP-04 reduced-motion 必须通配且不得回退成手工枚举', () =
     expect(通配?.体内).toMatch(/animation:\s*none\s*!important/);
     const 多余 = 则.filter((项) => 项.选择器 !== 通配?.选择器 && 声明列表(项.体内).some((声) => 声.属性.startsWith('transition') || 声.属性.startsWith('animation')));
     expect(多余.map((项) => 项.选择器), 'reduce 块又长出了手工枚举名单').toEqual([]);
+  });
+
+  it('关掉动画后必须仍看得见：任何把可见终态外包给 animation 填充的基态都判红', () => {
+    expect(扫描填充依赖(全表), 'reduce 通配会把 animation 整体关掉，基态自身就必须是可见终态').toEqual([]);
+    expect(扫描填充依赖([{ 路径: '脏.css', 文本: '.线 { stroke-dashoffset: 1; animation: 现 1s both; }' }])).toHaveLength(1);
+    expect(扫描填充依赖([{ 路径: '脏.css', 文本: '.条 { opacity: 0; animation-fill-mode: forwards; animation-name: 现; }' }])).toHaveLength(1);
+    expect(扫描填充依赖([{ 路径: '脏.css', 文本: '.卡 { visibility: hidden; animation: 现 1s infinite both; }' }])).toHaveLength(1);
+    expect(扫描填充依赖([{ 路径: '脏.css', 文本: '.点 { transform: scale(0); animation: 现 1s forwards; }' }])).toHaveLength(1);
+    expect(扫描填充依赖([{ 路径: '净.css', 文本: '.行 { animation: 上浮 1s backwards; }' }])).toEqual([]);
+    expect(扫描填充依赖([{ 路径: '净.css', 文本: '.点 { transform: scale(0.4); opacity: 1; animation: 现 1s forwards; }' }])).toEqual([]);
+  });
+
+  it('reduce 枚举禁令覆盖组件 <style> 块：全站任何 reduce 块都不得再长出非通配的节奏选择器', () => {
+    expect(减少动效块全表(全表), 'reduce 块回退成手工枚举，且扫描面必须含组件 <style>').toEqual([]);
+    expect(减少动效块全表([{ 路径: '脏.vue', 文本: '<style>\n@media (prefers-reduced-motion: reduce) {\n  .新类 {\n    animation: none !important;\n  }\n}\n</style>' }])).toEqual([
+      { 路径: '脏.vue', 选择器: '.新类' },
+    ]);
   });
 
   it('反证：把 animation 通配换成旧的枚举清单必须判红', () => {
@@ -537,17 +603,17 @@ describe('FP-05b 层族与站内确认层接线', () => {
     expect(族使用者数(条件节点清单(), '层')).toBe(1);
   });
 
-  it('反证：一个未接 层 族、判据又不是恒定五判据的同类面节点必须判红（守卫不空跑）', () => {
+  it('反证：一个未接 层 族、判据又不是恒定四判据的同类面节点必须判红（守卫不空跑）', () => {
     const 站点 = 条件节点清单();
     expect(恒定归类的结果(站点).违例).toEqual([]);
-    const 伪造: 条件节点 = { 文件: 'src/components/伪造层.vue', 行: 1, 标签: 'div', 指令: 'if', 表达式: '待执行 !== null', 祖先族: '', 链主判据: '', 直接子: false };
+    const 伪造: 条件节点 = { 文件: 'src/components/伪造层.vue', 行: 1, 标签: 'div', 指令: 'if', 表达式: '待执行 !== null', 祖先族: '', 链主判据: '', 直接子: false, 并生循环: false };
     const 结果 = 恒定归类的结果([...站点, 伪造]);
     expect(结果.违例.length).toBe(1);
     expect(结果.违例[0]).toContain('待执行 !== null');
   });
 });
 
-type 条件节点 = { 文件: string; 行: number; 标签: string; 指令: string; 表达式: string; 祖先族: string; 链主判据: string; 直接子: boolean };
+type 条件节点 = { 文件: string; 行: number; 标签: string; 指令: string; 表达式: string; 祖先族: string; 链主判据: string; 直接子: boolean; 并生循环: boolean };
 
 const 动效族 = ['条', '块', '组', '层'];
 
@@ -644,6 +710,7 @@ function 条件节点扫描(源: string, 路径: string): 条件节点[] {
         祖先族: 祖先.length > 0 ? 祖先[祖先.length - 1].族 : '',
         链主判据: 匹[1] === 'if' || 匹[1] === 'show' || 前 === undefined || 断了.has(父) ? '' : 前.链主判据 || 归类(前),
         直接子: 栈.length > 0 && 栈[栈.length - 1].标签 === 'Transition',
+        并生循环: /\sv-for\b/.test(属性),
       };
       上父.set(父, 节点);
       断了.delete(父);
@@ -677,19 +744,31 @@ function 条件节点清单(目录清单 = ['src/views', 'src/components']): 条
   return 出;
 }
 
-function 挂名族清单(路径: string): string[] {
-  const 出: string[] = [];
+function 挂名族清单(路径: string): { 文件: string; 族: string; 动态: boolean }[] {
   if (fs.statSync(路径).isDirectory()) {
-    for (const 名 of fs.readdirSync(路径)) {
-      出.push(...挂名族清单(`${路径}/${名}`));
-    }
-    return 出;
+    return fs.readdirSync(路径).flatMap((名) => 挂名族清单(`${路径}/${名}`));
   }
   if (!路径.endsWith('.vue')) {
-    return 出;
+    return [];
   }
   const 源 = 读(路径);
-  return [...源.matchAll(/<Transition\s+name="([^"]+)"/g)].map((匹) => 匹[1]);
+  const 出: { 文件: string; 族: string; 动态: boolean }[] = [];
+  let 游 = 0;
+  while ((游 = 源.indexOf('<Transition', 游)) >= 0) {
+    if (/[a-zA-Z]/.test(源.charAt(游 + 11))) {
+      游 += 11;
+      continue;
+    }
+    const 结 = 标签结束(源, 游);
+    if (结 < 0) {
+      break;
+    }
+    const 属性 = 源.slice(游, 结);
+    const 静 = /\sname="([^"]+)"/.exec(属性);
+    出.push({ 文件: 路径, 族: 静 === null ? '' : 静[1], 动态: 静 === null && /\s:name=/.test(属性) });
+    游 = 结 + 1;
+  }
+  return 出;
 }
 
 function 内建过渡根族表(): Record<string, string> {
@@ -701,10 +780,55 @@ function 内建过渡根族表(): Record<string, string> {
   return 出;
 }
 
+function 函数体(源: string, 名: string): string {
+  const 声明 = new RegExp(`function ${名}\\(`).exec(源);
+  if (声明 === null) {
+    return '';
+  }
+  const 开 = 源.indexOf('{', 声明.index);
+  return 开 < 0 ? '' : 括号块从(源, 开);
+}
+
+const 能力写点封闭 = (仓库: string): boolean => {
+  const 全站 = (仓库.match(/能力列表\.value =/g) ?? []).length;
+  const 允许 = ['设置身份', '同步存储', '退出登录'].map((名) => 函数体(仓库, 名)).join('\n');
+  return 全站 > 0 && 全站 === (允许.match(/能力列表\.value =/g) ?? []).length;
+};
+
+function 非测试源码清单(目录 = 'src'): string[] {
+  const 出: string[] = [];
+  for (const 名 of fs.readdirSync(目录)) {
+    if (名 === '__tests__') {
+      continue;
+    }
+    const 全 = `${目录}/${名}`;
+    if (fs.statSync(全).isDirectory()) {
+      出.push(...非测试源码清单(全));
+    } else if (名.endsWith('.ts') || 名.endsWith('.vue')) {
+      出.push(全);
+    }
+  }
+  return 出;
+}
+
+const 读方越界 = (源: string): boolean => [...源.matchAll(/能力列表\.([\w[]+)/g)].some((匹) => 匹[1] !== 'includes');
+
+const 能力读方封闭 = (): boolean =>
+  非测试源码清单()
+    .filter((文件) => 文件 !== 'src/stores/登录.ts')
+    .every((文件) => !读方越界(读(文件)));
+
+const 冷启动放行前提 = (仓库 = 读('src/stores/登录.ts'), 路由 = 读('src/router/index.ts')): boolean => {
+  const 单次闸门 = /function 冷启动会话\(\): Promise<boolean> \{[\s\S]{0,80}?if \(冷启动已续期\) \{[\s\S]{0,80}?冷启动已续期 = true;[\s\S]{0,80}?return 续期会话\(\);/.test(仓库);
+  const 守卫等待 = /路由实例\.beforeEach\(async \(目标\) => \{[\s\S]{0,240}?if \(持久令牌冷启动\(\) && 守卫判定\(目标\.path, null, false\) !== null\) \{[\s\S]{0,120}?await 使用登录仓库\(\)\.冷启动会话\(\);[\s\S]{0,240}?return 守卫判定\(目标\.path, 读令牌\(\), 可免登录进入\(\)\)/.test(路由);
+  return 单次闸门 && 守卫等待 && /export function 持久令牌冷启动\(\): boolean \{/.test(仓库);
+};
+
 const 权限位前提 = (): boolean => {
   const 仓库 = 读('src/stores/登录.ts');
-  const 路由 = 读('src/router/index.ts');
-  return /const 能力列表 = ref<管理能力名\[\]>\(读能力\(\)\)/.test(仓库) && /路由实例\.beforeEach\(\(目标\) => \{/.test(路由) && !/beforeEach\(async/.test(路由);
+  return (
+    /const 能力列表 = ref<管理能力名\[\]>\(读能力\(\)\)/.test(仓库) && 能力写点封闭(仓库) && 能力读方封闭() && 冷启动放行前提()
+  );
 };
 
 function 随行前提(文件: string): boolean {
@@ -713,16 +837,53 @@ function 随行前提(文件: string): boolean {
   return 切换.length > 0 && 切换.every((体) => /行列表\.value = \[\]/.test(体));
 }
 
+const 动态运算符 = /\?|&&|\|\||\.length/;
+
+function 转短横线(名: string): string {
+  return 名.replace(/[A-Z]/g, (词) => `-${词.toLowerCase()}`);
+}
+
+function vue源清单(): string[] {
+  const 出: string[] = [];
+  function 走(目录: string): void {
+    for (const 名 of fs.readdirSync(目录)) {
+      const 全 = `${目录}/${名}`;
+      if (fs.statSync(全).isDirectory()) {
+        走(全);
+      } else if (名.endsWith('.vue')) {
+        出.push(全);
+      }
+    }
+  }
+  for (const 目录 of ['src/views', 'src/components']) {
+    走(目录);
+  }
+  return [...出, 'src/App.vue'];
+}
+
+const 装载实参封闭 = (属性名: string): boolean => {
+  const 绑 = new RegExp(`:${转短横线(属性名)}="([^"]*)"`, 'g');
+  const 实参: string[] = [];
+  for (const 文件 of vue源清单()) {
+    for (const 匹 of 读(文件).matchAll(绑)) {
+      实参.push(匹[1].trim());
+    }
+  }
+  return 实参.length > 0 && 实参.every((式) => /^[\w\u4e00-\u9fa5]+文案\.[\w\u4e00-\u9fa5]+$/.test(式) || /^'[^']*'$/.test(式));
+};
+
 const 恒定判据: { 码: string; 判定: (节点: 条件节点) => boolean; 理由: string }[] = [
   {
     码: '恒定:权限位',
-    判定: (节点) => /^登录仓库\.可/.test(节点.表达式) && 权限位前提(),
-    理由: '能力位在 stores/登录.ts 由 读能力() 同步初始化，视图挂载后只在退出登录/身份复核时翻转，而那两刻整页正在走 页-* 离场',
+    判定: (节点) => /^登录仓库\.(?:可高危|可封禁|可封禁审核)$/.test(节点.表达式) && 权限位前提(),
+    理由: '能力位同步初始化且写点封闭在服务端复核链上；跨浏览器重开的自动登录路径由路由守卫在放行前 await 冷启动会话()，权限视图在首帧即完整',
   },
   {
     码: '恒定:分支',
-    判定: (节点) => /^(?:渲染为(?:徽标|链接)\(|quLianJie$|项\.插槽$|mingCheng === )/.test(节点.表达式) || 节点.链主判据 === '恒定:分支',
-    理由: '互斥渲染分支由列定义/图标名静态选定，同一提交周期内只选一条，不存在同一节点出入场',
+    判定: (节点) =>
+      !动态运算符.test(节点.表达式) &&
+      (/^(?:渲染为(?:徽标|链接)\(|quLianJie$|项\.插槽$|mingCheng === )/.test(节点.表达式) || 节点.链主判据 === '恒定:分支'),
+    理由: '互斥渲染分支由列定义与 项.插槽 静态选定，同一提交周期内只选一条；表达式含 ?/||/&&/.length 即为动态选形，不得免做',
   },
   {
     码: '恒定:随行',
@@ -730,14 +891,9 @@ const 恒定判据: { 码: string; 判定: (节点: 条件节点) => boolean; �
     理由: '页签门控的行内节点，切换时父级 块 族整块离场再进场，行内节点不会单独被看见',
   },
   {
-    码: '恒定:内建过渡',
-    判定: (节点) => Object.prototype.hasOwnProperty.call(内建过渡组件, 节点.标签),
-    理由: '该组件根节点自带登记族过渡，调用点无须再包一层',
-  },
-  {
     码: '恒定:装载属性',
-    判定: (节点) => /^[a-zA-Z]+$/.test(节点.表达式) && 属性门控(节点),
-    理由: '门控位是 defineProps 的静态属性且组件内无同名 ref，挂载期恒定',
+    判定: (节点) => /^[a-zA-Z]+$/.test(节点.表达式) && 属性门控(节点) && 装载实参封闭(节点.表达式),
+    理由: '门控位是 defineProps 的静态属性、组件内无同名 ref，且全站调用点实参一律是文案常量或字面量，挂载期恒定',
   },
 ];
 
@@ -748,6 +904,9 @@ function 属性门控(节点: 条件节点): boolean {
 }
 
 function 归类(节点: 条件节点): string {
+  if (节点.并生循环 || (节点.直接子 && 节点.标签 === 'template')) {
+    return '';
+  }
   if (节点.直接子 && 动效族.includes(节点.祖先族)) {
     return `族:${节点.祖先族}`;
   }
@@ -784,6 +943,53 @@ function 按判据计数(站点: 条件节点[], 判据: string): number {
   return 站点.filter((节点) => 归类(节点) === 目标 || `族:${目标}` === 归类(节点)).length;
 }
 
+function ast条件节点数(目录清单: string[]): { 总数: number; 明细: Record<string, number> } {
+  const 明细: Record<string, number> = {};
+  let 总数 = 0;
+  function 走(目录: string): void {
+    for (const 名 of fs.readdirSync(目录)) {
+      const 全 = `${目录}/${名}`;
+      if (fs.statSync(全).isDirectory()) {
+        走(全);
+        continue;
+      }
+      if (!名.endsWith('.vue')) {
+        continue;
+      }
+      const 解析 = parse(读(全), { filename: 全 });
+      if (解析.errors.length > 0) {
+        throw new Error(`${全} 编译失败：${解析.errors.map((错) => 错.message).join('；')}`);
+      }
+      const 根 = 解析.descriptor.template === null ? undefined : 解析.descriptor.template.ast;
+      let 计 = 0;
+      const 指令名 = new Set(['if', 'else-if', 'else', 'show']);
+      function 遍历(节: unknown): void {
+        const 项 = 节 as { props?: unknown[]; children?: unknown[] };
+        if (Array.isArray(项.props) && 项.props.some((牌) => {
+          const 导 = 牌 as { type?: number; name?: string };
+          return 导.type === 7 && typeof 导.name === 'string' && 指令名.has(导.name);
+        })) {
+          计 += 1;
+        }
+        if (Array.isArray(项.children)) {
+          for (const 子 of 项.children) {
+            遍历(子);
+          }
+        }
+      }
+      if (根) {
+        遍历(根);
+      }
+      明细[全] = 计;
+      总数 += 计;
+    }
+  }
+  for (const 目录 of 目录清单) {
+    走(目录);
+  }
+  return { 总数, 明细 };
+}
+
 describe('FP-05 组件级动效与瞬时面穷尽', () => {
   it('三族各自齐 enter-active/leave-active/enter-from/leave-to，只动 transform/opacity 且全部引用 token', () => {
     const 则 = 规则列表(去关键帧(主题样式));
@@ -812,20 +1018,22 @@ describe('FP-05 组件级动效与瞬时面穷尽', () => {
     }
   });
 
-  it('每个登记族都有真实使用者，模板里挂的族名一律在登记表内（僵尸族与野族名都判红）', () => {
+  it('每个登记族都有真实使用者，模板里挂的族名一律在登记表内（僵尸族、野族名与绑定式族名都判红）', () => {
     const 站点 = 条件节点清单();
     for (const 族 of 动效族) {
       expect(族使用者数(站点, 族), `${族} 族已无使用者`).toBeGreaterThan(0);
     }
-    const 野 = new Set<string>();
-    for (const 目录 of ['src/views', 'src/components', 'src/App.vue']) {
-      for (const 项 of 挂名族清单(目录)) {
-        if (!动效族.includes(项 as '条') && 项 !== '栏') {
-          野.add(`${项}`);
-        }
-      }
-    }
-    expect([...野], '模板里出现未登记的过渡族名').toEqual([]);
+    const 全部挂名 = ['src/views', 'src/components', 'src/App.vue'].flatMap((目录) => 挂名族清单(目录));
+    expect(全部挂名.length).toBeGreaterThan(0);
+    const 无名 = 全部挂名.filter((项) => 项.族 === '' && !项.动态).map((项) => 项.文件);
+    expect(无名, '<Transition> 未挂字面族名').toEqual([]);
+    const 已登记 = new Set([...动效族, '栏', 过渡前进, 过渡后退]);
+    const 野 = [...new Set(全部挂名.filter((项) => 项.族 !== '' && !已登记.has(项.族)).map((项) => 项.族))];
+    expect(野, '模板里出现未登记的过渡族名').toEqual([]);
+    expect(
+      全部挂名.filter((项) => 项.动态).map((项) => 项.文件),
+      ':name 绑定的族名只允许出现在 App.vue 的方向感知路由过渡一处',
+    ).toEqual(['src/App.vue']);
   });
 
   it('穷尽性：视图与组件的每一个条件节点都必须落到登记族或封闭的恒定判据，落不到即判红', () => {
@@ -848,7 +1056,7 @@ describe('FP-05 组件级动效与瞬时面穷尽', () => {
     expect(块).toMatch(/transition: none !important;/);
     for (const 族 of 动效族) {
       expect(块, `${族} 族被塞进 reduce 块，回退成手工枚举`).not.toContain(`.${族}-`);
-      const 绕过 = 规则列表(去关键帧(主题样式)).filter((项) => 项.选择器.includes(`${族}-`) && /!important/.test(项.体内));
+      const 绕过 = 全表.flatMap((项) => 规则列表(去关键帧(项.文本))).filter((项) => 项.选择器.includes(`${族}-`) && /!important/.test(项.体内));
       expect(绕过.map((项) => 项.选择器), `${族} 族用 !important 绕开通配`).toEqual([]);
     }
     const 全站规则 = 全表.flatMap((项) => 规则列表(去关键帧(项.文本)));
@@ -881,13 +1089,155 @@ describe('FP-05 组件级动效与瞬时面穷尽', () => {
     const 脏源 = 读('src/views/思考链.vue').replace(/<Transition name="块">(\s*)<ol/, '<ol$1');
     const 脏模板 = 条件节点扫描(脏源, 'src/views/思考链.vue');
     expect(恒定归类的结果(脏模板).违例.some((项) => 项.includes('行列表.length > 0'))).toBe(true);
-    const 伪造: 条件节点[] = [...站点, { 文件: 'src/views/伪造.vue', 行: 1, 标签: 'div', 指令: 'if', 表达式: '某流水.length > 0', 祖先族: '', 链主判据: '', 直接子: false }];
+    const 伪造: 条件节点[] = [...站点, { 文件: 'src/views/伪造.vue', 行: 1, 标签: 'div', 指令: 'if', 表达式: '某流水.length > 0', 祖先族: '', 链主判据: '', 直接子: false, 并生循环: false }];
     expect(恒定归类的结果(伪造).违例.length).toBe(1);
+    const 同节点双指令: 条件节点[] = [...站点, { 文件: 'src/views/伪造.vue', 行: 2, 标签: 'tr', 指令: 'if', 表达式: '行.异常', 祖先族: '块', 链主判据: '', 直接子: true, 并生循环: true }];
+    expect(恒定归类的结果(同节点双指令).违例.some((项) => 项.includes('行.异常'))).toBe(true);
+    const 片段直子: 条件节点[] = [...站点, { 文件: 'src/views/伪造.vue', 行: 3, 标签: 'template', 指令: 'if', 表达式: '错误', 祖先族: '组', 链主判据: '', 直接子: true, 并生循环: false }];
+    expect(恒定归类的结果(片段直子).违例.some((项) => 项.includes('v-if="错误"'))).toBe(true);
+    const 动态选形: 条件节点[] = [...站点, { 文件: 'src/views/伪造.vue', 行: 4, 标签: 'g', 指令: 'if', 表达式: "mingCheng === 主题 ? 'a' : 'b'", 祖先族: '', 链主判据: '', 直接子: false, 并生循环: false }];
+    expect(恒定归类的结果(动态选形).违例.length).toBe(1);
+    const 内建根站点: 条件节点[] = [...站点, { 文件: 'src/views/伪造.vue', 行: 5, 标签: 'XiaoXiTiao', 指令: 'if', 表达式: '说明', 祖先族: '', 链主判据: '', 直接子: false, 并生循环: false }];
+    expect(恒定归类的结果(内建根站点).违例.some((项) => 项.includes('<XiaoXiTiao'))).toBe(true);
     const 脏样式 = 主题样式.replace(/\.块-enter-from,\s\.块-leave-to \{/, '.块-enter-from {');
     expect(选择器全集聚(主题样式).has('.块-leave-to')).toBe(true);
     expect(动效后缀.filter((后缀) => !选择器全集聚(脏样式).has(`.块-${后缀}`))).toEqual(['leave-to']);
     const 脏节奏 = 扫描裸节奏([{ 路径: '脏.css', 文本: '.条-enter-active { transition: opacity 200ms ease-out; }' }], 节奏例外);
     expect(脏节奏.违例.length).toBe(2);
+  });
+});
+
+describe('FP-08 离场语义与站点归类修正', () => {
+  const 离场屏蔽选择器 = '[class*="-leave-active"]';
+
+  function 离场屏蔽缺陷(样式表: { 路径: string; 文本: string }[]): string[] {
+    const 出: string[] = [];
+    for (const 项 of 样式表) {
+      for (const 则 of 规则列表(去关键帧(项.文本))) {
+        for (const 段 of 分选择器(则.选择器)) {
+          if (段 !== 离场屏蔽选择器) {
+            continue;
+          }
+          const 声明们 = 声明列表(则.体内);
+          const 屏蔽 = 声明们.find((声) => 声.属性 === 'pointer-events');
+          if (屏蔽 === undefined || 屏蔽.值 !== 'none' || 声明们.length !== 1) {
+            出.push(`${项.路径} 的 ${段} 规则体必须恰好是一条 pointer-events: none`);
+          }
+        }
+      }
+    }
+    return 出;
+  }
+
+  it('台账有独立枚举源：compiler-sfc 的 AST 与正则扫描器逐文件对拼计数，分叉即红', () => {
+    const 站 = 条件节点清单();
+    const 独立 = ast条件节点数(['src/views', 'src/components']);
+    expect(独立.总数, `AST 枚举 ${独立.总数} ≠ 扫描器枚举 ${站.length}，扫描器在漏计`).toBe(站.length);
+    const 分组: Record<string, number> = {};
+    for (const 项 of 站) {
+      分组[项.文件] = (分组[项.文件] ?? 0) + 1;
+    }
+    const 分叉 = Object.keys(独立.明细)
+      .filter((文件) => 独立.明细[文件] !== (分组[文件] ?? 0))
+      .map((文件) => `${文件}: AST ${独立.明细[文件]} vs 扫描器 ${分组[文件] ?? 0}`);
+    expect(分叉, '扫描器与 AST 逐文件分叉').toEqual([]);
+    const 掉一个 = 站.filter((项) => !(项.文件 === 'src/views/思考链.vue' && 项.表达式 === '行列表.length > 0'));
+    expect(掉一个.length).toBe(站.length - 1);
+    expect(掉一个.length === 独立.总数, '扫描器漏计一个节点就必须被 AST 源抓到').toBe(false);
+  });
+
+  it('离场节点在动画期内不得可点：一条后缀通配屏蔽全部族的 leave-active', () => {
+    const 命中 = 全表
+      .flatMap((项) => 规则列表(去关键帧(项.文本)))
+      .filter((则) => 分选择器(则.选择器).includes(离场屏蔽选择器));
+    expect(命中.length, '离场屏蔽规则必须存在且只能有一条').toBe(1);
+    expect(离场屏蔽缺陷(全表)).toEqual([]);
+    const 词 = /^\[class\*="([^"]+)"\]$/.exec(离场屏蔽选择器);
+    expect(词?.[1], '屏蔽必须按 -leave-active 后缀通配，写成枚举就能漏掉新族').toBe('-leave-active');
+    for (const 族 of [...动效族, '栏', 过渡前进, 过渡后退]) {
+      expect(选择器全集聚(主题样式).has(`.${族}-leave-active`), `${族} 族缺 leave-active，通配屏蔽会落空`).toBe(true);
+    }
+    const 拆掉 = 全表.map((项) => ({ 路径: 项.路径, 文本: 项.文本.replace(/\[class\*="-leave-active"\]\s*\{\s*pointer-events:\s*none;\s*\}/, '[class*="-leave-active"] {\n  color: inherit;\n}') }));
+    expect(离场屏蔽缺陷(拆掉)).toHaveLength(1);
+  });
+
+  it('QueRenCeng 的 aria id 是静态的，全站只能有一个挂载点', () => {
+    const 挂载点 = vue源清单().filter((文件) => 文件 !== 'src/components/QueRenCeng.vue' && /<QueRenCeng[\s>]/.test(读(文件)));
+    expect(挂载点, '第二个实例会让静态 aria-labelledby/describedby 指向错节点，须改实例唯一 id 后再登记').toEqual(['src/views/账号列表.vue']);
+    const 声明 = 读('src/components/QueRenCeng.vue');
+    expect([...声明.matchAll(/id="que-ren-ceng-[\w-]+"/g)].map((匹) => 匹[0])).toHaveLength(2);
+  });
+
+  it('恒定:内建过渡判据已废除：组件根自带族过渡不再为调用点的 v-if 免做', () => {
+    expect(恒定判据.map((条) => 条.码)).not.toContain('恒定:内建过渡');
+    expect(条件节点清单().some((节点) => Object.prototype.hasOwnProperty.call(内建过渡组件, 节点.标签)), '内建过渡组件的调用点不得再写 v-if').toBe(false);
+    const 外壳模板 = 读('src/views/思考链.vue');
+    expect(外壳模板).toMatch(/:xian-shi="!说明 \|\| 说明\.dai_bu_chong\.length === 0"/);
+    expect(外壳模板).not.toMatch(/<XiaoXiTiao\s+v-if=/);
+  });
+
+  it('P4 前提是机器可检的封闭判据，不是存在性检查', () => {
+    expect(权限位前提(), '恒定:权限位的三条前提必须同时成立：同步初始化 + 写读点封闭 + 守卫放行前已 await').toBe(true);
+    expect(读方越界('const 补位 = () => 登录仓库.能力列表.push(\'gao_we\');'), '外部改数组能绕过挂载期恒定').toBe(true);
+    expect(读方越界('const 清空 = () => { 登录仓库.能力列表.value = []; };')).toBe(true);
+    expect(读方越界('const 可见 = computed(() => 导航.filter((项) => 登录仓库.能力列表.includes(项.需能力)));')).toBe(false);
+    expect(能力写点封闭('function 设置身份(): void {\n    能力列表.value = [];\n  }\n  function 别处(): void {\n    能力列表.value = [];\n  }')).toBe(false);
+    expect(能力写点封闭('function 设置身份(): void {\n    能力列表.value = [];\n  }')).toBe(true);
+    const 路由源 = 读('src/router/index.ts');
+    expect(冷启动放行前提(读('src/stores/登录.ts'), 路由源.replace('beforeEach(async', 'beforeEach(').replace('await 使用登录仓库().冷启动会话();', '')), '守卫退回同步放行必须让前提判红').toBe(false);
+    expect(冷启动放行前提(读('src/stores/登录.ts').replace('冷启动已续期 = true;', ''), 路由源), '单次闸门被摘掉必须让前提判红').toBe(false);
+    expect(冷启动放行前提(读('src/stores/登录.ts').replace('export function 持久令牌冷启动', 'function 持久令牌冷启动'), 路由源), '冷启动判定不再是导出真源必须让前提判红').toBe(false);
+  });
+
+  it('待补充空态经 条 族在两向都真的消费 enter 与 leave 类', async () => {
+    const { default: XiaoXiTiao } = await import('../components/XiaoXiTiao.vue');
+    const 原始 = window.getComputedStyle;
+    const 等 = (毫秒: number): Promise<void> => new Promise((完成) => setTimeout(完成, 毫秒));
+    // jsdom 不注入 CSS，getComputedStyle 的时长恒为 0s，Vue 会跳过过渡帧直接摘节点：
+    // 这里把时长桩成真实档位，好让 enter/leave 两类落在 DOM 上可被断言（只桩测试环境，不动实现）。
+    vi.spyOn(window, 'getComputedStyle').mockImplementation(((目: Element) => {
+      const 样 = 原始(目) as CSSStyleDeclaration;
+      return new Proxy(样, {
+        get: (标, 键) => {
+          if (键 === 'transitionDuration') {
+            return '0.16s';
+          }
+          if (键 === 'transitionDelay') {
+            return '0s';
+          }
+          if (键 === 'transitionProperty') {
+            return 'opacity, transform';
+          }
+          return Reflect.get(标, 键) as never;
+        },
+      });
+    }) as unknown as typeof window.getComputedStyle);
+    const 包装 = mount(XiaoXiTiao, { props: { xingTai: 'kong', xianShi: false, wenBen: '待补充' }, attachTo: document.body });
+    const 场内 = (): Element | null => document.body.querySelector('.空态');
+    const 类名 = (): string[] => (场内() === null ? [] : [...场内()!.classList]);
+    async function 等条件(谓词: () => boolean, 说明: string): Promise<void> {
+      for (let 次 = 0; 次 < 40; 次++) {
+        if (谓词()) {
+          return;
+        }
+        await 等(25);
+      }
+      throw new Error(`${说明}；实际类名：${类名().join(' ')}`);
+    }
+    try {
+      expect(场内()).toBe(null);
+      await 包装.setProps({ xianShi: true });
+      await nextTick();
+      expect(类名()).toEqual(expect.arrayContaining(['空态', '条-enter-from', '条-enter-active']));
+      await 等条件(() => !类名().some((名) => 名.startsWith('条-')), '入场过渡类未在时限内收敛');
+      await 包装.setProps({ xianShi: false });
+      await 等条件(() => 类名().includes('条-leave-active'), '离场帧未出现 条-leave-active，说明没有出动画');
+      expect(场内(), '离场帧必须仍在场内').not.toBe(null);
+      await 等条件(() => 场内() === null, '离场结束后节点未被摘除');
+    } finally {
+      vi.restoreAllMocks();
+      包装.unmount();
+    }
   });
 });
 

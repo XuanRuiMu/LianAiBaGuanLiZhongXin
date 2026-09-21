@@ -129,6 +129,10 @@ export function 可免登录进入(): boolean {
   return 读持久原始(会话键) !== null && 读登录选项().自动登录;
 }
 
+export function 持久令牌冷启动(): boolean {
+  return 读会话令牌() === null && 读持久原始(会话键) !== null;
+}
+
 function 读角色(): 管理角色名 | null {
   return 规范角色(读原始(角色键));
 }
@@ -205,6 +209,15 @@ export const 使用登录仓库 = defineStore('deng-lu', () => {
   const 可统计 = computed(() => 能力列表.value.includes('tong_ji_xie'));
   const 可管理 = computed(() => 管理角色.value !== null);
   let 续期在途: Promise<boolean> | null = null;
+  let 冷启动已续期 = false;
+
+  function 冷启动会话(): Promise<boolean> {
+    if (冷启动已续期) {
+      return Promise.resolve(已登录.value);
+    }
+    冷启动已续期 = true;
+    return 续期会话();
+  }
 
   function 设置令牌(原始: string, 持久会话 = false): boolean {
     const 规范 = 规范令牌(原始);
@@ -322,6 +335,7 @@ export const 使用登录仓库 = defineStore('deng-lu', () => {
     退出登录,
     注销会话,
     续期会话,
+    冷启动会话,
     需要续期,
     启动续期巡查,
     停止续期巡查,

@@ -4,7 +4,7 @@ import {
   type Router,
   type RouteRecordRaw,
 } from 'vue-router';
-import { 可免登录进入, 读令牌 } from '../stores/登录';
+import { 使用登录仓库, 可免登录进入, 持久令牌冷启动, 读令牌 } from '../stores/登录';
 
 export const 路由表: RouteRecordRaw[] = [
   { path: '/', redirect: '/zhang-hao' },
@@ -80,10 +80,14 @@ export function 守卫判定(目标路径: string, 令牌: string | null, 可免
 }
 
 export function 注册守卫(路由实例: Router): void {
-  路由实例.beforeEach((目标) => {
+  路由实例.beforeEach(async (目标) => {
     const 跳转 = 守卫判定(目标.path, 读令牌(), 可免登录进入());
     if (跳转 !== null) {
       return 跳转;
+    }
+    if (持久令牌冷启动() && 守卫判定(目标.path, null, false) !== null) {
+      await 使用登录仓库().冷启动会话();
+      return 守卫判定(目标.path, 读令牌(), 可免登录进入()) ?? true;
     }
     return true;
   });

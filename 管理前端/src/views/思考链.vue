@@ -205,8 +205,8 @@ onMounted(() => {
         </div>
       </Transition>
       <XiaoXiTiao
-        v-if="!说明 || 说明.dai_bu_chong.length === 0"
         xing-tai="kong"
+        :xian-shi="!说明 || 说明.dai_bu_chong.length === 0"
         :wen-ben="通用文案.待补充"
         ce-shi-biao-shi="kong-tai-dai-bu-chong"
       />

@@ -839,7 +839,6 @@ input.输入:-webkit-autofill {
 
 .描线 {
   stroke-dasharray: 1;
-  stroke-dashoffset: 1;
   animation: 描线现 var(--时长描) var(--缓出) var(--时长短) both;
 }
 
@@ -1034,4 +1033,8 @@ html.主题过渡 *::after {
 .层-leave-to {
   opacity: 0;
   transform: translateY(var(--位移近));
+}
+
+[class*="-leave-active"] {
+  pointer-events: none;
 }

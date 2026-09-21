@@ -8,6 +8,7 @@ import {
   勾选登录选项,
   清除令牌,
   可免登录进入,
+  持久令牌冷启动,
   读令牌,
   读登录选项,
   读记住账号,
@@ -15,9 +16,9 @@ import {
   默认登录选项,
   type 登录选项,
 } from '../stores/登录';
-import { 守卫判定, 路由表 } from '../router';
+import { 守卫判定, 注册守卫, 路由表 } from '../router';
 import { 业务错误 } from '../api/请求';
-import { 管理登录, 管理登出, 刷新管理令牌 } from '../api/管理';
+import { 管理登录, 管理登出, 刷新管理令牌, type 管理登录结果 } from '../api/管理';
 import { 登录选项存储键, 记住账号存储键, 会话续期间隔毫秒 } from '../配置';
 import { 取文案 } from '../文案/聚合';
 
@@ -492,5 +493,96 @@ describe('FP-03 死代码清除结论', () => {
     const 接口模块 = await import('../api/管理');
     expect(typeof 接口模块.刷新管理令牌).toBe('function');
     expect(typeof 接口模块.管理登出).toBe('function');
+  });
+});
+
+describe('FP-08 冷启动自动登录的权限视图就绪', () => {
+  function 持久标记冷启动(自动 = true): void {
+    window.localStorage.setItem('guan_li_hui_hua', 'yi_deng_lu');
+    写登录选项({ 记住账号: false, 记住密码: true, 自动登录: 自动 });
+  }
+
+  function 建路由() {
+    const 路由器 = createRouter({ history: createMemoryHistory(), routes: 路由表 });
+    注册守卫(路由器);
+    return 路由器;
+  }
+
+  const 轮换回包: 管理登录结果 = {
+    yong_hu_id: 'yi',
+    yong_hu_ming: null,
+    jiao_se: 'chao_guan',
+    neng_li: ['cha_kan', 'gao_we'],
+  };
+
+  it('持久标记冷启动判定精确：只有跨重开只剩持久层才算', () => {
+    expect(持久令牌冷启动()).toBe(false);
+    持久标记冷启动();
+    expect(持久令牌冷启动()).toBe(true);
+    使用登录仓库().设置令牌('yi_deng_lu', false);
+    expect(持久令牌冷启动(), '本次浏览器已有会话标记时不算冷启动').toBe(false);
+  });
+
+  it('路由放行前身份已就绪：首帧即带全部权限入口，不得中途补位', async () => {
+    持久标记冷启动();
+    vi.mocked(刷新管理令牌).mockResolvedValue(轮换回包);
+    const 仓库 = 使用登录仓库();
+    expect(仓库.可高危, '前置：冷启动那一刻能力位确实是空的').toBe(false);
+    const 路由器 = 建路由();
+    await 路由器.push('/zhang-hao');
+    expect(刷新管理令牌).toHaveBeenCalledTimes(1);
+    expect(仓库.能力列表).toEqual(['cha_kan', 'gao_we']);
+    expect(仓库.可高危, '守卫放行时权限视图必须已完整').toBe(true);
+    expect(路由器.currentRoute.value.path).toBe('/zhang-hao');
+  });
+
+  it('单次闸门：守卫与外壳装载共用同一次轮换，跳页不重复请求', async () => {
+    持久标记冷启动();
+    vi.mocked(刷新管理令牌).mockResolvedValue(轮换回包);
+    const 仓库 = 使用登录仓库();
+    const 路由器 = 建路由();
+    await Promise.all([路由器.push('/zhang-hao'), 仓库.冷启动会话(), 仓库.冷启动会话()]);
+    expect(刷新管理令牌).toHaveBeenCalledTimes(1);
+    await 路由器.push('/liao-tian');
+    await 路由器.push('/shen-ji');
+    expect(刷新管理令牌, '同一浏览器内的后续跳页不得再等身份').toHaveBeenCalledTimes(1);
+    仓库.同步存储();
+    expect(仓库.可高危).toBe(true);
+  });
+
+  it('免登录页不参与等待：只勾记住密码未勾自动登录时，登录表单不被续期挡在后面', async () => {
+    持久标记冷启动(false);
+    const 路由器 = 建路由();
+    await 路由器.push('/zhang-hao');
+    expect(路由器.currentRoute.value.path).toBe('/deng-lu');
+    expect(刷新管理令牌, '登录页没有权限视图要等，守卫不得在此触发一次性轮换').not.toHaveBeenCalled();
+  });
+
+  it('凭证被服务端否定：送回登录页且不卡死，仍可手动登录', async () => {
+    持久标记冷启动();
+    vi.mocked(刷新管理令牌).mockRejectedValue(new 业务错误('登录续期已过期，请重新登录', 'LING_PAI_WU_XIAO'));
+    const 仓库 = 使用登录仓库();
+    const 路由器 = 建路由();
+    await 路由器.push('/zhang-hao');
+    expect(路由器.currentRoute.value.path).toBe('/deng-lu');
+    expect(仓库.已登录).toBe(false);
+    expect(读令牌()).toBeNull();
+  });
+
+  it('限流与网络抖动不卡死：照常放行，能力位按空渲染', async () => {
+    持久标记冷启动();
+    vi.mocked(刷新管理令牌).mockRejectedValue(new 业务错误('请求过于频繁，请稍后再试', 'XIAN_LIU'));
+    const 路由器 = 建路由();
+    await 路由器.push('/zhang-hao');
+    expect(路由器.currentRoute.value.path).toBe('/zhang-hao');
+    expect(使用登录仓库().已登录).toBe(true);
+  });
+
+  it('本次浏览器已登录过的路径不经过等待，守卫保持同步语义', async () => {
+    window.sessionStorage.setItem('guan_li_hui_hua', 'yi_deng_lu');
+    const 路由器 = 建路由();
+    await 路由器.push('/zhang-hao');
+    expect(路由器.currentRoute.value.path).toBe('/zhang-hao');
+    expect(刷新管理令牌, '非冷启动不得被守卫触发轮换').not.toHaveBeenCalled();
   });
 });
