@@ -1,6 +1,6 @@
 import { Router, type Request, type Response } from 'express';
 import { 取文案 } from '../文案';
-import { 成功响应, 失败响应 } from '../响应';
+import { 成功响应 } from '../响应';
 import {
   校验UUID,
   校验手机号,
@@ -10,7 +10,9 @@ import {
 } from '../校验';
 import type { 查询池 } from '../数据库';
 import type { 认证请求 } from '../中间件/认证';
+import { 取管理角色 } from '../中间件/管理员';
 import { 取真实IP } from '../真实IP';
+import { 响应依赖缺失 } from '../错误归一化';
 
 function 取池(请求: Request): 查询池 | undefined {
   return (请求.app.locals as { 池?: 查询池 }).池;
@@ -23,8 +25,17 @@ function 掩码手机号(原始: unknown): string {
   return `${原始.slice(0, 3)}****${原始.slice(7)}`;
 }
 
+/** YH-108 三角色口径：角色由服务端按三旗标列推导，三列原始布尔一律不外传，前端不得拿任一单列当二值权限判断 */
+function 补角色(行: Record<string, unknown>): Record<string, unknown> {
+  const 副本: Record<string, unknown> = { ...行, 角色: 取管理角色(行) };
+  delete 副本['管理员'];
+  delete 副本['运营'];
+  delete 副本['审核员'];
+  return 副本;
+}
+
 function 脱敏列表行(行: Record<string, unknown>): Record<string, unknown> {
-  const 副本 = { ...行 };
+  const 副本 = 补角色(行);
   副本['手机号'] = 掩码手机号(副本['手机号']);
   return 副本;
 }
@@ -52,7 +63,7 @@ async function 记敏感读审计(池: 查询池, 请求: Request, 目标用户:
 }
 
 const 列表列 =
-  'u."ID", u."手机号", u."用户名", u."昵称", u."性别", u."管理员", u."人设标签", u."签名", u."创建时间", f."级别" AS "封禁级别", f."违规次数" AS "违规次数", f."申诉状态" AS "申诉状态", f."解封时间" AS "账号解封时间"';
+  'u."ID", u."手机号", u."用户名", u."昵称", u."性别", u."管理员", u."运营", u."审核员", u."人设标签", u."签名", u."创建时间", f."级别" AS "封禁级别", f."违规次数" AS "违规次数", f."申诉状态" AS "申诉状态", f."解封时间" AS "账号解封时间"';
 const 列表来源 = 'FROM "用户" u LEFT JOIN "账号封禁" f ON f."用户ID" = u."ID"';
 
 export function 创建账号路由(): Router {
@@ -61,7 +72,7 @@ export function 创建账号路由(): Router {
   路由.get('/zhang-hao-lie-biao', async (请求: Request, 响应: Response): Promise<void> => {
     const 池 = 取池(请求);
     if (!池) {
-      失败响应(响应, 500, 取文案('通用', '服务器内部错误'), 'NEI_BU_CUO_WU');
+      响应依赖缺失(响应, '账号', '数据库', 请求);
       return;
     }
     const 查询 = 请求.query as Record<string, unknown>;
@@ -77,7 +88,7 @@ export function 创建账号路由(): Router {
     }
     const 手机号 = 取可选字符串(查询['shou_ji_hao']);
     if (手机号 !== undefined) {
-      校验手机号('手机号', 手机号);
+      校验手机号('shou_ji_hao', 手机号);
       参数.push(手机号);
       条件.push(`u."手机号" = $${参数.length}`);
     }
@@ -98,10 +109,10 @@ export function 创建账号路由(): Router {
   路由.get('/zhang-hao-xiang-qing/:yongHuId', async (请求: Request, 响应: Response): Promise<void> => {
     const 池 = 取池(请求);
     if (!池) {
-      失败响应(响应, 500, 取文案('通用', '服务器内部错误'), 'NEI_BU_CUO_WU');
+      响应依赖缺失(响应, '账号', '数据库', 请求);
       return;
     }
-    const 用户编号 = 校验UUID('用户ID', 请求.params.yongHuId);
+    const 用户编号 = 校验UUID('yong_hu_id', 请求.params.yongHuId);
     const 结果 = await 池.query(
       `SELECT ${列表列} ${列表来源} WHERE u."ID" = $1 LIMIT 1`,
       [用户编号],
@@ -116,10 +127,10 @@ export function 创建账号路由(): Router {
   路由.get('/zhang-hao-jie-mi/:yongHuId', async (请求: Request, 响应: Response): Promise<void> => {
     const 池 = 取池(请求);
     if (!池) {
-      失败响应(响应, 500, 取文案('通用', '服务器内部错误'), 'NEI_BU_CUO_WU');
+      响应依赖缺失(响应, '账号', '数据库', 请求);
       return;
     }
-    const 用户编号 = 校验UUID('用户ID', 请求.params.yongHuId);
+    const 用户编号 = 校验UUID('yong_hu_id', 请求.params.yongHuId);
     const 结果 = await 池.query(
       `SELECT ${列表列} ${列表来源} WHERE u."ID" = $1 LIMIT 1`,
       [用户编号],
@@ -128,7 +139,7 @@ export function 创建账号路由(): Router {
       throw new 记录缺失(取文案('账号', '账号不存在'));
     }
     await 记敏感读审计(池, 请求, 用户编号, 'guan_li_jie_mi_shou_ji_hao');
-    成功响应(响应, 结果.rows[0]);
+    成功响应(响应, 补角色(结果.rows[0]));
   });
 
   return 路由;

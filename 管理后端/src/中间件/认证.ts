@@ -3,7 +3,9 @@ import jwt from 'jsonwebtoken';
 import { 当前配置 } from '../配置';
 import { 取文案 } from '../文案';
 import { 失败响应 } from '../响应';
+import { 错误码 } from '../错误码';
 import type { 缓存客户端 } from '../缓存';
+import { 响应依赖缺失, 响应缓存不可用, 响应鉴权或归一 } from '../错误归一化';
 
 export interface 令牌载荷 {
   yongHuId: string;
@@ -32,12 +34,12 @@ export async function 认证中间件(请求: Request, 响应: Response, 下一�
   const 头令牌 = 授权头 && 授权头.startsWith('Bearer ') ? 授权头.slice(7).trim() : '';
   const 令牌 = 曲奇令牌 || 头令牌;
   if (!令牌) {
-    失败响应(响应, 401, 取文案('通用', '未授权'), 'WEI_SHOU_QUAN');
+    失败响应(响应, 401, 取文案('通用', '未授权'), 错误码.未授权);
     return;
   }
   const 缓存 = 取缓存(请求);
   if (!缓存) {
-    失败响应(响应, 500, 取文案('通用', '服务器内部错误'), 'NEI_BU_CUO_WU');
+    响应依赖缺失(响应, '认证', '缓存', 请求);
     return;
   }
   try {
@@ -46,12 +48,12 @@ export async function 认证中间件(请求: Request, 响应: Response, 下一�
       // YH-031 JWT算法白名单：仅HS256，禁none/RS256混淆
       原始 = jwt.verify(令牌, 当前配置().令牌密钥, { algorithms: ['HS256'] }) as unknown as Record<string, unknown>;
     } catch {
-      失败响应(响应, 401, 取文案('通用', '令牌无效'), 'LING_PAI_WU_XIAO');
+      失败响应(响应, 401, 取文案('通用', '令牌无效'), 错误码.登录失效);
       return;
     }
     const 用户编号 = typeof 原始['yongHuId'] === 'string' ? 原始['yongHuId'] : typeof 原始['sub'] === 'string' ? 原始['sub'] : '';
     if (!用户编号) {
-      失败响应(响应, 401, 取文案('通用', '令牌无效'), 'LING_PAI_WU_XIAO');
+      失败响应(响应, 401, 取文案('通用', '令牌无效'), 错误码.登录失效);
       return;
     }
     const 令牌编号 = typeof 原始['jti'] === 'string' ? 原始['jti'] : '';
@@ -62,12 +64,12 @@ export async function 认证中间件(请求: Request, 响应: Response, 下一�
         已拉黑 = await 缓存.get(`jwt_blacklist:${令牌编号}`);
       }
       吊销值 = await 缓存.get(`jwt_yong_hu_cheXiao:${用户编号}`);
-    } catch {
-      失败响应(响应, 500, 取文案('通用', '缓存不可用'), 'HUAN_CUN_BU_KE_YONG');
+    } catch (错误) {
+      响应缓存不可用(响应, '认证', 错误, 请求);
       return;
     }
     if (已拉黑) {
-      失败响应(响应, 401, 取文案('通用', '令牌无效'), 'LING_PAI_WU_XIAO');
+      失败响应(响应, 401, 取文案('通用', '令牌无效'), 错误码.登录失效);
       return;
     }
     if (吊销值 !== null) {
@@ -78,7 +80,7 @@ export async function 认证中间件(请求: Request, 响应: Response, 下一�
             ? 原始['iat'] * 1000
             : undefined;
       if (typeof 签发毫秒 === 'number' && 签发毫秒 <= Number(吊销值)) {
-        失败响应(响应, 401, 取文案('通用', '令牌无效'), 'LING_PAI_WU_XIAO');
+        失败响应(响应, 401, 取文案('通用', '令牌无效'), 错误码.登录失效);
         return;
       }
     }
@@ -93,7 +95,8 @@ export async function 认证中间件(请求: Request, 响应: Response, 下一�
       sub: typeof 原始['sub'] === 'string' ? 原始['sub'] : undefined,
     };
     下一步();
-  } catch {
-    失败响应(响应, 401, 取文案('通用', '令牌无效'), 'LING_PAI_WU_XIAO');
+  } catch (错误) {
+    // 非JWT校验异常不得伪装成令牌无效：归一化后真实原因进日志
+    响应鉴权或归一(响应, 错误, '认证', 请求);
   }
 }

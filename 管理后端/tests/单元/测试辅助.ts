@@ -35,6 +35,7 @@ export function 创建模拟池(处理器?: 行处理器) {
 
 export function 创建模拟缓存(预置: Record<string, string> = {}) {
   const 表 = new Map<string, string>(Object.entries(预置));
+  const 订阅回调 = new Map<string, (消息: string) => void>();
   const 缓存 = {
     get: async (键: string): Promise<string | null> => 表.get(键) ?? null,
     set: async (键: string, 值: string): Promise<unknown> => {
@@ -42,10 +43,16 @@ export function 创建模拟缓存(预置: Record<string, string> = {}) {
       return 'OK';
     },
     del: async (键: string): Promise<unknown> => (表.delete(键) ? 1 : 0),
-    publish: async (): Promise<unknown> => 0,
-    subscribe: async (): Promise<() => void> => () => undefined,
+    publish: async (频道: string, 消息: string): Promise<unknown> => {
+      订阅回调.get(频道)?.(消息);
+      return 1;
+    },
+    subscribe: async (频道: string, 回调: (消息: string) => void): Promise<() => void> => {
+      订阅回调.set(频道, 回调);
+      return () => undefined;
+    },
   };
-  return { 缓存, 表 };
+  return { 缓存, 表, 订阅回调 };
 }
 
 export const 测试用户编号 = '22222222-2222-4222-8222-222222222222';
@@ -74,6 +81,7 @@ export function 创建测试应用(
       subscribe: (频道: string, 回调: (消息: string) => void) => Promise<() => void>;
     };
     管理员?: boolean;
+    旗标?: { 管理员?: boolean; 运营?: boolean; 审核员?: boolean };
     写上限?: number;
     读上限?: number;
   } = {},
@@ -81,7 +89,13 @@ export function 创建测试应用(
   const 模拟池 = 创建模拟池((文本, _参数) => {
     void _参数;
     if (文本.includes('SELECT "管理员"')) {
-      return [{ 管理员: 覆盖.管理员 ?? true, 运营: false, 审核员: false }];
+      return [
+        {
+          管理员: 覆盖.旗标?.管理员 ?? 覆盖.管理员 ?? true,
+          运营: 覆盖.旗标?.运营 ?? false,
+          审核员: 覆盖.旗标?.审核员 ?? false,
+        },
+      ];
     }
     return 默认行(文本);
   });
@@ -103,5 +117,5 @@ export function 创建测试应用(
     写限流: 覆盖.写上限 === undefined ? undefined : { 窗口毫秒: 60000, 上限: 覆盖.写上限 },
     读限流: 覆盖.读上限 === undefined ? undefined : { 窗口毫秒: 60000, 上限: 覆盖.读上限 },
   });
-  return { 应用, 查询记录, 缓存表: 模拟缓存.表 };
+  return { 应用, 查询记录, 缓存表: 模拟缓存.表, 订阅回调: 模拟缓存.订阅回调 };
 }

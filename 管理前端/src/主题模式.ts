@@ -2,6 +2,10 @@ const 存储键 = 'lian-ai-guan-li-zhu-ti';
 
 export type 主题名 = '浅' | '深';
 
+export const 浅色: 主题名 = '浅';
+
+export const 深色: 主题名 = '深';
+
 export function 读初始主题(): 主题名 {
   try {
     const 存 = window.localStorage.getItem(存储键);

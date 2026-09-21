@@ -39,7 +39,7 @@ export type 思考查询 = 分页查询 & {
   jiao_se_id?: string;
 };
 
-export type 夺舍查询 = 分页查询 & {
+export type 接管记录查询 = 分页查询 & {
   guan_li_yuan_id?: string;
   jiao_se_id?: string;
 };
@@ -128,13 +128,13 @@ export type 审核评审 = {
   bei_zhu?: string;
 };
 
-export type 审核批量 = {
+export type 审核多项处理 = {
   mu_biao_ids: string[];
   lun_ci: string;
   tong_guo: boolean;
 };
 
-export type 留痕查询 = 分页查询 & {
+export type 处理记录查询 = 分页查询 & {
   mu_biao_lei_xing?: string;
   mu_biao_id?: string;
 };
@@ -189,7 +189,7 @@ export function 关键事件列表(查询: 思考查询 = {}): Promise<列表结
   return 取列表<表格行>('/api/guan-li/guan-jian-shi-jian', { ...查询 });
 }
 
-export function 夺舍日志列表(查询: 夺舍查询 = {}): Promise<列表结果<表格行>> {
+export function 接管记录列表(查询: 接管记录查询 = {}): Promise<列表结果<表格行>> {
   return 取列表<表格行>('/api/guan-li/duo-she-ri-zhi', { ...查询 });
 }
 
@@ -228,12 +228,26 @@ export type 管理登录结果 = {
   shua_xin_ling_pai?: string;
   yong_hu_id: string;
   yong_hu_ming: string | null;
-  guan_li: boolean;
+  // YH-108 三角色口径：登录回传角色标识与服务端能力位，而非管理员二值旗标
+  jiao_se: string | null;
+  neng_li: string[];
+};
+
+export type 当前身份 = {
+  yong_hu_id: string;
+  jiao_se: string | null;
+  neng_li: string[];
 };
 
 export async function 管理登录(正文: 管理登录请求): Promise<管理登录结果> {
   const 响应: AxiosResponse = await 请求实例.post('/api/guan-li/deng-lu', 正文);
   return 解析包络<管理登录结果>(响应.data).数据;
+}
+
+/** YH-108 身份以服务端查库结果为准，供刷新页面后重建权限视图 */
+export async function 我的身份(): Promise<当前身份> {
+  const 响应: AxiosResponse = await 请求实例.get('/api/guan-li/wo-de-jiao-se');
+  return 解析包络<当前身份>(响应.data).数据;
 }
 
 export async function 刷新管理令牌(刷新令牌: string): Promise<管理登录结果> {
@@ -244,28 +258,29 @@ export async function 刷新管理令牌(刷新令牌: string): Promise<管理�
 export type 编号请求 = {
   yong_hu_id: string;
   que_ren?: boolean;
+  jiao_se?: string;
 };
 
 export type 角色请求 = {
   jiao_se_id: string;
 };
 
-export async function 授予管理员(正文: 编号请求): Promise<封禁写入结果> {
+export async function 授予角色(正文: 编号请求): Promise<封禁写入结果> {
   const 响应: AxiosResponse = await 请求实例.post('/api/guan-li/shou-quan', 正文);
   return 解析包络<封禁写入结果>(响应.data).数据;
 }
 
-export async function 回收管理员(正文: 编号请求): Promise<封禁写入结果> {
+export async function 回收角色(正文: 编号请求): Promise<封禁写入结果> {
   const 响应: AxiosResponse = await 请求实例.post('/api/guan-li/hui-shou', 正文);
   return 解析包络<封禁写入结果>(响应.data).数据;
 }
 
-export async function 夺舍角色(正文: 角色请求): Promise<封禁写入结果> {
+export async function 接管角色(正文: 角色请求): Promise<封禁写入结果> {
   const 响应: AxiosResponse = await 请求实例.post('/api/guan-li/duo-she', 正文);
   return 解析包络<封禁写入结果>(响应.data).数据;
 }
 
-export async function 归还角色(正文: 角色请求): Promise<封禁写入结果> {
+export async function 结束接管(正文: 角色请求): Promise<封禁写入结果> {
   const 响应: AxiosResponse = await 请求实例.post('/api/guan-li/gui-huan', 正文);
   return 解析包络<封禁写入结果>(响应.data).数据;
 }
@@ -343,24 +358,24 @@ export async function 审核新建(目标类型: string, 正文: 审核新建): 
   return 解析包络<表格行>(响应.data).数据;
 }
 
-export async function 审核一审(目标类型: string, 正文: 审核评审): Promise<封禁写入结果> {
+export async function 审核初审(目标类型: string, 正文: 审核评审): Promise<封禁写入结果> {
   const 路径段 = 审核路径段[目标类型] ?? 目标类型;
   const 响应: AxiosResponse = await 请求实例.post(`/api/guan-li/${路径段}-yi-shen`, 正文);
   return 解析包络<封禁写入结果>(响应.data).数据;
 }
 
-export async function 审核二审(目标类型: string, 正文: 审核评审): Promise<封禁写入结果> {
+export async function 审核复审(目标类型: string, 正文: 审核评审): Promise<封禁写入结果> {
   const 路径段 = 审核路径段[目标类型] ?? 目标类型;
   const 响应: AxiosResponse = await 请求实例.post(`/api/guan-li/${路径段}-er-shen`, 正文);
   return 解析包络<封禁写入结果>(响应.data).数据;
 }
 
-export async function 审核批量(目标类型: string, 正文: 审核批量): Promise<表格行> {
+export async function 审核多项处理(目标类型: string, 正文: 审核多项处理): Promise<表格行> {
   const 路径段 = 审核路径段[目标类型] ?? 目标类型;
   const 响应: AxiosResponse = await 请求实例.post(`/api/guan-li/${路径段}-pi-liang`, 正文);
   return 解析包络<表格行>(响应.data).数据;
 }
 
-export function 审核留痕(查询: 留痕查询 = {}): Promise<列表结果<表格行>> {
+export function 处理记录列表(查询: 处理记录查询 = {}): Promise<列表结果<表格行>> {
   return 取列表<表格行>('/api/guan-li/liu-hen', { ...查询 });
 }

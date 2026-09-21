@@ -1,10 +1,12 @@
 import { Router, type Request, type Response } from 'express';
 import { 取文案 } from '../文案';
 import { 成功响应, 失败响应 } from '../响应';
-import { 解析分页, 取可选字符串, 校验失败, 校验可选UUID, 解析时间范围, 审计事件白名单 } from '../校验';
+import { 错误码 } from '../错误码';
+import { 解析分页, 取可选字符串, 参数错误提示, 校验失败, 校验可选UUID, 解析时间范围, 审计事件白名单 } from '../校验';
 import type { 查询池 } from '../数据库';
 import type { 认证请求 } from '../中间件/认证';
 import { 取真实IP } from '../真实IP';
+import { 响应依赖缺失, 响应查询降级 } from '../错误归一化';
 
 function 取池(请求: Request): 查询池 | undefined {
   return (请求.app.locals as { 池?: 查询池 }).池;
@@ -37,7 +39,7 @@ export function 创建审计路由(): Router {
   路由.get('/shen-ji-ri-zhi', async (请求: Request, 响应: Response): Promise<void> => {
     const 池 = 取池(请求);
     if (!池) {
-      失败响应(响应, 500, 取文案('通用', '服务器内部错误'), 'NEI_BU_CUO_WU');
+      响应依赖缺失(响应, '审计', '数据库', 请求);
       return;
     }
     const 查询 = 请求.query as Record<string, unknown>;
@@ -55,7 +57,7 @@ export function 创建审计路由(): Router {
         条件.push(`"事件类型" = $${参数.length}`);
       }
     }
-    const 用户编号 = 校验可选UUID('用户ID', 查询['yong_hu_id']);
+    const 用户编号 = 校验可选UUID('yong_hu_id', 查询['yong_hu_id']);
     if (用户编号 !== undefined) {
       参数.push(用户编号);
       条件.push(`"用户ID" = $${参数.length}`);
@@ -92,7 +94,7 @@ export function 创建审计路由(): Router {
   路由.get('/shen-ji-bao-liu', async (请求: Request, 响应: Response): Promise<void> => {
     const 池 = 取池(请求);
     if (!池) {
-      失败响应(响应, 500, 取文案('通用', '服务器内部错误'), 'NEI_BU_CUO_WU');
+      响应依赖缺失(响应, '审计', '数据库', 请求);
       return;
     }
     try {
@@ -108,25 +110,25 @@ export function 创建审计路由(): Router {
         an_lei_xing: 按类型.rows,
         bao_liu_ce_lue: 取文案('审计', '保留策略'),
       });
-    } catch {
-      失败响应(响应, 200, 取文案('审计', '表缺失降级'), 'BIAO_QUE_SHI_JIANG_JI');
+    } catch (错误) {
+      响应查询降级(响应, 错误, '审计', '审计', 请求);
     }
   });
 
   路由.get('/shen-ji-dao-chu', async (请求: Request, 响应: Response): Promise<void> => {
     const 池 = 取池(请求);
     if (!池) {
-      失败响应(响应, 500, 取文案('通用', '服务器内部错误'), 'NEI_BU_CUO_WU');
+      响应依赖缺失(响应, '审计', '数据库', 请求);
       return;
     }
     const 查询 = 请求.query as Record<string, unknown>;
     const 审批单 = 取可选字符串(查询['shen_pi_dan']);
     if (审批单 === undefined || 审批单.trim().length === 0) {
-      失败响应(响应, 400, `${取文案('通用', '参数错误')}：导出需审批单`, 'XU_SHEN_PI_DAN');
+      失败响应(响应, 400, 取文案('审计', '需审批单'), 错误码.需审批单);
       return;
     }
     if (!/^[A-Za-z0-9][A-Za-z0-9\-_]{0,63}$/.test(审批单.trim())) {
-      throw new 校验失败(`${取文案('通用', '参数错误')}：审批单`);
+      throw new 校验失败(参数错误提示('shen_pi_dan'));
     }
     const { 页码, 每页条数, 偏移量 } = 解析分页(查询);
     const 条件: string[] = [];

@@ -3,6 +3,7 @@ import type { Request, Response } from 'express';
 import { 当前配置 } from '../配置';
 import { 取文案 } from '../文案';
 import { 失败响应 } from '../响应';
+import { 错误码 } from '../错误码';
 import type { 认证请求 } from './认证';
 import { 取真实IP } from '../真实IP';
 
@@ -81,7 +82,7 @@ function 创建限流器(默认窗口毫秒: number, 默认上限: number, 选�
     ...(缓存 ? { store: 取缓存作存储(缓存) as never } : {}),
     keyGenerator: (请求: Request): string => 取请求标识(请求),
     handler: (_请求: Request, 响应: Response): void => {
-      失败响应(响应, 429, 取文案('通用', '请求过于频繁'), 'XIAN_LIU');
+      失败响应(响应, 429, 取文案('通用', '请求过于频繁'), 错误码.请求过频);
     },
   });
 }

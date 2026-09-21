@@ -1,6 +1,5 @@
 import { Router, type Request, type Response } from 'express';
-import { 取文案 } from '../文案';
-import { 成功响应, 失败响应 } from '../响应';
+import { 成功响应 } from '../响应';
 import {
   校验可选UUID,
   校验发送方,
@@ -9,6 +8,7 @@ import {
   解析时间范围,
 } from '../校验';
 import type { 查询池 } from '../数据库';
+import { 响应依赖缺失 } from '../错误归一化';
 
 function 取池(请求: Request): 查询池 | undefined {
   return (请求.app.locals as { 池?: 查询池 }).池;
@@ -25,13 +25,13 @@ export function 创建聊天路由(): Router {
   路由.get('/xiao-xi', async (请求: Request, 响应: Response): Promise<void> => {
     const 池 = 取池(请求);
     if (!池) {
-      失败响应(响应, 500, 取文案('通用', '服务器内部错误'), 'NEI_BU_CUO_WU');
+      响应依赖缺失(响应, '聊天', '数据库', 请求);
       return;
     }
     const 查询 = 请求.query as Record<string, unknown>;
     const { 页码, 每页条数, 偏移量 } = 解析分页(查询);
-    const 用户编号 = 校验可选UUID('用户ID', 查询['yong_hu_id']);
-    const 角色编号 = 校验可选UUID('角色ID', 查询['jiao_se_id']);
+    const 用户编号 = 校验可选UUID('yong_hu_id', 查询['yong_hu_id']);
+    const 角色编号 = 校验可选UUID('jiao_se_id', 查询['jiao_se_id']);
     const 发送方 = 校验发送方(查询['fa_song_fang']);
     const 方向 = 校验排序方向(查询['pai_xu']);
     const { 开始, 结束 } = 解析时间范围(查询);
@@ -74,13 +74,13 @@ export function 创建聊天路由(): Router {
   路由.get('/hao-you-xiao-xi', async (请求: Request, 响应: Response): Promise<void> => {
     const 池 = 取池(请求);
     if (!池) {
-      失败响应(响应, 500, 取文案('通用', '服务器内部错误'), 'NEI_BU_CUO_WU');
+      响应依赖缺失(响应, '聊天', '数据库', 请求);
       return;
     }
     const 查询 = 请求.query as Record<string, unknown>;
     const { 页码, 每页条数, 偏移量 } = 解析分页(查询);
-    const 发送者编号 = 校验可选UUID('发送者ID', 查询['fa_song_zhe_id']);
-    const 接收者编号 = 校验可选UUID('接收者ID', 查询['jie_shou_zhe_id']);
+    const 发送者编号 = 校验可选UUID('fa_song_zhe_id', 查询['fa_song_zhe_id']);
+    const 接收者编号 = 校验可选UUID('jie_shou_zhe_id', 查询['jie_shou_zhe_id']);
     const { 开始, 结束 } = 解析时间范围(查询);
     const 条件: string[] = [];
     const 参数: unknown[] = [];

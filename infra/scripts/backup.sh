@@ -32,7 +32,11 @@ if command -v gpg >/dev/null 2>&1 && [[ -n "${BACKUP_GPG_FINGERPRINT:-}" ]]; the
   gpg --batch --yes --trust-model always --encrypt --recipient "$BACKUP_GPG_FINGERPRINT" --output "$beiFenMuLu/lovewithme-pg.sql.gpg" "$beiFenMuLu/lovewithme-pg.sql"
   rm -f "$beiFenMuLu/lovewithme-pg.sql"
 fi
-sha256sum "$beiFenMuLu"/* > "$beiFenMuLu/SHA256SUMS" 2>/dev/null || true
+# FP-15 同类隐患收敛：校验和清单写不成就是备份失败，禁 `|| true` 静默出"备份完成"
+if ! sha256sum "$beiFenMuLu"/* > "$beiFenMuLu/SHA256SUMS"; then
+  echo "错误：写入 SHA256SUMS 失败，备份缺少完整性清单，按备份失败处理: $beiFenMuLu" >&2
+  exit 1
+fi
 
 echo "备份完成: $beiFenMuLu"
 ls -lh "$beiFenMuLu"

@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
 import request from 'supertest';
-import { 创建测试应用, 签发管理令牌, 授权头, 创建模拟池 } from './测试辅助';
+import { 创建测试应用, 签发管理令牌, 授权头, 创建模拟池, 测试用户编号 } from './测试辅助';
 
 const 登录路径 = '/api/guan-li/deng-lu';
 
@@ -26,7 +27,7 @@ describe('管理登录签发', () => {
     expect(响应.body.cheng_gong).toBe(true);
     expect(响应.body.shu_ju.ling_pai).toBeUndefined();
     expect(响应.body.shu_ju.shua_xin_ling_pai).toBeUndefined();
-    expect(响应.body.shu_ju.guan_li).toBe(true);
+    expect(响应.body.shu_ju.jiao_se).toBe('chao_guan');
     const 曲奇 = 响应.headers['set-cookie'] as unknown as string[] | undefined;
     expect(Array.isArray(曲奇)).toBe(true);
     expect(曲奇!.some((项) => 项.includes('guan_li_ling_pai=') && 项.includes('HttpOnly'))).toBe(true);
@@ -108,5 +109,93 @@ describe('管理登录签发', () => {
     const { 应用 } = 创建测试应用();
     const 响应 = await request(应用).get('/api/guan-li/zhang-hao-lie-biao').set(授权头(签发管理令牌()));
     expect(响应.status).toBe(200);
+  });
+});
+
+type 旗标组 = { 管理员: boolean; 运营: boolean; 审核员: boolean };
+
+function 三角色池(旗标: 旗标组, 密码 = 'mi-ma-123') {
+  const 哈希 = bcrypt.hashSync(密码, 4);
+  return 创建模拟池((文本) => {
+    if (文本.includes('FROM "用户" WHERE "手机号"')) {
+      return [{ ID: 测试用户编号, 手机号: '13800000000', 用户名: 'jiao-se-yuan', 密码哈希: 哈希, ...旗标 }];
+    }
+    if (文本.includes('SELECT "管理员"')) {
+      return [{ ...旗标 }];
+    }
+    return [{ ID: 测试用户编号 }];
+  });
+}
+
+function 曲奇令牌(响应: { headers: Record<string, unknown> }, 名: string): string {
+  const 项 = (响应.headers['set-cookie'] as unknown as string[]).find((条) => 条.startsWith(`${名}=`));
+  return decodeURIComponent(String(项).split(';')[0].split('=')[1] ?? '');
+}
+
+// FP-17 扩权后按契约第8行口径：运营=读+封禁+统计，审核员=读+封禁审核（矩阵字面量金丝雀，改矩阵必改此行）
+const 三角色用例: Array<{ 角色: string; 旗标: 旗标组; 能力: string[] }> = [
+  { 角色: 'chao_guan', 旗标: { 管理员: true, 运营: false, 审核员: false }, 能力: ['cha_kan', 'feng_jin', 'feng_jin_shen_he', 'tong_ji_xie', 'gao_we'] },
+  { 角色: 'yun_ying', 旗标: { 管理员: false, 运营: true, 审核员: false }, 能力: ['cha_kan', 'feng_jin', 'tong_ji_xie'] },
+  { 角色: 'shen_he_yuan', 旗标: { 管理员: false, 运营: false, 审核员: true }, 能力: ['cha_kan', 'feng_jin_shen_he'] },
+];
+
+describe('YH-108 三角色登录链路', () => {
+  for (const 用例 of 三角色用例) {
+    it(`${用例.角色}可登录且令牌与响应携带同一角色标识`, async () => {
+      const 自备 = 三角色池(用例.旗标);
+      const { 应用 } = 创建测试应用({ 池: 自备.池 });
+      const 响应 = await request(应用).post(登录路径).send({ shou_ji_hao: '13800000000', mi_ma: 'mi-ma-123' });
+      expect(响应.status).toBe(200);
+      expect(响应.body.shu_ju.jiao_se).toBe(用例.角色);
+      expect(响应.body.shu_ju.neng_li).toEqual(用例.能力);
+      const 载荷 = jwt.decode(曲奇令牌(响应, 'guan_li_ling_pai')) as Record<string, unknown>;
+      expect(载荷['jiaoSe']).toBe(用例.角色);
+      expect(载荷['guanLi']).toBeUndefined();
+      expect(载荷['yongHuId']).toBe(测试用户编号);
+    });
+
+    it(`${用例.角色}持Cookie可通过管理员门禁读取账号列表`, async () => {
+      const 自备 = 三角色池(用例.旗标);
+      const { 应用 } = 创建测试应用({ 池: 自备.池 });
+      const 登录 = await request(应用).post(登录路径).send({ shou_ji_hao: '13800000000', mi_ma: 'mi-ma-123' });
+      const 曲奇头 = (登录.headers['set-cookie'] as unknown as string[]).map((项) => String(项).split(';')[0]).join('; ');
+      const 列表 = await request(应用).get('/api/guan-li/zhang-hao-lie-biao').set('Cookie', 曲奇头);
+      expect(列表.status).toBe(200);
+      const 身份 = await request(应用).get('/api/guan-li/wo-de-jiao-se').set('Cookie', 曲奇头);
+      expect(身份.status).toBe(200);
+      expect(身份.body.shu_ju.jiao_se).toBe(用例.角色);
+    });
+
+    it(`${用例.角色}刷新轮换按查库角色签票`, async () => {
+      const 自备 = 三角色池(用例.旗标);
+      const { 应用 } = 创建测试应用({ 池: 自备.池 });
+      const 登录 = await request(应用).post(登录路径).send({ shou_ji_hao: '13800000000', mi_ma: 'mi-ma-123' });
+      const 旧刷新 = 曲奇令牌(登录, 'guan_li_shua_xin');
+      const 轮换 = await request(应用).post('/api/guan-li/shua-xin').send({ shua_xin_ling_pai: 旧刷新 });
+      expect(轮换.status).toBe(200);
+      expect(轮换.body.shu_ju.jiao_se).toBe(用例.角色);
+      expect(轮换.body.shu_ju.neng_li).toEqual(用例.能力);
+      const 载荷 = jwt.decode(曲奇令牌(轮换, 'guan_li_ling_pai')) as Record<string, unknown>;
+      expect(载荷['jiaoSe']).toBe(用例.角色);
+    });
+  }
+
+  it('三旗标全伪账号登录403且不签发令牌', async () => {
+    const 自备 = 三角色池({ 管理员: false, 运营: false, 审核员: false });
+    const { 应用 } = 创建测试应用({ 池: 自备.池 });
+    const 响应 = await request(应用).post(登录路径).send({ shou_ji_hao: '13800000000', mi_ma: 'mi-ma-123' });
+    expect(响应.status).toBe(403);
+    expect(响应.body.cuo_wu_ma).toBe('WU_GUAN_LI_QUAN_XIAN');
+    expect(响应.headers['set-cookie']).toBeUndefined();
+  });
+
+  it('登录查询语句按三角色列读取，不再只认管理员单列', async () => {
+    const 自备 = 三角色池({ 管理员: false, 运营: true, 审核员: false });
+    const { 应用, 查询记录 } = 创建测试应用({ 池: 自备.池 });
+    const 响应 = await request(应用).post(登录路径).send({ shou_ji_hao: '13800000000', mi_ma: 'mi-ma-123' });
+    expect(响应.status).toBe(200);
+    const 登录查 = 查询记录.find((记录) => 记录.文本.includes('FROM "用户" WHERE "手机号"'));
+    expect(登录查?.文本).toContain('"运营"');
+    expect(登录查?.文本).toContain('"审核员"');
   });
 });

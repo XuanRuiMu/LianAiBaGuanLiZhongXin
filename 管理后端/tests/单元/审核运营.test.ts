@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import request from 'supertest';
+import { 取文案 } from '../../src/文案';
 import { 创建测试应用, 创建模拟池, 签发管理令牌, 授权头 } from './测试辅助';
 
 const 有效编号 = '22222222-2222-4222-8222-222222222222';
@@ -103,11 +104,12 @@ describe('FP-11审核运营', () => {
     expect((await request(应用).get('/api/guan-li/tong-ji/ai-yong-liang').set(头)).status).toBe(200);
   });
 
-  it('思考回放准则以落库为准', async () => {
+  it('思考回放准则只剩管理员结论，不再叙述落库', async () => {
     const { 应用 } = 创建测试应用();
     const 响应 = await request(应用).get('/api/guan-li/si-kao-shuo-ming').set(授权头(签发管理令牌()));
     expect(响应.status).toBe(200);
-    expect(String((响应.body.shu_ju as Record<string, unknown>)['hui_fang_zhun_ze'] ?? '')).toContain('落库');
+    expect(String((响应.body.shu_ju as Record<string, unknown>)['hui_fang_zhun_ze'] ?? '')).toBe(取文案('思考', '回放准则'));
+    expect(JSON.stringify(响应.body)).not.toMatch(/落库|Socket|018迁移/);
   });
 
   it('审计保留导出多维总数', async () => {

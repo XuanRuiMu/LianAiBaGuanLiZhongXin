@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { 取文案 } from '../文案';
+import { 通用文案 } from '../文案/通用';
 
 defineProps<{ zongShu: number; dangQianYe: number; shiFouShouYe: boolean }>();
 
@@ -9,7 +9,7 @@ defineEmits<{ (事件: 'shangYe' | 'xiaYe'): void }>();
 <template>
   <div class="分页条">
     <span class="总数">
-      {{ 取文案('通用', '总数前缀') }}{{ zongShu }}{{ 取文案('通用', '总数后缀') }} · {{ dangQianYe }}
+      {{ 通用文案.总数前缀 }}{{ zongShu }}{{ 通用文案.总数后缀 }} · {{ dangQianYe }}
     </span>
     <button
       type="button"
@@ -17,14 +17,14 @@ defineEmits<{ (事件: 'shangYe' | 'xiaYe'): void }>();
       :disabled="shiFouShouYe"
       @click="$emit('shangYe')"
     >
-      {{ 取文案('通用', '上一页') }}
+      {{ 通用文案.上一页 }}
     </button>
     <button
       type="button"
       class="按钮次"
       @click="$emit('xiaYe')"
     >
-      {{ 取文案('通用', '下一页') }}
+      {{ 通用文案.下一页 }}
     </button>
   </div>
 </template>

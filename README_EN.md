@@ -30,13 +30,13 @@
 
 | Module | Description |
 | --- | --- |
-| 👤 Account list / detail | Full user account search, detail view, exclusive-binding relations |
+| 👤 Account management / account detail | Full account search; the **actions** column starts **grant role**, **revoke role**, **take over a role** and **end takeover** |
 | 💬 Chat history | Full replay of user–AI conversations for content QA |
 | 🧠 Reasoning chain | Inspect the AI's reasoning process to judge response quality |
-| ✅ Review & ops | Content review and moderation workflows |
-| 🚫 Ban management | Account ban / unban with transactional consistency |
-| 🧾 Audit log | Full operation audit — who did what when, fully traceable |
-| 📊 Statistics & charts | Operational metric visualization (signups, activity, retention, engagement) |
+| ✅ Review & ops | Reports / tickets / announcements / events / experiments: **create**, **first-pass review**, **second-pass review**, **multi-item review**, plus the **review records** block |
+| 🚫 Ban management | **Submit ban** / **lift ban**, **approve appeal** / **reject appeal**, with transactional consistency |
+| 🧾 Audit log | Full operation audit — who did what when, fully traceable; the extra-payload column is **record details** |
+| 📊 Statistics & charts | Operational metric visualization over a **day range** (signups, activity, retention, engagement) |
 
 ---
 

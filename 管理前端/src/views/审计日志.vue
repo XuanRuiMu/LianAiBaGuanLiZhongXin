@@ -1,12 +1,19 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
 import { 审计日志, 审计保留, type 表格行 } from '../api/管理';
-import type { 分页信息 } from '../api/请求';
+import { 取错误展示, type 分页信息 } from '../api/请求';
 import { 默认每页条数, 默认页码 } from '../配置';
-import { 取文案 } from '../文案';
+import { 列定义登记, 命名值文本 } from '../列定义';
+import { 审计事件选项 } from '../枚举映射/审计事件';
+import { 审计分类选项 } from '../枚举映射/审计分类';
 import YeMei from '../components/YeMei.vue';
 import FenYeTiao from '../components/FenYeTiao.vue';
+import ShuJuBiaoGe from '../components/ShuJuBiaoGe.vue';
+import XiaoXiTiao from '../components/XiaoXiTiao.vue';
 import TuBiao from '../components/TuBiao.vue';
+import { 通用文案 } from '../文案/通用';
+import { 账号文案 } from '../文案/账号';
+import { 审计文案 } from '../文案/审计';
 
 const 事件类型 = ref('');
 const 用户编号 = ref('');
@@ -18,25 +25,18 @@ const 分页 = ref<分页信息 | undefined>(undefined);
 const 保留信息 = ref<表格行 | null>(null);
 const 加载中 = ref(false);
 const 错误提示 = ref('');
+const 错误码 = ref('');
 
-function 显示值(行: 表格行, 键: string): string {
-  const 值 = 行[键];
-  if (值 === null || 值 === undefined || 值 === '') {
-    return 取文案('通用', '暂无数据');
-  }
-  if (typeof 值 === 'object') {
-    try {
-      return JSON.stringify(值);
-    } catch {
-      return 取文案('通用', '暂无数据');
-    }
-  }
-  return String(值);
+function 显示错误(错误: unknown): void {
+  const 展示 = 取错误展示(错误);
+  错误提示.value = 展示.提示;
+  错误码.value = 展示.错误码;
 }
 
 async function 查询(页码: number = 默认页码): Promise<void> {
   加载中.value = true;
   错误提示.value = '';
+  错误码.value = '';
   try {
     const 结果 = await 审计日志({
       ye_ma: 页码,
@@ -50,7 +50,7 @@ async function 查询(页码: number = 默认页码): Promise<void> {
     行列表.value = 结果.行;
     分页.value = 结果.分页;
   } catch (错误) {
-    错误提示.value = 错误 instanceof Error ? 错误.message : 取文案('通用', '请求失败');
+    显示错误(错误);
   } finally {
     加载中.value = false;
   }
@@ -84,37 +84,47 @@ onMounted(() => {
 
 <template>
   <section>
-    <YeMei
-      xu-hao="伍 · 起居"
-      :biao-ti="取文案('审计', '标题')"
-    />
+    <YeMei :biao-ti="审计文案.标题" />
     <div class="账簿">
       <label class="字段">
-        {{ 取文案('审计', '事件类型占位') }}
-        <input
+        {{ 审计文案.事件类型列 }}
+        <select
           v-model="事件类型"
-          class="输入"
-          :placeholder="取文案('审计', '事件类型占位')"
+          class="选择"
+          data-testid="lv-xuan-shi-jian-lei-xing"
         >
+          <option value="">{{ 通用文案.全部 }}</option>
+          <option
+            v-for="项 in 审计事件选项"
+            :key="项.值"
+            :value="项.值"
+          >{{ 项.文案 }}</option>
+        </select>
       </label>
       <label class="字段">
-        {{ 取文案('审计', '用户占位') }}
+        {{ 账号文案.用户编号 }}
         <input
           v-model="用户编号"
           class="输入"
-          :placeholder="取文案('审计', '用户占位')"
         >
       </label>
       <label class="字段">
-        {{ 取文案('审计', '类型占位') }}
-        <input
+        {{ 审计文案.类型列 }}
+        <select
           v-model="类型名"
-          class="输入"
-          :placeholder="取文案('审计', '类型占位')"
+          class="选择"
+          data-testid="lv-xuan-shen-ji-fen-lei"
         >
+          <option value="">{{ 通用文案.全部 }}</option>
+          <option
+            v-for="项 in 审计分类选项"
+            :key="项.值"
+            :value="项.值"
+          >{{ 项.文案 }}</option>
+        </select>
       </label>
       <label class="字段">
-        {{ 取文案('审计', '开始占位') }}
+        {{ 审计文案.开始时间标签 }}
         <input
           v-model="开始时间"
           class="输入"
@@ -122,7 +132,7 @@ onMounted(() => {
         >
       </label>
       <label class="字段">
-        {{ 取文案('审计', '结束占位') }}
+        {{ 审计文案.结束时间标签 }}
         <input
           v-model="结束时间"
           class="输入"
@@ -134,67 +144,34 @@ onMounted(() => {
         class="按钮主"
         @click="查询()"
       >
-        <TuBiao ming-cheng="查询" />
-        {{ 取文案('通用', '查询') }}
+        <TuBiao ming-cheng="cha-xun" />
+        {{ 通用文案.查询 }}
       </button>
     </div>
     <p
       v-if="保留信息"
       class="加载条"
     >
-      {{ 取文案('审计', '保留标题') }}：{{ String(保留信息['zong_shu'] ?? '') }}
+      {{ 命名值文本(审计文案.保留标题, 保留信息['zong_shu']) }}
     </p>
-    <p
-      v-if="加载中"
-      class="加载条"
-    >
-      {{ 取文案('通用', '加载中') }}
-    </p>
-    <p
-      v-if="错误提示.length > 0"
-      class="错误条"
-    >
-      {{ 错误提示 }}
-    </p>
-    <p
-      v-if="!加载中 && 行列表.length === 0"
-      class="空态"
-    >
-      {{ 取文案('通用', '暂无数据') }}
-    </p>
-    <table
+    <XiaoXiTiao
+      xing-tai="jia-zai"
+      :xian-shi="加载中"
+    />
+    <XiaoXiTiao
+      xing-tai="cuo-wu"
+      :wen-ben="错误提示"
+      :cuo-wu-ma="错误码"
+    />
+    <XiaoXiTiao
+      xing-tai="kong"
+      :xian-shi="!加载中 && 行列表.length === 0"
+    />
+    <ShuJuBiaoGe
       v-if="行列表.length > 0"
-      class="账簿表"
-    >
-      <thead>
-        <tr>
-          <th>{{ 取文案('审计', '事件类型列') }}</th>
-          <th>{{ 取文案('审计', '用户列') }}</th>
-          <th>{{ 取文案('审计', '地址列') }}</th>
-          <th>{{ 取文案('审计', '详情列') }}</th>
-          <th>{{ 取文案('审计', '类型列') }}</th>
-          <th>{{ 取文案('审计', '时间列') }}</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr
-          v-for="(行, 序号) in 行列表"
-          :key="String(行['ID'] ?? '')"
-          :style="{ '--位': Math.min(序号, 7) }"
-        >
-          <td>
-            <span class="徽标 墨">{{ 显示值(行, '事件类型') }}</span>
-          </td>
-          <td>{{ 显示值(行, '用户ID') }}</td>
-          <td class="数字">
-            {{ 显示值(行, 'IP') }}
-          </td>
-          <td>{{ 显示值(行, '详情') }}</td>
-          <td>{{ 显示值(行, '类型') }}</td>
-          <td>{{ 显示值(行, '创建时间') }}</td>
-        </tr>
-      </tbody>
-    </table>
+      :lie="列定义登记.审计日志"
+      :hang="行列表"
+    />
     <FenYeTiao
       v-if="分页"
       :zong-shu="分页.zong_shu"

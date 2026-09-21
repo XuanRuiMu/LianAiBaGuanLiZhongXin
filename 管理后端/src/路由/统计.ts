@@ -1,11 +1,12 @@
-import { Router, type Request, type Response } from 'express';
+import { Router, type Request, type Response, type RequestHandler } from 'express';
 import { 取文案 } from '../文案';
-import { 成功响应, 失败响应 } from '../响应';
+import { 成功响应 } from '../响应';
 import { 校验天数 } from '../校验';
 import { 埋点事件字典 } from '../埋点';
 import type { 查询池 } from '../数据库';
 import type { 认证请求 } from '../中间件/认证';
 import { 取真实IP } from '../真实IP';
+import { 响应依赖缺失, 响应查询降级 } from '../错误归一化';
 
 function 取池(请求: Request): 查询池 | undefined {
   return (请求.app.locals as { 池?: 查询池 }).池;
@@ -48,11 +49,15 @@ const 好感按阶段 =
 
 export function 创建统计路由(): Router {
   const 路由 = Router();
+  // FP-17 按契约第8行：统计族（含读审计写侧）归 tong_ji_xie（运营/超管），审核员只读域不再含统计
+  const 统计门禁: RequestHandler = (请求, 响应, 下一步) => {
+    void import('../中间件/管理员').then(({ 统计操作门禁 }) => 统计操作门禁(请求, 响应, 下一步));
+  };
 
-  路由.get('/tong-ji/zhu-ce', async (请求: Request, 响应: Response): Promise<void> => {
+  路由.get('/tong-ji/zhu-ce', 统计门禁, async (请求: Request, 响应: Response): Promise<void> => {
     const 池 = 取池(请求);
     if (!池) {
-      失败响应(响应, 500, 取文案('通用', '服务器内部错误'), 'NEI_BU_CUO_WU');
+      响应依赖缺失(响应, '统计', '数据库', 请求);
       return;
     }
     const 天数 = 校验天数((请求.query as Record<string, unknown>)['tian_shu']);
@@ -63,10 +68,10 @@ export function 创建统计路由(): Router {
     成功响应(响应, { lie_biao: 结果.rows, zong_shu: 总数, tian_shu: 天数 });
   });
 
-  路由.get('/tong-ji/xiao-xi', async (请求: Request, 响应: Response): Promise<void> => {
+  路由.get('/tong-ji/xiao-xi', 统计门禁, async (请求: Request, 响应: Response): Promise<void> => {
     const 池 = 取池(请求);
     if (!池) {
-      失败响应(响应, 500, 取文案('通用', '服务器内部错误'), 'NEI_BU_CUO_WU');
+      响应依赖缺失(响应, '统计', '数据库', 请求);
       return;
     }
     const 天数 = 校验天数((请求.query as Record<string, unknown>)['tian_shu']);
@@ -75,10 +80,10 @@ export function 创建统计路由(): Router {
     成功响应(响应, { lie_biao: 结果.rows, tian_shu: 天数 });
   });
 
-  路由.get('/tong-ji/hao-gan-du', async (请求: Request, 响应: Response): Promise<void> => {
+  路由.get('/tong-ji/hao-gan-du', 统计门禁, async (请求: Request, 响应: Response): Promise<void> => {
     const 池 = 取池(请求);
     if (!池) {
-      失败响应(响应, 500, 取文案('通用', '服务器内部错误'), 'NEI_BU_CUO_WU');
+      响应依赖缺失(响应, '统计', '数据库', 请求);
       return;
     }
     const 总览 = await 池.query(好感总览, []);
@@ -87,10 +92,10 @@ export function 创建统计路由(): Router {
     成功响应(响应, { zong_lan: 总览.rows[0] ?? {}, an_jie_duan: 按阶段.rows });
   });
 
-  路由.get('/tong-ji/liu-cun', async (请求: Request, 响应: Response): Promise<void> => {
+  路由.get('/tong-ji/liu-cun', 统计门禁, async (请求: Request, 响应: Response): Promise<void> => {
     const 池 = 取池(请求);
     if (!池) {
-      失败响应(响应, 500, 取文案('通用', '服务器内部错误'), 'NEI_BU_CUO_WU');
+      响应依赖缺失(响应, '统计', '数据库', 请求);
       return;
     }
     const 天数 = 校验天数((请求.query as Record<string, unknown>)['tian_shu']);
@@ -101,15 +106,15 @@ export function 创建统计路由(): Router {
       );
       await 记统计读审计(池, 请求);
       成功响应(响应, { lie_biao: 留存.rows, tian_shu: 天数 });
-    } catch {
-      失败响应(响应, 200, 取文案('统计', '表缺失降级'), 'BIAO_QUE_SHI_JIANG_JI');
+    } catch (错误) {
+      响应查询降级(响应, 错误, '统计', '统计', 请求);
     }
   });
 
-  路由.get('/tong-ji/ai-yong-liang', async (请求: Request, 响应: Response): Promise<void> => {
+  路由.get('/tong-ji/ai-yong-liang', 统计门禁, async (请求: Request, 响应: Response): Promise<void> => {
     const 池 = 取池(请求);
     if (!池) {
-      失败响应(响应, 500, 取文案('通用', '服务器内部错误'), 'NEI_BU_CUO_WU');
+      响应依赖缺失(响应, '统计', '数据库', 请求);
       return;
     }
     try {
@@ -119,12 +124,12 @@ export function 创建统计路由(): Router {
       );
       await 记统计读审计(池, 请求);
       成功响应(响应, { lie_biao: 用量.rows, kou_jing: 取文案('统计', '用量口径') });
-    } catch {
-      失败响应(响应, 200, 取文案('统计', '表缺失降级'), 'BIAO_QUE_SHI_JIANG_JI');
+    } catch (错误) {
+      响应查询降级(响应, 错误, '统计', '统计', 请求);
     }
   });
 
-  路由.get('/tong-ji/mai-dian-zi-dian', async (_请求: Request, 响应: Response): Promise<void> => {
+  路由.get('/tong-ji/mai-dian-zi-dian', 统计门禁, async (_请求: Request, 响应: Response): Promise<void> => {
     成功响应(响应, { lie_biao: [...埋点事件字典], zong_shu: 埋点事件字典.length });
   });
 

@@ -2,12 +2,19 @@
 import { onMounted, ref } from 'vue';
 import { 封禁记录, 写入封禁, 账号封禁列表, 解封账号, 审核申诉, type 表格行 } from '../api/管理';
 import { 使用登录仓库 } from '../stores/登录';
-import type { 分页信息 } from '../api/请求';
+import { 取错误展示, type 分页信息 } from '../api/请求';
 import { 默认每页条数, 默认页码 } from '../配置';
-import { 取文案 } from '../文案';
+import { 封禁级别默认, 封禁级别选项 } from '../枚举映射/封禁级别';
+import { 严重程度选项, 严重程度默认 } from '../枚举映射/严重程度';
+import { 列定义登记, 响应行键 } from '../列定义';
 import YeMei from '../components/YeMei.vue';
 import FenYeTiao from '../components/FenYeTiao.vue';
+import ShuJuBiaoGe from '../components/ShuJuBiaoGe.vue';
+import XiaoXiTiao from '../components/XiaoXiTiao.vue';
 import TuBiao from '../components/TuBiao.vue';
+import { 通用文案 } from '../文案/通用';
+import { 账号文案 } from '../文案/账号';
+import { 封禁文案 } from '../文案/封禁';
 
 const 查询地址 = ref('');
 const 登录仓库 = 使用登录仓库();
@@ -15,27 +22,32 @@ const 行列表 = ref<表格行[]>([]);
 const 分页 = ref<分页信息 | undefined>(undefined);
 const 加载中 = ref(false);
 const 错误提示 = ref('');
+const 错误码 = ref('');
 const 成功提示 = ref('');
 const 写入用户 = ref('');
 const 写入地址 = ref('');
 const 写入原因 = ref('');
-const 写入级别 = ref('feng_jin_1_tian');
-const 写入严重程度 = ref('中等');
+const 写入级别 = ref<string>(封禁级别默认);
+const 写入严重程度 = ref<string>(严重程度默认);
 const 写入解封时间 = ref('');
 const 账号封禁行 = ref<表格行[]>([]);
 const 账号封禁分页 = ref<分页信息 | undefined>(undefined);
 
-function 显示值(行: 表格行, 键: string): string {
-  const 值 = 行[键];
-  if (值 === null || 值 === undefined || 值 === '') {
-    return 取文案('通用', '暂无数据');
-  }
-  return String(值);
+function 显示错误(错误: unknown): void {
+  const 展示 = 取错误展示(错误);
+  错误提示.value = 展示.提示;
+  错误码.value = 展示.错误码;
+}
+
+function 提示错误(文本: string): void {
+  错误提示.value = 文本;
+  错误码.value = '';
 }
 
 async function 查询(页码: number = 默认页码): Promise<void> {
   加载中.value = true;
   错误提示.value = '';
+  错误码.value = '';
   try {
     const 结果 = await 封禁记录({
       ye_ma: 页码,
@@ -45,7 +57,7 @@ async function 查询(页码: number = 默认页码): Promise<void> {
     行列表.value = 结果.行;
     分页.value = 结果.分页;
   } catch (错误) {
-    错误提示.value = 错误 instanceof Error ? 错误.message : 取文案('通用', '请求失败');
+    显示错误(错误);
   } finally {
     加载中.value = false;
   }
@@ -53,16 +65,17 @@ async function 查询(页码: number = 默认页码): Promise<void> {
 
 async function 提交封禁(): Promise<void> {
   错误提示.value = '';
+  错误码.value = '';
   成功提示.value = '';
   const 用户编号 = 写入用户.value.trim() === '' ? undefined : 写入用户.value.trim();
   const 地址 = 写入地址.value.trim() === '' ? undefined : 写入地址.value.trim();
   const 原因 = 写入原因.value.trim();
   if (用户编号 === undefined && 地址 === undefined) {
-    错误提示.value = 取文案('封禁', '缺少目标');
+    提示错误(封禁文案.缺少目标);
     return;
   }
   if (原因 === '') {
-    错误提示.value = 取文案('封禁', '缺少原因');
+    提示错误(封禁文案.缺少原因);
     return;
   }
   try {
@@ -74,14 +87,14 @@ async function 提交封禁(): Promise<void> {
       yan_zhong_cheng_du: 写入严重程度.value,
       jie_feng_shi_jian: 写入解封时间.value.trim() === '' ? undefined : 写入解封时间.value.trim(),
     });
-    成功提示.value = 取文案('封禁', '写入成功');
+    成功提示.value = 封禁文案.封禁成功;
     写入用户.value = '';
     写入地址.value = '';
     写入原因.value = '';
     写入解封时间.value = '';
     await 查询();
   } catch (错误) {
-    错误提示.value = 错误 instanceof Error ? 错误.message : 取文案('通用', '请求失败');
+    显示错误(错误);
   }
 }
 
@@ -91,7 +104,7 @@ async function 查询账号封禁(页码: number = 默认页码): Promise<void> 
     账号封禁行.value = 结果.行;
     账号封禁分页.value = 结果.分页;
   } catch (错误) {
-    错误提示.value = 错误 instanceof Error ? 错误.message : 取文案('通用', '请求失败');
+    显示错误(错误);
   }
 }
 
@@ -101,10 +114,10 @@ async function 解封(用户编号: unknown): Promise<void> {
   }
   try {
     await 解封账号({ yong_hu_id: 用户编号 });
-    成功提示.value = 取文案('封禁', '写入成功');
+    成功提示.value = 封禁文案.解封成功;
     await 查询账号封禁();
   } catch (错误) {
-    错误提示.value = 错误 instanceof Error ? 错误.message : 取文案('通用', '请求失败');
+    显示错误(错误);
   }
 }
 
@@ -114,10 +127,10 @@ async function 审核(用户编号: unknown, 通过: boolean): Promise<void> {
   }
   try {
     await 审核申诉({ yong_hu_id: 用户编号, tong_guo: 通过 });
-    成功提示.value = 取文案('封禁', '写入成功');
+    成功提示.value = 通过 ? 封禁文案.申诉通过成功 : 封禁文案.申诉驳回成功;
     await 查询账号封禁();
   } catch (错误) {
-    错误提示.value = 错误 instanceof Error ? 错误.message : 取文案('通用', '请求失败');
+    显示错误(错误);
   }
 }
 
@@ -142,81 +155,80 @@ onMounted(() => {
 <template>
   <section>
     <YeMei
-      xu-hao="肆 · 戒尺"
-      :biao-ti="取文案('封禁', '标题')"
-      :shuo-ming="取文案('封禁', '留痕说明')"
+      :biao-ti="封禁文案.标题"
+      :shuo-ming="封禁文案.操作记录说明"
     />
-    <p
-      v-if="成功提示.length > 0"
-      class="成功条"
-    >
-      {{ 成功提示 }}
-    </p>
-    <p
-      v-if="错误提示.length > 0"
-      class="错误条"
-    >
-      {{ 错误提示 }}
-    </p>
+    <XiaoXiTiao
+      xing-tai="cheng-gong"
+      :wen-ben="成功提示"
+    />
+    <XiaoXiTiao
+      xing-tai="cuo-wu"
+      :wen-ben="错误提示"
+      :cuo-wu-ma="错误码"
+    />
     <div class="双栏">
-      <!-- YH-108+YH-111 封禁写入仅超管可见，级别以迁移为准禁正常态 -->
+      <!-- FP-17 封禁写入按矩阵归 feng_jin（运营/超管）可见，级别以迁移为准禁正常态 -->
       <div
-        v-if="登录仓库.是否超管"
+        v-if="登录仓库.可封禁"
         class="卡片 封禁卡"
       >
-        <h3>{{ 取文案('封禁', '写入标题') }}</h3>
+        <h3>{{ 封禁文案.写入标题 }}</h3>
+        <p class="页眉说明">
+          {{ 封禁文案.目标组说明 }}
+        </p>
         <label class="字段">
-          {{ 取文案('封禁', '用户编号占位') }}
+          {{ 账号文案.用户编号 }}
           <input
             v-model="写入用户"
             class="输入"
-            :placeholder="取文案('封禁', '用户编号占位')"
           >
         </label>
         <label class="字段">
-          {{ 取文案('封禁', '地址输入占位') }}
+          {{ 封禁文案.地址标签 }}
           <input
             v-model="写入地址"
             class="输入"
-            :placeholder="取文案('封禁', '地址输入占位')"
           >
         </label>
         <label class="字段">
-          {{ 取文案('封禁', '原因占位') }}
+          {{ 封禁文案.原因标签 }}
           <input
             v-model="写入原因"
             class="输入"
-            :placeholder="取文案('封禁', '原因占位')"
           >
         </label>
         <label class="字段">
-          {{ 取文案('封禁', '级别标签') }}
+          {{ 封禁文案.级别标签 }}
           <select
             v-model="写入级别"
             class="选择"
           >
-            <option value="feng_jin_1_fen">feng_jin_1_fen</option>
-            <option value="feng_jin_1_tian">feng_jin_1_tian</option>
-            <option value="yong_feng">yong_feng</option>
+            <option
+              v-for="项 in 封禁级别选项"
+              :key="项.值"
+              :value="项.值"
+            >{{ 项.文案 }}</option>
           </select>
         </label>
         <label class="字段">
-          {{ 取文案('封禁', '严重程度标签') }}
+          {{ 封禁文案.严重程度标签 }}
           <select
             v-model="写入严重程度"
             class="选择"
           >
-            <option value="轻微">轻微</option>
-            <option value="中等">中等</option>
-            <option value="严重">严重</option>
+            <option
+              v-for="项 in 严重程度选项"
+              :key="项.值"
+              :value="项.值"
+            >{{ 项.文案 }}</option>
           </select>
         </label>
         <label class="字段">
-          {{ 取文案('封禁', '解封时间占位') }}
+          {{ 封禁文案.解封时间标签 }}
           <input
             v-model="写入解封时间"
             class="输入"
-            :placeholder="取文案('封禁', '解封时间占位')"
           >
         </label>
         <button
@@ -224,20 +236,19 @@ onMounted(() => {
           class="按钮危"
           @click="提交封禁"
         >
-          {{ 取文案('通用', '提交') }}
+          {{ 通用文案.提交 }}
         </button>
       </div>
       <div>
         <h3 class="记录题">
-          {{ 取文案('封禁', '记录标题') }}
+          {{ 封禁文案.记录标题 }}
         </h3>
         <div class="账簿">
           <label class="字段">
-            {{ 取文案('封禁', '地址占位') }}
+            {{ 封禁文案.地址标签 }}
             <input
               v-model="查询地址"
               class="输入"
-              :placeholder="取文案('封禁', '地址占位')"
             >
           </label>
           <button
@@ -245,51 +256,23 @@ onMounted(() => {
             class="按钮主"
             @click="查询()"
           >
-            <TuBiao ming-cheng="查询" />
-            {{ 取文案('通用', '查询') }}
+            <TuBiao ming-cheng="cha-xun" />
+            {{ 通用文案.查询 }}
           </button>
         </div>
-        <p
-          v-if="加载中"
-          class="加载条"
-        >
-          {{ 取文案('通用', '加载中') }}
-        </p>
-        <p
-          v-if="!加载中 && 行列表.length === 0"
-          class="空态"
-        >
-          {{ 取文案('通用', '暂无数据') }}
-        </p>
-        <table
+        <XiaoXiTiao
+          xing-tai="jia-zai"
+          :xian-shi="加载中"
+        />
+        <XiaoXiTiao
+          xing-tai="kong"
+          :xian-shi="!加载中 && 行列表.length === 0"
+        />
+        <ShuJuBiaoGe
           v-if="行列表.length > 0"
-          class="账簿表"
-        >
-          <thead>
-            <tr>
-              <th>{{ 取文案('封禁', '地址列') }}</th>
-              <th>{{ 取文案('封禁', '原因列') }}</th>
-              <th>{{ 取文案('封禁', '严重程度标签') }}</th>
-              <th>{{ 取文案('封禁', '时间列') }}</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr
-              v-for="(行, 序号) in 行列表"
-              :key="String(行['ID'] ?? '')"
-              :style="{ '--位': Math.min(序号, 7) }"
-            >
-              <td class="数字">
-                {{ 显示值(行, 'IP') }}
-              </td>
-              <td>{{ 显示值(行, '原因') }}</td>
-              <td>
-                <span class="徽标 危">{{ 显示值(行, '严重程度') }}</span>
-              </td>
-              <td>{{ 显示值(行, '创建时间') }}</td>
-            </tr>
-          </tbody>
-        </table>
+          :lie="列定义登记.封禁记录"
+          :hang="行列表"
+        />
         <FenYeTiao
           v-if="分页"
           :zong-shu="分页.zong_shu"
@@ -301,71 +284,49 @@ onMounted(() => {
       </div>
     </div>
     <h3 class="记录题">
-      {{ 取文案('封禁', '账号封禁标题') }}
+      {{ 封禁文案.账号封禁标题 }}
     </h3>
-    <p
-      v-if="账号封禁行.length === 0"
-      class="空态"
+    <XiaoXiTiao
+      xing-tai="kong"
+      :xian-shi="账号封禁行.length === 0"
+    />
+    <ShuJuBiaoGe
+      v-if="账号封禁行.length > 0"
+      :lie="列定义登记.账号封禁"
+      :hang="账号封禁行"
+      hang-jian="用户ID"
     >
-      {{ 取文案('通用', '暂无数据') }}
-    </p>
-    <table
-      v-else
-      class="账簿表"
-    >
-      <thead>
-        <tr>
-          <th>{{ 取文案('封禁', '用户列') }}</th>
-          <th>{{ 取文案('封禁', '级别标签') }}</th>
-          <th>{{ 取文案('封禁', '申诉列') }}</th>
-          <th>{{ 取文案('封禁', '原因列') }}</th>
-          <th>{{ 取文案('通用', '详情') }}</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr
-          v-for="(行, 序号) in 账号封禁行"
-          :key="String(行['用户ID'] ?? '')"
-          :style="{ '--位': Math.min(序号, 7) }"
+      <template #cao-zuo="{ hang }">
+        <!-- FP-17 解封归 feng_jin（运营/超管），申诉通过/驳回归 feng_jin_shen_he（审核员/超管） -->
+        <button
+          v-if="登录仓库.可封禁"
+          type="button"
+          class="按钮次"
+          data-testid="jie-feng-an-niu"
+          @click="解封(hang[响应行键.用户ID])"
         >
-          <td class="数字">
-            {{ 显示值(行, '用户ID') }}
-          </td>
-          <td>
-            <span class="徽标 危">{{ 显示值(行, '级别') }}</span>
-          </td>
-          <td>{{ 显示值(行, '申诉状态') }}</td>
-          <td>{{ 显示值(行, '最后原因') }}</td>
-          <td>
-            <!-- YH-108 解封审核仅超管可点 -->
-            <button
-              v-if="登录仓库.是否超管"
-              type="button"
-              class="按钮次"
-              @click="解封(行['用户ID'])"
-            >
-              {{ 取文案('封禁', '解封按钮') }}
-            </button>
-            <button
-              v-if="登录仓库.是否超管"
-              type="button"
-              class="按钮次"
-              @click="审核(行['用户ID'], true)"
-            >
-              {{ 取文案('封禁', '通过按钮') }}
-            </button>
-            <button
-              v-if="登录仓库.是否超管"
-              type="button"
-              class="按钮次"
-              @click="审核(行['用户ID'], false)"
-            >
-              {{ 取文案('封禁', '驳回按钮') }}
-            </button>
-          </td>
-        </tr>
-      </tbody>
-    </table>
+          {{ 封禁文案.解封按钮 }}
+        </button>
+        <button
+          v-if="登录仓库.可封禁审核"
+          type="button"
+          class="按钮次"
+          data-testid="tong-guo-shen-su-an-niu"
+          @click="审核(hang[响应行键.用户ID], true)"
+        >
+          {{ 封禁文案.通过按钮 }}
+        </button>
+        <button
+          v-if="登录仓库.可封禁审核"
+          type="button"
+          class="按钮次"
+          data-testid="bo-hui-shen-su-an-niu"
+          @click="审核(hang[响应行键.用户ID], false)"
+        >
+          {{ 封禁文案.驳回按钮 }}
+        </button>
+      </template>
+    </ShuJuBiaoGe>
     <FenYeTiao
       v-if="账号封禁分页"
       :zong-shu="账号封禁分页.zong_shu"

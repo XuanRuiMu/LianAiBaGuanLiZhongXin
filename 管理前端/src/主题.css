@@ -21,6 +21,8 @@
   --圆小: 6px;
   --圆中: 10px;
   --圆大: 16px;
+  --滚动条宽: 10px;
+  color-scheme: light;
 }
 
 .dark {
@@ -40,6 +42,7 @@
   --警淡: rgba(217, 168, 69, 0.14);
   --危淡: rgba(217, 95, 67, 0.12);
   --影: 0 1px 2px rgba(0, 0, 0, 0.4), 0 12px 28px -12px rgba(0, 0, 0, 0.6);
+  color-scheme: dark;
 }
 
 * {
@@ -99,48 +102,40 @@ select {
   outline-offset: 2px;
 }
 
-.印章 {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 44px;
-  height: 44px;
-  flex: none;
-  border-radius: 8px;
+::-webkit-scrollbar {
+  width: var(--滚动条宽);
+  height: var(--滚动条宽);
+  cursor: default;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--面二);
+  cursor: pointer;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--淡墨);
+  border-radius: var(--滚动条宽);
+  cursor: grab;
+}
+
+::-webkit-scrollbar-thumb:hover {
   background: var(--印);
-  color: #fff8f2;
-  font-family: var(--展示字);
-  font-weight: 900;
-  font-size: 19px;
-  letter-spacing: 1px;
-  box-shadow: var(--影);
+}
+
+::-webkit-scrollbar-corner {
+  background: var(--纸);
+}
+
+@supports not selector(::-webkit-scrollbar) {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--淡墨) var(--面二);
+  }
 }
 
 .页眉 {
   margin: 0 0 22px;
-}
-
-.眉题 {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin: 0 0 8px;
-}
-
-.眉题::before {
-  content: '';
-  width: 26px;
-  height: 5px;
-  flex: none;
-  background: var(--印);
-  border-radius: 2px;
-}
-
-.眉题序号 {
-  font-family: var(--数据字);
-  font-size: 12px;
-  letter-spacing: 2px;
-  color: var(--印);
 }
 
 .页眉 h2 {
@@ -186,6 +181,9 @@ select {
   font-size: 13px;
   color: var(--淡墨);
   min-width: 150px;
+}
+
+.账簿 > .字段 {
   flex: 1 1 150px;
 }
 
@@ -199,11 +197,19 @@ select {
   transition: border-color 160ms ease, box-shadow 160ms ease;
 }
 
+input.输入:not([type='number'], [type='datetime-local']) {
+  appearance: none;
+}
+
+input.输入:-webkit-autofill {
+  -webkit-text-fill-color: currentColor;
+  transition: background-color 5000s ease-in-out;
+}
+
 .输入:focus,
 .选择:focus {
   border-color: var(--印);
   box-shadow: 0 0 0 3px var(--印淡);
-  outline: none;
 }
 
 .按钮主,
@@ -308,6 +314,18 @@ select {
 .账簿表 th.数字 {
   font-family: var(--数据字);
   font-variant-numeric: tabular-nums;
+}
+
+.账簿表 td.数字 {
+  white-space: nowrap;
+  overflow-wrap: normal;
+}
+
+.账簿表 td.操作 {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
 }
 
 .徽标 {
@@ -592,12 +610,6 @@ select {
   font-size: clamp(30px, 5vw, 44px);
   font-variant-numeric: tabular-nums;
   line-height: 1.2;
-}
-
-.统计卡 .卡注 {
-  margin: 2px 0 0;
-  font-size: 12.5px;
-  color: var(--淡墨);
 }
 
 .条组 {

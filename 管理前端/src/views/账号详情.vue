@@ -2,46 +2,44 @@
 import { computed, onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { 账号详情, type 表格行 } from '../api/管理';
-import { 取文案 } from '../文案';
+import { 取错误展示 } from '../api/请求';
+import { 取管理角色文案, 取管理角色色调 } from '../枚举映射/管理角色';
+import { 单元格文本, 单元格色调, 列定义登记, 取列映射, 响应行键, 表头文本, 渲染为徽标 } from '../列定义';
 import YeMei from '../components/YeMei.vue';
+import XiaoXiTiao from '../components/XiaoXiTiao.vue';
 import TuBiao from '../components/TuBiao.vue';
+import { 通用文案 } from '../文案/通用';
+import { 账号文案 } from '../文案/账号';
 
 const 当前路由 = useRoute();
 const 路由器 = useRouter();
 const 详情 = ref<表格行 | null>(null);
 const 加载中 = ref(false);
 const 错误提示 = ref('');
+const 错误码 = ref('');
 
-const 首字 = computed(() => {
-  const 名 = String(详情.value?.['昵称'] ?? 详情.value?.['用户名'] ?? '管');
-  return 名.trim().charAt(0) || '管';
-});
-
-function 显示值(键: string): string {
-  const 值 = 详情.value?.[键];
-  if (值 === null || 值 === undefined || 值 === '') {
-    return 取文案('通用', '暂无数据');
-  }
-  return String(值);
-}
+const 详情行 = computed<表格行>(() => 详情.value ?? {});
+const 概览列 = 取列映射('账号概览');
 
 async function 查询(): Promise<void> {
   const 用户编号 = 当前路由.params.yongHuId;
   if (typeof 用户编号 !== 'string' || 用户编号.length === 0) {
-    错误提示.value = 取文案('通用', '请求失败');
+    错误提示.value = 通用文案.请求失败;
+    错误码.value = '';
     return;
   }
   加载中.value = true;
   错误提示.value = '';
+  错误码.value = '';
   try {
     详情.value = await 账号详情(用户编号);
   } catch (错误) {
-    if (错误 instanceof Error && 错误.message === 取文案('通用', '登录过期')) {
-      错误提示.value = 取文案('通用', '登录过期');
+    const 展示 = 取错误展示(错误);
+    错误提示.value = 展示.提示;
+    错误码.value = 展示.错误码;
+    if (展示.提示 === 通用文案.登录过期) {
       void 路由器.push('/deng-lu');
-      return;
     }
-    错误提示.value = 错误 instanceof Error ? 错误.message : 取文案('通用', '请求失败');
   } finally {
     加载中.value = false;
   }
@@ -58,90 +56,49 @@ onMounted(() => {
 
 <template>
   <section>
-    <YeMei
-      xu-hao="壹 · 卷宗"
-      :biao-ti="取文案('账号', '详情标题')"
+    <YeMei :biao-ti="账号文案.详情标题" />
+    <XiaoXiTiao
+      xing-tai="jia-zai"
+      :xian-shi="加载中"
     />
-    <p
-      v-if="加载中"
-      class="加载条"
-    >
-      {{ 取文案('通用', '加载中') }}
-    </p>
-    <p
-      v-if="错误提示.length > 0"
-      class="错误条"
-    >
-      {{ 错误提示 }}
-    </p>
+    <XiaoXiTiao
+      xing-tai="cuo-wu"
+      :wen-ben="错误提示"
+      :cuo-wu-ma="错误码"
+    />
     <div
       v-if="详情"
       class="双栏 反"
     >
       <div class="卡片 人物卡">
-        <span
-          class="印章 人物章"
-          aria-hidden="true"
-        >{{ 首字 }}</span>
         <h3 class="人物名">
-          {{ 显示值('昵称') }}
+          {{ 单元格文本(概览列.昵称, 详情行) }}
         </h3>
         <p class="人物号">
-          {{ 显示值('用户名') }}
+          {{ 单元格文本(概览列.用户名, 详情行) }}
         </p>
         <span
-          v-if="详情['管理员'] === true"
-          class="徽标 警"
-        >{{ 取文案('账号', '是') }}</span>
-        <span
-          v-else
-          class="徽标 墨"
-        >{{ 取文案('账号', '否') }}</span>
+          class="徽标"
+          :class="取管理角色色调(详情[响应行键.角色])"
+          data-testid="jiao-se-hui"
+        >{{ 取管理角色文案(详情[响应行键.角色]) }}</span>
       </div>
       <dl class="卷宗">
-        <div>
-          <dt>{{ 取文案('账号', '用户编号') }}</dt>
-          <dd>{{ 显示值('ID') }}</dd>
-        </div>
-        <div>
-          <dt>{{ 取文案('账号', '手机号') }}</dt>
-          <dd>{{ 显示值('手机号') }}</dd>
-        </div>
-        <div>
-          <dt>{{ 取文案('账号', '性别') }}</dt>
-          <dd>{{ 显示值('性别') }}</dd>
-        </div>
-        <div>
-          <dt>{{ 取文案('账号', '人设标签') }}</dt>
-          <dd>{{ 显示值('人设标签') }}</dd>
-        </div>
-        <div>
-          <dt>{{ 取文案('账号', '签名') }}</dt>
-          <dd>{{ 显示值('签名') }}</dd>
-        </div>
-        <div>
-          <dt>{{ 取文案('账号', '是否管理员') }}</dt>
-          <dd>{{ 详情['管理员'] === true ? 取文案('账号', '是') : 取文案('账号', '否') }}</dd>
-        </div>
-        <div>
-          <dt>{{ 取文案('账号', '封禁级别') }}</dt>
-          <dd>{{ 显示值('封禁级别') }}</dd>
-        </div>
-        <div>
-          <dt>{{ 取文案('账号', '违规次数') }}</dt>
-          <dd>{{ 显示值('违规次数') }}</dd>
-        </div>
-        <div>
-          <dt>{{ 取文案('账号', '申诉状态') }}</dt>
-          <dd>{{ 显示值('申诉状态') }}</dd>
-        </div>
-        <div>
-          <dt>{{ 取文案('账号', '账号解封时间') }}</dt>
-          <dd>{{ 显示值('账号解封时间') }}</dd>
-        </div>
-        <div>
-          <dt>{{ 取文案('账号', '创建时间') }}</dt>
-          <dd>{{ 显示值('创建时间') }}</dd>
+        <div
+          v-for="项 in 列定义登记.账号详情"
+          :key="String(项.数据键)"
+        >
+          <dt>{{ 表头文本(项) }}</dt>
+          <dd>
+            <span
+              v-if="渲染为徽标(项)"
+              class="徽标"
+              :class="单元格色调(项, 详情行)"
+            >{{ 单元格文本(项, 详情行) }}</span>
+            <template v-else>
+              {{ 单元格文本(项, 详情行) }}
+            </template>
+          </dd>
         </div>
       </dl>
     </div>
@@ -150,8 +107,8 @@ onMounted(() => {
       class="按钮次"
       @click="返回"
     >
-      <TuBiao ming-cheng="返回" />
-      {{ 取文案('通用', '返回') }}
+      <TuBiao ming-cheng="fan-hui" />
+      {{ 通用文案.返回 }}
     </button>
   </section>
 </template>
@@ -160,13 +117,6 @@ onMounted(() => {
 .人物卡 {
   text-align: center;
   border-top: 6px solid var(--印);
-}
-
-.人物章 {
-  width: 64px;
-  height: 64px;
-  font-size: 28px;
-  margin: 6px auto 12px;
 }
 
 .人物名 {

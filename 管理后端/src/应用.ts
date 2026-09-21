@@ -5,8 +5,9 @@ import cors from 'cors';
 import { 当前配置 } from './配置';
 import { 取文案 } from './文案';
 import { 成功响应, 失败响应 } from './响应';
+import { 错误码 } from './错误码';
 import { 日志, 取请求编号 } from './日志';
-import { 校验失败, 记录缺失 } from './校验';
+import { 归一化错误中间件 } from './错误归一化';
 import type { 查询池 } from './数据库';
 import type { 缓存客户端 } from './缓存';
 import { 认证中间件 } from './中间件/认证';
@@ -20,7 +21,7 @@ import { 创建封禁路由 } from './路由/封禁';
 import { 创建审计路由 } from './路由/审计';
 import { 创建统计路由 } from './路由/统计';
 import { 创建审核路由 } from './路由/审核';
-import { 创建登录路由 } from './路由/登录';
+import { 创建登录路由, 创建身份路由 } from './路由/登录';
 import { 创建管理写路由 } from './路由/管理写';
 
 export interface 应用选项 {
@@ -88,7 +89,7 @@ export function 创建应用(选项: 应用选项 = {}) {
   });
   应用.use((请求: Request, 响应: Response, 下一步: NextFunction): void => {
     if (当前配置().强制安全传输 && 请求.secure !== true && 请求.headers['x-forwarded-proto'] !== 'https') {
-      失败响应(响应, 426, 取文案('通用', '需经加密通道访问'), 'XU_JIA_MI_TONG_DAO');
+      失败响应(响应, 426, 取文案('通用', '需经加密通道访问'), 错误码.需加密访问);
       return;
     }
     下一步();
@@ -100,7 +101,7 @@ export function 创建应用(选项: 应用选项 = {}) {
     }
     // YH-016 真实IP推导：不再信任客户端可控XFF派生的req.ip
     if (!是否允许源地址(取真实IP(请求))) {
-      失败响应(响应, 403, 取文案('通用', '源地址不在白名单'), 'YUAN_DI_ZHI_JU_JUE');
+      失败响应(响应, 403, 取文案('通用', '源地址不在白名单'), 错误码.源地址被拒);
       return;
     }
     下一步();
@@ -185,46 +186,25 @@ export function 创建应用(选项: 应用选项 = {}) {
   管理路由.use(认证中间件);
   管理路由.use(创建读限流(选项.读限流 ?? {}, undefined));
   管理路由.use(管理员门禁);
+  // YH-108 身份回传走认证+门禁之后，角色与能力一律服务端查库结果，不接受客户端申报
+  管理路由.use(创建身份路由());
   管理路由.use(创建账号路由());
   管理路由.use(创建聊天路由());
   管理路由.use(创建思考路由());
-  // YH-108 高危封禁写入走双人复核门禁：普通管理身份可读，写入仅超管
+  // FP-17 封禁写挂 feng_jin、申诉审核挂 feng_jin_shen_he、统计族挂 tong_ji_xie（矩阵内角色按位可达），授回收/夺舍/审核发布仍 gao_we
   管理路由.use(创建封禁路由(创建写限流(选项.写限流 ?? {}, 选项.缓存)));
   管理路由.use(创建审计路由());
   管理路由.use(创建统计路由());
   管理路由.use(创建审核路由(创建写限流(选项.写限流 ?? {}, 选项.缓存)));
-  管理路由.use(创建管理写路由(创建写限流(选项.写限流 ?? {}, 选项.缓存), true));
+  管理路由.use(创建管理写路由(创建写限流(选项.写限流 ?? {}, 选项.缓存)));
   应用.use('/api/guan-li', 管理路由);
 
   应用.use((请求: Request, 响应: Response): void => {
     日志.信息('路由', '未知路径', { 路径: 请求.path });
-    失败响应(响应, 404, 取文案('通用', '未找到'), 'WEI_ZHAO_DAO');
+    失败响应(响应, 404, 取文案('通用', '未找到'), 错误码.记录未找到);
   });
 
-  应用.use((错误: unknown, 请求: Request, 响应: Response, 下一步: NextFunction): void => {
-    if (响应.headersSent) {
-      下一步(错误);
-      return;
-    }
-    if (错误 instanceof 校验失败) {
-      失败响应(响应, 错误.状态码, 错误.message, 'CAN_SHU_CUO_WU');
-      return;
-    }
-    if (错误 instanceof 记录缺失) {
-      失败响应(响应, 错误.状态码, 错误.message, 'WEI_ZHAO_DAO');
-      return;
-    }
-    const 状态码 = (错误 as { status?: unknown }).status;
-    if (状态码 === 400) {
-      失败响应(响应, 400, 取文案('通用', '参数错误'), 'CAN_SHU_CUO_WU');
-      return;
-    }
-    日志.错误('应用', '请求处理异常', {
-      路径: 请求.path,
-      错误: 错误 instanceof Error ? 错误.message : String(错误),
-    });
-    失败响应(响应, 500, 取文案('通用', '服务器内部错误'), 'NEI_BU_CUO_WU');
-  });
+  应用.use(归一化错误中间件());
 
   return 应用;
 }

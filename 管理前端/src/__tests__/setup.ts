@@ -1,4 +1,22 @@
 import { vi } from 'vitest';
+import { config } from '@vue/test-utils';
+import { defineComponent, h, type App } from 'vue';
+
+const 路由链接桩 = defineComponent({
+  name: 'RouterLink',
+  props: { to: { type: String, required: true } },
+  setup(属性, { slots }) {
+    return () => h('a', { href: 属性.to }, slots.default?.());
+  },
+});
+
+const 路由链接桩插件 = {
+  install(应用: App): void {
+    应用.component('RouterLink', 路由链接桩);
+  },
+};
+
+config.global.plugins = [...config.global.plugins, 路由链接桩插件];
 
 class NeiCunCunChu implements Storage {
   private 数据 = new Map<string, string>();

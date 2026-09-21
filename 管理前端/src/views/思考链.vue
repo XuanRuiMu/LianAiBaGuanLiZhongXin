@@ -4,7 +4,7 @@ import {
   记忆列表,
   对话摘要列表,
   关键事件列表,
-  夺舍日志列表,
+  接管记录列表,
   评估列表,
   思考记录列表,
   思考记录详情,
@@ -12,23 +12,28 @@ import {
   type 表格行,
   type 思考说明 as 思考说明类型,
 } from '../api/管理';
-import type { 分页信息 } from '../api/请求';
+import { 取错误展示, type 分页信息 } from '../api/请求';
 import { 默认每页条数, 默认页码 } from '../配置';
-import { 取文案 } from '../文案';
+import { 单元格文本, 单元格色调, 取列映射, 行快照文本, 响应行键, 页签快照表, type 思考页签 } from '../列定义';
+import { 思考事件选项 } from '../枚举映射/思考事件';
 import YeMei from '../components/YeMei.vue';
 import FenYeTiao from '../components/FenYeTiao.vue';
+import XiaoXiTiao from '../components/XiaoXiTiao.vue';
 import TuBiao from '../components/TuBiao.vue';
+import { 通用文案 } from '../文案/通用';
+import { 账号文案 } from '../文案/账号';
+import { 思考文案 } from '../文案/思考';
 
-type 标签页 = 'si-kao-ji-lu' | 'ji-yi' | 'dui-hua-zhai-yao' | 'guan-jian-shi-jian' | 'duo-she-ri-zhi' | 'ping-gu';
+type 标签页 = 思考页签;
 
-type 标签键 = '思考记录标签' | '记忆标签' | '对话摘要标签' | '关键事件标签' | '夺舍日志标签' | '评估标签';
+type 标签键 = '思考记录标签' | '记忆标签' | '对话摘要标签' | '关键事件标签' | '接管记录标签' | '评估标签';
 
 const 标签列: Array<{ 值: 标签页; 键: 标签键 }> = [
   { 值: 'si-kao-ji-lu', 键: '思考记录标签' },
   { 值: 'ji-yi', 键: '记忆标签' },
   { 值: 'dui-hua-zhai-yao', 键: '对话摘要标签' },
   { 值: 'guan-jian-shi-jian', 键: '关键事件标签' },
-  { 值: 'duo-she-ri-zhi', 键: '夺舍日志标签' },
+  { 值: 'duo-she-ri-zhi', 键: '接管记录标签' },
   { 值: 'ping-gu', 键: '评估标签' },
 ];
 
@@ -40,23 +45,25 @@ const 事件筛选 = ref('');
 const 行列表 = ref<表格行[]>([]);
 const 分页 = ref<分页信息 | undefined>(undefined);
 const 说明 = ref<思考说明类型 | null>(null);
+const 原文内容 = ref<Record<string, string>>({});
 const 加载中 = ref(false);
 const 错误提示 = ref('');
+const 错误码 = ref('');
 
-function 显示值(行: 表格行, 键: string): string {
-  const 值 = 行[键];
-  if (值 === null || 值 === undefined || 值 === '') {
-    return 取文案('通用', '暂无数据');
-  }
-  return String(值);
+function 显示错误(错误: unknown): void {
+  const 展示 = 取错误展示(错误);
+  错误提示.value = 展示.提示;
+  错误码.value = 展示.错误码;
 }
 
+const 记录列 = 取列映射('思考记录');
+
 function 行快照(行: 表格行): string {
-  try {
-    return JSON.stringify(行, null, 2);
-  } catch {
-    return 取文案('通用', '暂无数据');
-  }
+  return 行快照文本(页签快照表[当前标签.value], 行);
+}
+
+function 取原文(值: unknown): string {
+  return typeof 值 === 'string' && 值.length > 0 ? 值 : 通用文案.未记录;
 }
 
 function 可选文本(原始: string): string | undefined {
@@ -79,18 +86,16 @@ async function 展开思考记录(记录编号: unknown): Promise<void> {
   }
   try {
     const 详情 = await 思考记录详情(记录编号);
-    const 目标 = 行列表.value.find((行) => String(行['ID'] ?? '') === 记录编号);
-    if (目标) {
-      目标['内容'] = 详情['内容'];
-    }
+    原文内容.value = { ...原文内容.value, [记录编号]: 取原文(详情[响应行键.内容]) };
   } catch (错误) {
-    错误提示.value = 错误 instanceof Error ? 错误.message : 取文案('通用', '请求失败');
+    显示错误(错误);
   }
 }
 
 async function 查询(页码: number = 默认页码): Promise<void> {
   加载中.value = true;
   错误提示.value = '';
+  错误码.value = '';
   try {
     const 基础 = {
       ye_ma: 页码,
@@ -114,7 +119,7 @@ async function 查询(页码: number = 默认页码): Promise<void> {
       行列表.value = 结果.行;
       分页.value = 结果.分页;
     } else if (当前标签.value === 'duo-she-ri-zhi') {
-      const 结果 = await 夺舍日志列表(基础);
+      const 结果 = await 接管记录列表(基础);
       行列表.value = 结果.行;
       分页.value = 结果.分页;
     } else {
@@ -123,7 +128,7 @@ async function 查询(页码: number = 默认页码): Promise<void> {
       分页.value = 结果.分页;
     }
   } catch (错误) {
-    错误提示.value = 错误 instanceof Error ? 错误.message : 取文案('通用', '请求失败');
+    显示错误(错误);
   } finally {
     加载中.value = false;
   }
@@ -140,6 +145,7 @@ async function 查询说明(): Promise<void> {
 function 切换标签(目标: 标签页): void {
   当前标签.value = 目标;
   行列表.value = [];
+  原文内容.value = {};
   分页.value = undefined;
   void 查询();
 }
@@ -165,16 +171,14 @@ onMounted(() => {
 <template>
   <section>
     <YeMei
-      xu-hao="叁 · 心迹"
-      :biao-ti="取文案('思考', '标题')"
-      :shuo-ming="取文案('思考', '实时推送提示')"
+      :biao-ti="思考文案.标题"
+      :shuo-ming="思考文案.实时推送提示"
     />
     <div
       class="卡片 说明卡"
       data-testid="shi-shi-shuo-ming"
     >
-      <h3>{{ 取文案('思考', '实时说明标签') }}</h3>
-      <p>{{ 取文案('思考', '实时推送提示') }}</p>
+      <h3>{{ 思考文案.实时说明标签 }}</h3>
       <p v-if="说明">
         {{ 说明.sheng_ming }}
       </p>
@@ -182,25 +186,24 @@ onMounted(() => {
         {{ 说明.shi_shi_shuo_ming }}
       </p>
       <div v-if="说明 && 说明.dai_bu_chong.length > 0">
-        <span class="待补题">{{ 取文案('思考', '待补充项标签') }}</span>
+        <span class="待补题">{{ 思考文案.待补充项标签 }}</span>
         <ul class="待补列">
           <li
             v-for="项 in 说明.dai_bu_chong"
             :key="项"
             data-testid="dai-bu-chong"
           >
-            <span class="徽标 警">{{ 取文案('通用', '待补充') }}</span>
-            {{ 项 }}（{{ 取文案('通用', '待补充') }}）
+            <span class="徽标 警">{{ 通用文案.待补充 }}</span>
+            {{ 项 }}
           </li>
         </ul>
       </div>
-      <p
+      <XiaoXiTiao
         v-else
-        class="空态"
-        data-testid="kong-tai-dai-bu-chong"
-      >
-        {{ 取文案('通用', '待补充') }}
-      </p>
+        xing-tai="kong"
+        :wen-ben="通用文案.待补充"
+        ce-shi-biao-shi="kong-tai-dai-bu-chong"
+      />
     </div>
     <div class="标签页">
       <button
@@ -210,75 +213,74 @@ onMounted(() => {
         :class="当前标签 === 项.值 ? '激活' : ''"
         @click="切换标签(项.值)"
       >
-        {{ 取文案('思考', 项.键) }}
+        {{ 思考文案[项.键] }}
       </button>
     </div>
     <div class="账簿">
       <label class="字段">
-        {{ 取文案('思考', '用户编号占位') }}
+        {{ 账号文案.用户编号 }}
         <input
           v-model="用户编号"
           class="输入"
-          :placeholder="取文案('思考', '用户编号占位')"
         >
       </label>
       <label class="字段">
-        {{ 取文案('思考', '角色编号占位') }}
+        {{ 账号文案.角色编号标签 }}
         <input
           v-model="角色编号"
           class="输入"
-          :placeholder="取文案('思考', '角色编号占位')"
         >
       </label>
       <label
         v-if="当前标签 === 'duo-she-ri-zhi'"
         class="字段"
       >
-        {{ 取文案('思考', '管理员编号占位') }}
+        {{ 思考文案.管理员编号标签 }}
         <input
           v-model="管理员编号"
           class="输入"
-          :placeholder="取文案('思考', '管理员编号占位')"
         >
       </label>
       <label
         v-if="当前标签 === 'si-kao-ji-lu'"
         class="字段"
       >
-        {{ 取文案('思考', '事件筛选占位') }}
-        <input
+        {{ 思考文案.事件标签 }}
+        <select
           v-model="事件筛选"
-          class="输入"
-          :placeholder="取文案('思考', '事件筛选占位')"
+          class="选择"
+          data-testid="lv-xuan-si-kao-shi-jian"
         >
+          <option value="">{{ 通用文案.全部 }}</option>
+          <option
+            v-for="项 in 思考事件选项"
+            :key="项.值"
+            :value="项.值"
+          >{{ 项.文案 }}</option>
+        </select>
       </label>
       <button
         type="button"
         class="按钮主"
         @click="查询()"
       >
-        <TuBiao ming-cheng="查询" />
-        {{ 取文案('通用', '查询') }}
+        <TuBiao ming-cheng="cha-xun" />
+        {{ 通用文案.查询 }}
       </button>
     </div>
-    <p
-      v-if="加载中"
-      class="加载条"
-    >
-      {{ 取文案('通用', '加载中') }}
-    </p>
-    <p
-      v-if="错误提示.length > 0"
-      class="错误条"
-    >
-      {{ 错误提示 }}
-    </p>
-    <p
-      v-if="!加载中 && 行列表.length === 0"
-      class="空态"
-    >
-      {{ 取文案('通用', '暂无数据') }}
-    </p>
+    <XiaoXiTiao
+      xing-tai="jia-zai"
+      :xian-shi="加载中"
+    />
+    <XiaoXiTiao
+      xing-tai="cuo-wu"
+      :wen-ben="错误提示"
+      :cuo-wu-ma="错误码"
+    />
+    <XiaoXiTiao
+      xing-tai="kong"
+      :xian-shi="!加载中 && 行列表.length === 0"
+    />
     <ol
       v-if="行列表.length > 0"
       class="时间线"
@@ -290,24 +292,32 @@ onMounted(() => {
       >
         <div class="节点卡">
           <div class="节点元">
-            <span class="徽标 墨">{{ 取文案('思考', '序号列') }}{{ 序号 + 1 }}</span>
-            <time>{{ 显示值(行, '创建时间') }}</time>
+            <span class="徽标 墨">{{ 思考文案.序号列 }} {{ 序号 + 1 }}</span>
+            <time>{{ 单元格文本(记录列.创建时间, 行) }}</time>
             <span
               v-if="当前标签 === 'si-kao-ji-lu'"
-              class="徽标 墨"
-            >{{ 显示值(行, '事件') }}</span>
+              class="徽标"
+              :class="单元格色调(记录列.事件, 行)"
+            >{{ 单元格文本(记录列.事件, 行) }}</span>
           </div>
           <p v-if="当前标签 === 'si-kao-ji-lu'">
-            {{ 显示值(行, '摘要') }}
+            {{ 单元格文本(记录列.摘要, 行) }}
           </p>
           <button
             v-if="当前标签 === 'si-kao-ji-lu'"
             type="button"
             class="按钮次"
-            @click="展开思考记录(行['ID'])"
+            @click="展开思考记录(行[响应行键.ID])"
           >
-            {{ 取文案('通用', '详情') }}
+            {{ 通用文案.详情 }}
           </button>
+          <p
+            v-if="原文内容[String(行[响应行键.ID] ?? '')]"
+            class="原文行"
+          >
+            <span class="原文名">{{ 思考文案.内容标签 }}</span>
+            <span>{{ 原文内容[String(行[响应行键.ID] ?? '')] }}</span>
+          </p>
           <pre class="快照码">{{ 行快照(行) }}</pre>
         </div>
       </li>
@@ -363,5 +373,16 @@ onMounted(() => {
 
 .空态 {
   margin-bottom: 0;
+}
+
+.原文行 {
+  margin: 10px 0 0;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+.原文名 {
+  color: var(--淡墨);
+  margin-right: 8px;
 }
 </style>

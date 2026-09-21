@@ -2,9 +2,19 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createPinia, setActivePinia } from 'pinia';
 import { createMemoryHistory, createRouter } from 'vue-router';
 import { flushPromises, mount } from '@vue/test-utils';
-import { 使用登录仓库, 清除令牌, 规范令牌 } from '../stores/登录';
+import { 使用登录仓库, 清除令牌, 规范令牌, 规范角色, 规范能力 } from '../stores/登录';
 import { 解析包络, 业务错误, 请求实例 } from '../api/请求';
-import { 思考说明 as 获取思考说明, 管理登录 as 管理登录接口, type 思考说明 } from '../api/管理';
+import {
+  思考说明 as 获取思考说明,
+  封禁记录 as 封禁记录接口,
+  账号封禁列表 as 账号封禁列表接口,
+  管理登录 as 管理登录接口,
+  账号列表 as 账号列表接口,
+  我的身份 as 我的身份接口,
+  type 思考说明,
+} from '../api/管理';
+import { 取管理角色文案, 管理角色选项 } from '../枚举映射';
+import { 文案 } from '../文案/聚合';
 import { 注册守卫, 路由表 } from '../router';
 import 思考链 from '../views/思考链.vue';
 import App from '../App.vue';
@@ -12,17 +22,18 @@ import App from '../App.vue';
 vi.mock('../api/管理', () => ({
   账号列表: vi.fn(),
   账号详情: vi.fn(),
-  授予管理员: vi.fn(),
-  回收管理员: vi.fn(),
-  夺舍角色: vi.fn(),
-  归还角色: vi.fn(),
+  授予角色: vi.fn(),
+  回收角色: vi.fn(),
+  我的身份: vi.fn().mockResolvedValue({ yong_hu_id: 'yi', jiao_se: 'chao_guan', neng_li: ['cha_kan', 'feng_jin', 'feng_jin_shen_he', 'tong_ji_xie', 'gao_we'] }),
+  接管角色: vi.fn(),
+  结束接管: vi.fn(),
   管理登录: vi.fn(),
   聊天消息: vi.fn(),
   好友消息: vi.fn(),
   记忆列表: vi.fn().mockResolvedValue({ 行: [] }),
   对话摘要列表: vi.fn().mockResolvedValue({ 行: [] }),
   关键事件列表: vi.fn().mockResolvedValue({ 行: [] }),
-  夺舍日志列表: vi.fn().mockResolvedValue({ 行: [] }),
+  接管记录列表: vi.fn().mockResolvedValue({ 行: [] }),
   评估列表: vi.fn().mockResolvedValue({ 行: [] }),
   思考记录列表: vi.fn().mockResolvedValue({ 行: [] }),
   思考记录详情: vi.fn(),
@@ -54,10 +65,10 @@ vi.mock('../api/管理', () => ({
   指标概览: vi.fn(),
   审核列表: vi.fn().mockResolvedValue({ 行: [] }),
   审核新建: vi.fn(),
-  审核一审: vi.fn(),
-  审核二审: vi.fn(),
-  审核批量: vi.fn(),
-  审核留痕: vi.fn().mockResolvedValue({ 行: [] }),
+  审核初审: vi.fn(),
+  审核复审: vi.fn(),
+  审核多项处理: vi.fn(),
+  处理记录列表: vi.fn().mockResolvedValue({ 行: [] }),
 }));
 
 beforeEach(() => {
@@ -207,7 +218,17 @@ describe('应用导航', () => {
     });
     await flushPromises();
     const 导航文本 = 包装.find('nav').text();
-    for (const 标签 of ['账号管理', '聊天记录', '思考链', '封禁管理', '审计日志', '统计图表', '审核运营']) {
+    const 七个模块标签 = [
+      文案.导航.账号管理,
+      文案.导航.聊天记录,
+      文案.导航.思考链,
+      文案.导航.封禁管理,
+      文案.导航.审计日志,
+      文案.导航.统计图表,
+      文案.导航.审核运营,
+    ];
+    expect(七个模块标签.filter((标签) => 标签.length === 0)).toEqual([]);
+    for (const 标签 of 七个模块标签) {
       expect(导航文本).toContain(标签);
     }
     expect(包装.findAll('nav svg')).toHaveLength(7);
@@ -219,8 +240,11 @@ describe('思考链空态', () => {
   it('有待补充项时渲染待补充标记', async () => {
     const 包装 = mount(思考链);
     await flushPromises();
-    expect(包装.text()).toContain('待补充');
+    expect(包装.text()).toContain(文案.通用.待补充);
     expect(包装.find('[data-testid="dai-bu-chong"]').exists()).toBe(true);
+    expect(包装.find('.待补题').text()).toBe(文案.思考.待补充项标签);
+    expect(包装.find('[data-testid="dai-bu-chong"] .徽标').text()).toBe(文案.通用.待补充);
+    expect(包装.find('[data-testid="dai-bu-chong"]').text()).toContain('实时思考链订阅通道');
   });
 
   it('说明缺失时渲染空态待补充', async () => {
@@ -239,7 +263,8 @@ describe('思考链空态', () => {
     const 包装 = mount(思考链);
     await flushPromises();
     expect(包装.find('[data-testid="kong-tai-dai-bu-chong"]').exists()).toBe(true);
-    expect(包装.text()).toContain('暂无数据');
+    expect(包装.find('[data-testid="kong-tai-dai-bu-chong"]').text()).toBe(文案.通用.待补充);
+    expect(包装.text()).toContain(文案.通用.暂无数据);
   });
 });
 
@@ -260,6 +285,306 @@ describe('管理登录', () => {
     });
     await 包装.find('[data-testid="deng-lu-an-niu"]').trigger('click');
     expect(vi.mocked(管理登录接口)).not.toHaveBeenCalled();
-    expect(包装.text()).toContain('请输入手机号与密码');
+    expect(包装.text()).toContain(文案.登录.账号或密码为空);
+  });
+});
+
+describe('YH-108 身份与能力存储', () => {
+  it('设置身份后角色与能力落会话存储，可高危随能力派生', () => {
+    const 仓库 = 使用登录仓库();
+    expect(仓库.可高危).toBe(false);
+    仓库.设置身份('chao_guan', ['cha_kan', 'gao_we']);
+    expect(仓库.管理角色).toBe('chao_guan');
+    expect(仓库.可高危).toBe(true);
+    expect(window.sessionStorage.getItem('guan_li_jiao_se')).toBe('chao_guan');
+    expect(JSON.parse(String(window.sessionStorage.getItem('guan_li_neng_li')))).toEqual(['cha_kan', 'gao_we']);
+  });
+
+  it('FP-17 扩权后运营拿封禁与统计位、审核员拿封禁审核位，可高危仍只归超管', () => {
+    const 仓库 = 使用登录仓库();
+    仓库.设置身份('yun_ying', ['cha_kan', 'feng_jin', 'tong_ji_xie']);
+    expect(仓库.可管理).toBe(true);
+    expect(仓库.可高危).toBe(false);
+    expect(仓库.可封禁).toBe(true);
+    expect(仓库.可统计).toBe(true);
+    expect(仓库.可封禁审核).toBe(false);
+    仓库.设置身份('shen_he_yuan', ['cha_kan', 'feng_jin_shen_he']);
+    expect(仓库.可高危).toBe(false);
+    expect(仓库.可封禁).toBe(false);
+    expect(仓库.可统计).toBe(false);
+    expect(仓库.可封禁审核).toBe(true);
+  });
+
+  it('刷新后从会话存储重建角色，未知角色与未知能力被白名单剔除', () => {
+    window.sessionStorage.setItem('guan_li_hui_hua', 'yi_deng_lu');
+    window.sessionStorage.setItem('guan_li_jiao_se', 'shen_he_yuan');
+    window.sessionStorage.setItem('guan_li_neng_li', JSON.stringify(['cha_kan', 'wei_zhi']));
+    const 仓库 = 使用登录仓库();
+    expect(仓库.管理角色).toBe('shen_he_yuan');
+    expect(仓库.能力列表).toEqual(['cha_kan']);
+    expect(仓库.可高危).toBe(false);
+    expect(规范角色('zhi_dai_wei')).toBeNull();
+    expect(规范角色(null)).toBeNull();
+    expect(规范能力('fei-zu-ju')).toEqual([]);
+    expect(规范能力(['gao_we', 1, null])).toEqual(['gao_we']);
+  });
+
+  it('退出登录与401清令牌同时清角色与能力', () => {
+    const 仓库 = 使用登录仓库();
+    仓库.设置令牌('ce-shi');
+    仓库.设置身份('chao_guan', ['cha_kan', 'gao_we']);
+    仓库.退出登录();
+    expect(window.sessionStorage.getItem('guan_li_jiao_se')).toBeNull();
+    expect(window.sessionStorage.getItem('guan_li_neng_li')).toBeNull();
+    expect(仓库.可高危).toBe(false);
+    仓库.设置身份('chao_guan', ['cha_kan', 'gao_we']);
+    清除令牌();
+    仓库.同步存储();
+    expect(仓库.管理角色).toBeNull();
+    expect(仓库.能力列表).toEqual([]);
+    expect(规范令牌('   ')).toBeNull();
+  });
+
+  it('角色文案映射三角色，空值标无管理身份，域外值标未收录', () => {
+    expect(取管理角色文案('chao_guan')).toBe(文案.账号.角色超级管理员);
+    expect(取管理角色文案('yun_ying')).toBe(文案.账号.角色运营);
+    expect(取管理角色文案('shen_he_yuan')).toBe(文案.账号.角色审核员);
+    expect(取管理角色文案(null)).toBe(文案.账号.角色无);
+    expect(取管理角色文案('zhi_dai_wei')).toBe(`${文案.通用.未收录}（zhi_dai_wei）`);
+    expect(管理角色选项.map((项) => 项.值)).toEqual(['chao_guan', 'yun_ying', 'shen_he_yuan']);
+    expect(管理角色选项.map((项) => 项.文案)).toEqual([
+      文案.账号.角色超级管理员,
+      文案.账号.角色运营,
+      文案.账号.角色审核员,
+    ]);
+  });
+});
+
+describe('YH-108 前端按角色隐藏入口', () => {
+  function 预置身份(角色: string | null, 能力: string[]): void {
+    使用登录仓库().设置身份(角色, 能力);
+  }
+
+  it('账号列表按服务端角色列渲染，超管见授予/回收/接管与角色选择', async () => {
+    vi.mocked(账号列表接口).mockResolvedValue({
+      行: [
+        { ID: 'yi', 昵称: '甲', 手机号: '138****0000', 角色: 'yun_ying' },
+        { ID: 'er', 昵称: '乙', 手机号: '139****0001', 角色: null },
+      ],
+      分页: undefined,
+    });
+    预置身份('chao_guan', ['cha_kan', 'gao_we']);
+    const { default: 账号列表页 } = await import('../views/账号列表.vue');
+    const 包装 = mount(账号列表页);
+    await flushPromises();
+    expect(包装.text()).toContain(文案.账号.角色运营);
+    expect(包装.text()).toContain(文案.账号.角色无);
+    expect(包装.findAll('[data-testid="jiao-se-hui"]').map((项) => 项.text())).toEqual([
+      文案.账号.角色运营,
+      文案.账号.角色无,
+    ]);
+    expect(包装.find('[data-testid="shou-yu-an-niu"]').exists()).toBe(true);
+    expect(包装.find('[data-testid="hui-shou-an-niu"]').exists()).toBe(true);
+    expect(包装.find('[data-testid="jie-guan-an-niu"]').exists()).toBe(true);
+    expect(包装.find('[data-testid="jie-shu-jie-guan-an-niu"]').exists()).toBe(true);
+    expect(包装.find('[data-testid="shou-yu-jiao-se-xuan-ze"]').exists()).toBe(true);
+    expect(
+      包装
+        .find('[data-testid="shou-yu-jiao-se-xuan-ze"]')
+        .findAll('option')
+        .map((项) => 项.text()),
+    ).toEqual([文案.账号.角色超级管理员, 文案.账号.角色运营, 文案.账号.角色审核员]);
+  });
+
+  it('审核员登录不渲染任何高危入口，只读入口仍在', async () => {
+    vi.mocked(账号列表接口).mockResolvedValue({
+      行: [{ ID: 'yi', 昵称: '甲', 手机号: '138****0000', 角色: 'chao_guan' }],
+      分页: undefined,
+    });
+    预置身份('shen_he_yuan', ['cha_kan']);
+    const { default: 账号列表页 } = await import('../views/账号列表.vue');
+    const 包装 = mount(账号列表页);
+    await flushPromises();
+    expect(包装.find('[data-testid="shou-yu-an-niu"]').exists()).toBe(false);
+    expect(包装.find('[data-testid="hui-shou-an-niu"]').exists()).toBe(false);
+    expect(包装.find('[data-testid="jie-guan-an-niu"]').exists()).toBe(false);
+    expect(包装.find('[data-testid="jie-shu-jie-guan-an-niu"]').exists()).toBe(false);
+    expect(包装.find('[data-testid="shou-yu-jiao-se-xuan-ze"]').exists()).toBe(false);
+    expect(包装.text()).toContain(文案.账号.角色超级管理员);
+  });
+
+  it('运营在审核运营页看到无权限提示而非写表单', async () => {
+    预置身份('yun_ying', ['cha_kan']);
+    const { default: 审核运营页 } = await import('../views/审核运营.vue');
+    const 包装 = mount(审核运营页);
+    await flushPromises();
+    expect(包装.find('[data-testid="wu-gao-wei-qi-yong"]').exists()).toBe(true);
+    expect(包装.find('[data-testid="wu-gao-wei-qi-yong"]').text()).toBe(文案.账号.无权限提示);
+    expect(包装.text()).toContain(文案.账号.无权限提示);
+    expect(包装.text()).not.toContain(文案.审核.处理多项按钮);
+  });
+
+  it('超管在审核运营页看到写表单而非无权限提示', async () => {
+    预置身份('chao_guan', ['cha_kan', 'gao_we']);
+    const { default: 审核运营页 } = await import('../views/审核运营.vue');
+    const 包装 = mount(审核运营页);
+    await flushPromises();
+    expect(包装.find('[data-testid="wu-gao-wei-qi-yong"]').exists()).toBe(false);
+    expect(包装.text()).toContain(文案.审核.处理多项按钮);
+  });
+
+  it('应用外壳挂载后拉取服务端身份并展示当前角色', async () => {
+    window.sessionStorage.setItem('guan_li_hui_hua', 'yi_deng_lu');
+    vi.mocked(我的身份接口).mockResolvedValue({ yong_hu_id: 'yi', jiao_se: 'yun_ying', neng_li: ['cha_kan'] });
+    const 路由器 = createRouter({ history: createMemoryHistory(), routes: 路由表 });
+    注册守卫(路由器);
+    await 路由器.push('/zhang-hao');
+    await 路由器.isReady();
+    const 包装 = mount(App, { global: { plugins: [路由器], stubs: { RouterView: true } } });
+    await flushPromises();
+    expect(我的身份接口).toHaveBeenCalled();
+    expect(包装.find('[data-testid="dang-qian-jiao-se"]').text()).toBe(文案.账号.角色运营);
+    expect(使用登录仓库().可高危).toBe(false);
+  });
+
+  it('本地存储被伪造成高危也会被装载时的服务端复核覆盖', async () => {
+    window.sessionStorage.setItem('guan_li_hui_hua', 'yi_deng_lu');
+    window.sessionStorage.setItem('guan_li_jiao_se', 'chao_guan');
+    window.sessionStorage.setItem('guan_li_neng_li', JSON.stringify(['cha_kan', 'gao_we']));
+    vi.mocked(我的身份接口).mockResolvedValue({ yong_hu_id: 'yi', jiao_se: 'shen_he_yuan', neng_li: ['cha_kan'] });
+    const 路由器 = createRouter({ history: createMemoryHistory(), routes: 路由表 });
+    注册守卫(路由器);
+    await 路由器.push('/zhang-hao');
+    await 路由器.isReady();
+    mount(App, { global: { plugins: [路由器], stubs: { RouterView: true } } });
+    expect(使用登录仓库().可高危).toBe(true);
+    await flushPromises();
+    expect(使用登录仓库().管理角色).toBe('shen_he_yuan');
+    expect(使用登录仓库().可高危).toBe(false);
+    expect(window.sessionStorage.getItem('guan_li_jiao_se')).toBe('shen_he_yuan');
+  });
+});
+
+describe('YH-108 菜单条目从服务端能力位派生', () => {
+  function 挂外壳(): ReturnType<typeof mount> {
+    const 路由器 = createRouter({ history: createMemoryHistory(), routes: 路由表 });
+    注册守卫(路由器);
+    return mount(App, { global: { plugins: [路由器], stubs: { RouterView: true } } });
+  }
+
+  it('FP-17 运营按矩阵能力看到全部七个模块（含统计），审核员看不到统计图表', async () => {
+    window.sessionStorage.setItem('guan_li_hui_hua', 'yi_deng_lu');
+    使用登录仓库().设置身份('yun_ying', ['cha_kan', 'feng_jin', 'tong_ji_xie']);
+    vi.mocked(我的身份接口).mockResolvedValue({
+      yong_hu_id: 'yi',
+      jiao_se: 'yun_ying',
+      neng_li: ['cha_kan', 'feng_jin', 'tong_ji_xie'],
+    });
+    const 包装 = 挂外壳();
+    await flushPromises();
+    expect(包装.findAll('nav a')).toHaveLength(7);
+    window.sessionStorage.setItem('guan_li_hui_hua', 'yi_deng_lu');
+    setActivePinia(createPinia());
+    使用登录仓库().设置身份('shen_he_yuan', ['cha_kan', 'feng_jin_shen_he']);
+    vi.mocked(我的身份接口).mockResolvedValue({
+      yong_hu_id: 'yi',
+      jiao_se: 'shen_he_yuan',
+      neng_li: ['cha_kan', 'feng_jin_shen_he'],
+    });
+    const 审核包装 = 挂外壳();
+    await flushPromises();
+    const 导航文本 = 审核包装.find('nav').text();
+    expect(审核包装.findAll('nav a')).toHaveLength(6);
+    expect(导航文本).not.toContain(文案.导航.统计图表);
+    expect(导航文本).toContain(文案.导航.封禁管理);
+  });
+
+  it('身份接口未落地前能力为空则不渲染任何入口，不靠前端猜角色', async () => {
+    window.sessionStorage.setItem('guan_li_hui_hua', 'yi_deng_lu');
+    vi.mocked(我的身份接口).mockRejectedValue(new Error('shen_fen_jie_kou_bu_ke_da'));
+    const 包装 = 挂外壳();
+    await flushPromises();
+    expect(包装.findAll('nav a')).toHaveLength(0);
+  });
+});
+
+describe('YH-108 登录响应即建权限视图', () => {
+  it('登录成功后按响应角色与能力落身份，高危入口随能力出现', async () => {
+    vi.mocked(管理登录接口).mockResolvedValue({
+      yong_hu_id: 'yi',
+      yong_hu_ming: 'jia',
+      jiao_se: 'chao_guan',
+      neng_li: ['cha_kan', 'gao_we'],
+    });
+    const { default: 登录页 } = await import('../views/登录页.vue');
+    const 包装 = mount(登录页, {
+      global: { plugins: [createPinia(), createRouter({ history: createMemoryHistory(), routes: 路由表 })] },
+    });
+    await 包装.find('[data-testid="shou-ji-hao-shu-ru"]').setValue('13800000000');
+    await 包装.find('[data-testid="mi-ma-shu-ru"]').setValue('mi-ma-123');
+    await 包装.find('[data-testid="deng-lu-an-niu"]').trigger('click');
+    await flushPromises();
+    expect(使用登录仓库().管理角色).toBe('chao_guan');
+    expect(使用登录仓库().能力列表).toEqual(['cha_kan', 'gao_we']);
+    expect(使用登录仓库().可高危).toBe(true);
+    expect(window.sessionStorage.getItem('guan_li_neng_li')).toBe(JSON.stringify(['cha_kan', 'gao_we']));
+  });
+
+  it('登录响应只给查看能力时前端不得自造高危身份', async () => {
+    vi.mocked(管理登录接口).mockResolvedValue({
+      yong_hu_id: 'yi',
+      yong_hu_ming: 'jia',
+      jiao_se: 'yun_ying',
+      neng_li: ['cha_kan'],
+    });
+    const { default: 登录页 } = await import('../views/登录页.vue');
+    const 包装 = mount(登录页, {
+      global: { plugins: [createPinia(), createRouter({ history: createMemoryHistory(), routes: 路由表 })] },
+    });
+    await 包装.find('[data-testid="shou-ji-hao-shu-ru"]').setValue('13800000000');
+    await 包装.find('[data-testid="mi-ma-shu-ru"]').setValue('mi-ma-123');
+    await 包装.find('[data-testid="deng-lu-an-niu"]').trigger('click');
+    await flushPromises();
+    expect(使用登录仓库().可高危).toBe(false);
+    expect(使用登录仓库().能力列表).toEqual(['cha_kan']);
+  });
+});
+
+describe('FP-17 封禁管理页入口按能力位派生', () => {
+  async function 挂封禁页(角色: 'chao_guan' | 'yun_ying' | 'shen_he_yuan', 能力: string[]) {
+    vi.mocked(封禁记录接口).mockResolvedValue({ 行: [], 分页: undefined });
+    vi.mocked(账号封禁列表接口).mockResolvedValue({
+      行: [{ 用户ID: 'yi', 级别: 'feng_jin_1_tian', 申诉状态: 'shen_su_zhong', 最后原因: 'ce' }],
+      分页: undefined,
+    });
+    使用登录仓库().设置身份(角色, 能力);
+    const { default: 封禁管理页 } = await import('../views/封禁管理.vue');
+    const 包装 = mount(封禁管理页);
+    await flushPromises();
+    return 包装;
+  }
+
+  it('运营见封禁写入卡与解封按钮，不见申诉通过/驳回（feng_jin 不含审核位）', async () => {
+    const 包装 = await 挂封禁页('yun_ying', ['cha_kan', 'feng_jin', 'tong_ji_xie']);
+    expect(包装.find('.封禁卡').exists()).toBe(true);
+    expect(包装.find('[data-testid="jie-feng-an-niu"]').exists()).toBe(true);
+    expect(包装.find('[data-testid="tong-guo-shen-su-an-niu"]').exists()).toBe(false);
+    expect(包装.find('[data-testid="bo-hui-shen-su-an-niu"]').exists()).toBe(false);
+  });
+
+  it('审核员见申诉通过/驳回，不见封禁写入卡与解封（feng_jin_shen_he 不含封禁位）', async () => {
+    const 包装 = await 挂封禁页('shen_he_yuan', ['cha_kan', 'feng_jin_shen_he']);
+    expect(包装.find('.封禁卡').exists()).toBe(false);
+    expect(包装.find('[data-testid="jie-feng-an-niu"]').exists()).toBe(false);
+    expect(包装.find('[data-testid="tong-guo-shen-su-an-niu"]').exists()).toBe(true);
+    expect(包装.find('[data-testid="bo-hui-shen-su-an-niu"]').exists()).toBe(true);
+  });
+
+  it('超管五位全量，封禁写入卡/解封/申诉审核三类入口俱在', async () => {
+    const 包装 = await 挂封禁页('chao_guan', ['cha_kan', 'feng_jin', 'feng_jin_shen_he', 'tong_ji_xie', 'gao_we']);
+    expect(包装.find('.封禁卡').exists()).toBe(true);
+    expect(包装.find('[data-testid="jie-feng-an-niu"]').exists()).toBe(true);
+    expect(包装.find('[data-testid="tong-guo-shen-su-an-niu"]').exists()).toBe(true);
+    expect(包装.find('[data-testid="bo-hui-shen-su-an-niu"]').exists()).toBe(true);
   });
 });
