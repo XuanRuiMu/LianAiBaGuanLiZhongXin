@@ -530,13 +530,30 @@ describe('FP-04 方向判定纯函数', () => {
   });
 });
 
+describe('FP-05b 层族与站内确认层接线', () => {
+  it('确认层组件根真的挂 层 族，且全站 层 族使用者恰好是它的开关节点', () => {
+    const 根族 = 内建过渡根族表();
+    expect(根族.QueRenCeng, 'QueRenCeng.vue 根节点没有 <Transition name="层">').toBe(内建过渡组件.QueRenCeng);
+    expect(族使用者数(条件节点清单(), '层')).toBe(1);
+  });
+
+  it('反证：一个未接 层 族、判据又不是恒定五判据的同类面节点必须判红（守卫不空跑）', () => {
+    const 站点 = 条件节点清单();
+    expect(恒定归类的结果(站点).违例).toEqual([]);
+    const 伪造: 条件节点 = { 文件: 'src/components/伪造层.vue', 行: 1, 标签: 'div', 指令: 'if', 表达式: '待执行 !== null', 祖先族: '', 链主判据: '', 直接子: false };
+    const 结果 = 恒定归类的结果([...站点, 伪造]);
+    expect(结果.违例.length).toBe(1);
+    expect(结果.违例[0]).toContain('待执行 !== null');
+  });
+});
+
 type 条件节点 = { 文件: string; 行: number; 标签: string; 指令: string; 表达式: string; 祖先族: string; 链主判据: string; 直接子: boolean };
 
-const 动效族 = ['条', '块', '组'];
+const 动效族 = ['条', '块', '组', '层'];
 
 const 动效后缀 = ['enter-active', 'leave-active', 'enter-from', 'leave-to'];
 
-const 内建过渡组件: Record<string, string> = { XiaoXiTiao: '条', ShuJuBiaoGe: '块' };
+const 内建过渡组件: Record<string, string> = { XiaoXiTiao: '条', ShuJuBiaoGe: '块', QueRenCeng: '层' };
 
 function 分选择器(选择器: string): string[] {
   return 选择器.split(',').map((段) => 段.trim()).filter((段) => 段.length > 0);

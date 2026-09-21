@@ -8,6 +8,7 @@ import { 列定义登记, 响应行键 } from '../列定义';
 import { 管理角色选项 } from '../枚举映射/管理角色';
 import YeMei from '../components/YeMei.vue';
 import FenYeTiao from '../components/FenYeTiao.vue';
+import QueRenCeng from '../components/QueRenCeng.vue';
 import ShuJuBiaoGe from '../components/ShuJuBiaoGe.vue';
 import XiaoXiTiao from '../components/XiaoXiTiao.vue';
 import TuBiao from '../components/TuBiao.vue';
@@ -29,6 +30,21 @@ const 管理身份数 = computed(() => 行列表.value.filter((行) => 行[响�
 const 角色编号 = ref('');
 const 授予角色值 = ref<string>('chao_guan');
 const 操作提示 = ref('');
+const 待确认执行 = ref<(() => Promise<void>) | null>(null);
+
+function 请求二次确认(执行: () => Promise<void>): void {
+  待确认执行.value = 执行;
+}
+
+function 确认层确认(): void {
+  const 执行 = 待确认执行.value;
+  待确认执行.value = null;
+  void 执行?.();
+}
+
+function 确认层取消(): void {
+  待确认执行.value = null;
+}
 
 function 详情链接(行: 表格行): string {
   return `/zhang-hao/${String(行[响应行键.ID] ?? '')}`;
@@ -82,34 +98,32 @@ async function 授予(用户编号: unknown): Promise<void> {
   if (typeof 用户编号 !== 'string' || 用户编号.length === 0) {
     return;
   }
-  const 已二次确认 = typeof globalThis.confirm === 'function' ? globalThis.confirm(账号文案.高危二次确认) : true;
-  if (!已二次确认) {
-    return;
-  }
-  try {
-    await 授予角色({ yong_hu_id: 用户编号, jiao_se: 授予角色值.value, que_ren: true });
-    操作提示.value = 账号文案.授予角色成功;
-    await 查询(当前页.value);
-  } catch (错误) {
-    显示错误(错误);
-  }
+  const 编号 = 用户编号;
+  请求二次确认(async () => {
+    try {
+      await 授予角色({ yong_hu_id: 编号, jiao_se: 授予角色值.value, que_ren: true });
+      操作提示.value = 账号文案.授予角色成功;
+      await 查询(当前页.value);
+    } catch (错误) {
+      显示错误(错误);
+    }
+  });
 }
 
 async function 回收(用户编号: unknown): Promise<void> {
   if (typeof 用户编号 !== 'string' || 用户编号.length === 0) {
     return;
   }
-  const 已二次确认 = typeof globalThis.confirm === 'function' ? globalThis.confirm(账号文案.高危二次确认) : true;
-  if (!已二次确认) {
-    return;
-  }
-  try {
-    await 回收角色({ yong_hu_id: 用户编号, jiao_se: 授予角色值.value, que_ren: true });
-    操作提示.value = 账号文案.回收角色成功;
-    await 查询(当前页.value);
-  } catch (错误) {
-    显示错误(错误);
-  }
+  const 编号 = 用户编号;
+  请求二次确认(async () => {
+    try {
+      await 回收角色({ yong_hu_id: 编号, jiao_se: 授予角色值.value, que_ren: true });
+      操作提示.value = 账号文案.回收角色成功;
+      await 查询(当前页.value);
+    } catch (错误) {
+      显示错误(错误);
+    }
+  });
 }
 
 async function 接管(): Promise<void> {
@@ -306,5 +320,14 @@ onMounted(() => {
         @xia-ye="下一页"
       />
     </Transition>
+    <QueRenCeng
+      :xian-shi="待确认执行 !== null"
+      :biao-ti="通用文案.二次确认"
+      :zheng-wen="账号文案.高危二次确认"
+      wei-xian
+      ce-shi-biao-shi="que-ren-ceng"
+      @que-ren="确认层确认"
+      @qu-xiao="确认层取消"
+    />
   </section>
 </template>

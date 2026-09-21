@@ -15,6 +15,9 @@ export const 未记录 = '未记录';
 export const 无适用值 = '—';
 export const 全部 = '全部';
 export const 已隐藏 = '已隐藏';
+export const 确认 = '确认';
+export const 取消 = '取消';
+export const 二次确认 = '二次确认';
 
 export const 通用术语 = {
   应用标题,
@@ -34,4 +37,7 @@ export const 通用术语 = {
   无适用值,
   全部,
   已隐藏,
+  确认,
+  取消,
+  二次确认,
 } as const;

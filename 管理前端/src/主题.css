@@ -980,3 +980,58 @@ html.主题过渡 *::after {
 .块-leave-to {
   opacity: 0;
 }
+
+.确认遮罩 {
+  position: fixed;
+  inset: 0;
+  z-index: 9800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(38, 34, 27, 0.45);
+}
+
+.dark .确认遮罩 {
+  background: rgba(0, 0, 0, 0.55);
+}
+
+.确认框 {
+  width: min(440px, 100%);
+  background: var(--面);
+  border: 1px solid var(--线);
+  border-radius: var(--圆大);
+  box-shadow: var(--影);
+  padding: 22px;
+}
+
+.确认框 h3 {
+  margin: 0;
+  font-size: 19px;
+}
+
+.确认框 p {
+  margin: 8px 0 0;
+  color: var(--淡墨);
+}
+
+.确认操作 {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 20px;
+}
+
+.层-enter-active {
+  transition: opacity var(--时长中) var(--缓出), transform var(--时长中) var(--缓出);
+}
+
+.层-leave-active {
+  transition: opacity var(--时长微) var(--缓入), transform var(--时长微) var(--缓入);
+}
+
+.层-enter-from,
+.层-leave-to {
+  opacity: 0;
+  transform: translateY(var(--位移近));
+}
