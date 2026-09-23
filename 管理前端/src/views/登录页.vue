@@ -151,6 +151,9 @@ async function 提交(): Promise<void> {
   display: grid;
   gap: 26px;
   grid-template-columns: 1fr;
+  grid-template-rows: minmax(0, 1fr);
+  min-height: 0;
+  max-height: 100%;
   width: 100%;
   max-width: 960px;
   margin: auto;
@@ -164,6 +167,8 @@ async function 提交(): Promise<void> {
   border-radius: var(--圆大);
   box-shadow: var(--影);
   padding: 30px 28px;
+  min-height: 0;
+  overflow-y: scroll;
   display: flex;
   flex-direction: column;
   gap: 14px;

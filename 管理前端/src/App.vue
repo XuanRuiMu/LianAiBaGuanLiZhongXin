@@ -304,8 +304,9 @@ onBeforeUnmount(() => {
 }
 
 .外壳.登录页 .正文 {
-  min-height: 100dvh;
+  height: 100dvh;
   display: grid;
+  grid-template-rows: minmax(0, 1fr);
   padding-bottom: var(--正文距纵);
 }
 

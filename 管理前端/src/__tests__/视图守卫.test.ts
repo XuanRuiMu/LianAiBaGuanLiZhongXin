@@ -1415,8 +1415,11 @@ function 焦点反馈缺陷(样式: string): string[] {
   if (撤环.length > 0) {
     缺.push(`撤焦点环命中 ${撤环.length} 处：${撤环.join(' / ')}`);
   }
-  if (!/:focus-visible\s*\{[^}]*outline:\s*2px solid var\(--印\)/.test(样式)) {
-    缺.push('缺 :focus-visible 的 2px 印色焦点环');
+  if (!规则块(样式, ':root').includes('--焦点环宽:') || !规则块(样式, ':root').includes('--焦点环色:')) {
+    缺.push(':root 未成对声明 --焦点环宽/--焦点环色，焦点反馈没有可指的真源');
+  }
+  if (!/:focus-visible\s*\{[^}]*outline:\s*var\(--焦点环宽\) solid var\(--焦点环色\)/.test(样式)) {
+    缺.push(':focus-visible 的环不吃 --焦点环宽/--焦点环色，退回了魔法量或品牌色直取');
   }
   return 缺;
 }
@@ -1512,8 +1515,14 @@ function 登录居中缺陷(栅块: string, 正文块: string, 登录块: string
   if (/\dv[hw]/.test(栅块)) {
     缺.push('.登录栅 仍用 vh 外边距凑居中');
   }
-  if (!登录块.includes('min-height: 100dvh') || !登录块.includes('display: grid')) {
-    缺.push('.外壳.登录页 .正文 未撑出 100dvh 网格容器');
+  if (!登录块.includes('height: 100dvh') || !登录块.includes('display: grid')) {
+    缺.push('.外壳.登录页 .正文 未撑出确定高的 100dvh 网格容器');
+  }
+  if (登录块.includes('min-height: 100dvh')) {
+    缺.push('登录态正文只写 min-height 会被内容撑高，卡片拿不到可封顶的确定高 ⇒ 恒定滚动口永不生效');
+  }
+  if (!/grid-template-rows:\s*minmax\(0,\s*1fr\)/.test(登录块)) {
+    缺.push('.外壳.登录页 .正文 的行不是 minmax(0,1fr)；auto 行只会被撑大不会被压小，封不住卡顶');
   }
   if (!登录块.includes('padding-bottom: var(--正文距纵)')) {
     缺.push('登录态正文上下内边距不同源，卡片中心会偏 (底-上)/2');
@@ -1521,7 +1530,7 @@ function 登录居中缺陷(栅块: string, 正文块: string, 登录块: string
   if (!正文块.includes('--正文距纵: clamp(20px, 4vw, 44px)') || !正文块.includes('padding: var(--正文距纵) clamp(16px, 4vw, 40px) 72px')) {
     缺.push('.正文 内边距未收敛到 --正文距纵 单源');
   }
-  if (!正文块.includes('min-height: 100dvh') && !登录块.includes('min-height: 100dvh')) {
+  if (/(^|[^d])100vh/.test(`${正文块}\n${登录块}`)) {
     缺.push('外壳/正文仍用 100vh，移动端 URL 栏会把卡片顶离视口中心');
   }
   if (!/是否登录页 \? '登录页'/.test(模板) || !/登录仓库\.已登录 && !是否登录页 \? '有栏'/.test(模板)) {
@@ -1572,6 +1581,8 @@ describe('FP-17 管理端等价修复：色方案/焦点环/滚动条/居中单�
     expect(滚动条缺陷(主题样式表.replace('cursor: grab', 'cursor: text'))).not.toEqual([]);
     expect(滚动条缺陷(主题样式表.replace('background: var(--淡墨);\n  border-radius', 'background: var(--面二);\n  border-radius'))).not.toEqual([]);
     expect(焦点反馈缺陷(`${主题样式表}\n.输入:focus{outline:none}`)).not.toEqual([]);
+    expect(焦点反馈缺陷(主题样式表.replace('outline: var(--焦点环宽) solid var(--焦点环色)', 'outline: 2px solid var(--印)'))).not.toEqual([]);
+    expect(焦点反馈缺陷(主题样式表.replace('  --焦点环色: var(--印);\n', ''))).not.toEqual([]);
     expect(原生外观缺陷(主题样式表.replace('input.输入:not', '.输入:not'))).not.toEqual([]);
     expect(色方案缺陷(主题样式表.replace('color-scheme: dark', 'color-scheme: light'))).not.toEqual([]);
     expect(色方案缺陷(主题样式表.replace(':root {', '.dark {'))).not.toEqual([]);
@@ -1583,7 +1594,10 @@ describe('FP-17 管理端等价修复：色方案/焦点环/滚动条/居中单�
     expect(登录居中缺陷(栅.replace('margin: auto', 'margin: 24px auto 0'), 文, 登, 壳模板)).not.toEqual([]);
     expect(登录居中缺陷(栅.replace('margin: auto', 'margin: auto').replace('grid-template-columns: 1fr;', 'grid-template-columns: 1fr; align-items: start;'), 文, 登, 壳模板)).not.toEqual([]);
     expect(登录居中缺陷(栅, 文, 登.replace('padding-bottom: var(--正文距纵)', 'padding-bottom: 72px'), 壳模板)).not.toEqual([]);
-    expect(登录居中缺陷(栅, 文, 登.replace('min-height: 100dvh', 'min-height: 100vh'), 壳模板)).not.toEqual([]);
+    expect(登录居中缺陷(栅, 文, 登.replace('height: 100dvh', 'height: 100vh'), 壳模板)).not.toEqual([]);
+    expect(登录居中缺陷(栅, 文, 登.replace('height: 100dvh', 'min-height: 100dvh'), 壳模板)).not.toEqual([]);
+    expect(登录居中缺陷(栅, 文, 登.replace('grid-template-rows: minmax(0, 1fr);', ''), 壳模板)).not.toEqual([]);
+    expect(登录居中缺陷(栅, 文, 登.replace('grid-template-rows: minmax(0, 1fr)', 'grid-template-rows: auto'), 壳模板)).not.toEqual([]);
     expect(登录居中缺陷(栅, 文, 登, 壳模板.replace("是否登录页 ? '登录页' : ''", "''"))).not.toEqual([]);
   });
 });

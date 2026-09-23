@@ -1,6 +1,8 @@
 export const 关键词 = '关键词';
 export const 昵称 = '昵称';
 export const 性别 = '性别';
+export const 性别男 = '男';
+export const 性别女 = '女';
 export const 签名 = '签名';
 export const 人设标签 = '人设标签';
 export const 账号详情 = '账号详情';
@@ -23,6 +25,8 @@ export const 账号术语 = {
   关键词,
   昵称,
   性别,
+  性别男,
+  性别女,
   签名,
   人设标签,
   账号详情,

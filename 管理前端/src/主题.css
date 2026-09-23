@@ -22,6 +22,8 @@
   --圆中: 10px;
   --圆大: 16px;
   --滚动条宽: 10px;
+  --焦点环宽: 2px;
+  --焦点环色: var(--印);
   --时长微: 120ms;
   --时长短: 160ms;
   --时长中: 240ms;
@@ -111,7 +113,7 @@ select {
 }
 
 :focus-visible {
-  outline: 2px solid var(--印);
+  outline: var(--焦点环宽) solid var(--焦点环色);
   outline-offset: 2px;
 }
 
@@ -207,7 +209,7 @@ select {
   border-radius: var(--圆小);
   padding: 9px 12px;
   min-height: 42px;
-  transition: border-color var(--时长短) var(--缓匀), box-shadow var(--时长短) var(--缓匀);
+  transition: border-color var(--时长短) var(--缓匀);
 }
 
 input.输入:not([type='number'], [type='datetime-local']) {
@@ -221,8 +223,7 @@ input.输入:-webkit-autofill {
 
 .输入:focus,
 .选择:focus {
-  border-color: var(--印);
-  box-shadow: 0 0 0 3px var(--印淡);
+  border-color: var(--焦点环色);
 }
 
 .按钮主,
