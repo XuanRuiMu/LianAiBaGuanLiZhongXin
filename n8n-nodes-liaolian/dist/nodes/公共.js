@@ -5,6 +5,7 @@ exports.通用参数 = 通用参数;
 async function 调开放接口(上下文, 路径, 方法 = 'GET', 查询 = {}, 请求体 = undefined) {
     const 服务地址 = 上下文.getNodeParameter('服务地址', 0);
     const 接口密钥 = 上下文.getNodeParameter('接口密钥', 0);
+    // YH-113 令牌直通：空令牌拒绝发起，禁无凭证调管理后端
     if (!接口密钥 || 接口密钥.trim().length < 16) {
         throw new Error('开放接口令牌缺失或长度不足，拒绝发起调用');
     }
@@ -26,6 +27,7 @@ function 通用参数() {
             displayName: '服务地址',
             name: '服务地址',
             type: 'string',
+            // YH-113 n8n默认改3100：管理后端容器内地址，随行部署同网
             default: 'http://management-backend:3100',
             description: '管理后端地址（容器内3100，宿主经MANAGEMENT_BACKEND_PORT映射）',
         },

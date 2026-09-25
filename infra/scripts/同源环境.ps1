@@ -9,7 +9,14 @@ function 读取环境文件([string]$路径) {
   Get-Content -LiteralPath $路径 | ForEach-Object {
     if ($_ -match '^\s*#' -or $_ -notmatch '=') { return }
     $键, $值 = $_.Split('=', 2)
-    $表[$键.Trim()] = $值.Trim()
+    $值 = $值.Trim()
+    if ($值.Length -ge 2 -and (
+      ($值.StartsWith("'") -and $值.EndsWith("'")) -or
+      ($值.StartsWith('"') -and $值.EndsWith('"'))
+    )) {
+      $值 = $值.Substring(1, $值.Length - 2)
+    }
+    $表[$键.Trim()] = $值
   }
   return $表
 }

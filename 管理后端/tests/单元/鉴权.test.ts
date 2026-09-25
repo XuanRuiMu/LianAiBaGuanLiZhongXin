@@ -93,7 +93,7 @@ describe('管理鉴权链', () => {
     };
     const { 应用 } = 创建测试应用({ 池, 缓存: 坏缓存 });
     const 响应 = await request(应用).get(列表路径).set(授权头(签发管理令牌()));
-    expect(响应.status).toBe(500);
+    expect(响应.status).toBe(503);
     expect(响应.body.cuo_wu_ma).toBe('HUAN_CUN_BU_KE_YONG');
     expect(响应.body.ti_shi).toMatch(/[\u4e00-\u9fa5]/);
   });

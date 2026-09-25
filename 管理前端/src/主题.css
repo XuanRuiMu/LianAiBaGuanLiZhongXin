@@ -21,9 +21,31 @@
   --圆小: 6px;
   --圆中: 10px;
   --圆大: 16px;
-  --滚动条宽: 10px;
+  --条宽: 10px;
   --焦点环宽: 2px;
   --焦点环色: var(--印);
+  --输入底线常态: var(--线);
+  --输入底线聚焦: var(--印);
+  --输入底线失焦: var(--面二);
+  --输入底线禁用: #9e9483;
+  --输入底线只读: #d8ccb8;
+  --输入底线自动填充: #e8dcc8;
+  --输入底线错误: #a1261f;
+  --输入底线宽: 2px;
+  --入宽: var(--输入底线宽);
+  --滚动条宽: 10px;
+  --滚动条轨道: var(--线);
+  --滚动条滑块: var(--淡墨);
+  --滚动条滑块悬停: var(--印);
+  --滚动条滑块焦点: var(--印深);
+  --滚动条角落: var(--纸);
+  --滚动条光标: default;
+  --条轨道: var(--滚动条轨道);
+  --条滑块: var(--滚动条滑块);
+  --条滑块悬停: var(--滚动条滑块悬停);
+  --条滑块焦点: var(--滚动条滑块焦点);
+  --条角落: var(--滚动条角落);
+  --条光标: var(--滚动条光标);
   --时长微: 120ms;
   --时长短: 160ms;
   --时长中: 240ms;
@@ -57,6 +79,26 @@
   --警淡: rgba(217, 168, 69, 0.14);
   --危淡: rgba(217, 95, 67, 0.12);
   --影: 0 1px 2px rgba(0, 0, 0, 0.4), 0 12px 28px -12px rgba(0, 0, 0, 0.6);
+  --输入底线常态: #5a4d35;
+  --输入底线聚焦: var(--印深);
+  --输入底线失焦: var(--线);
+  --输入底线禁用: #756a57;
+  --输入底线只读: #473d2a;
+  --输入底线自动填充: #51442f;
+  --输入底线错误: #ff8b73;
+  --滚动条轨道: var(--线);
+  --滚动条滑块: var(--淡墨);
+  --滚动条滑块悬停: var(--印);
+  --滚动条滑块焦点: var(--印深);
+  --滚动条角落: var(--纸);
+  --滚动条光标: default;
+  --条宽: 10px;
+  --条轨道: var(--滚动条轨道);
+  --条滑块: var(--滚动条滑块);
+  --条滑块悬停: var(--滚动条滑块悬停);
+  --条滑块焦点: var(--滚动条滑块焦点);
+  --条角落: var(--滚动条角落);
+  --条光标: var(--滚动条光标);
   color-scheme: dark;
 }
 
@@ -107,7 +149,9 @@ a {
 
 button,
 input,
-select {
+select,
+textarea,
+[contenteditable] {
   font: inherit;
   color: inherit;
 }
@@ -118,34 +162,40 @@ select {
 }
 
 ::-webkit-scrollbar {
-  width: var(--滚动条宽);
-  height: var(--滚动条宽);
-  cursor: default;
+  width: var(--条宽);
+  height: var(--条宽);
+  cursor: var(--条光标);
 }
 
 ::-webkit-scrollbar-track {
-  background: var(--面二);
-  cursor: pointer;
+  background: var(--条轨道);
+  cursor: var(--条光标);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--淡墨);
-  border-radius: var(--滚动条宽);
-  cursor: grab;
+  background: var(--条滑块);
+  cursor: var(--条光标);
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--印);
+  background: var(--条滑块悬停);
+  cursor: var(--条光标);
+}
+
+:focus-visible::-webkit-scrollbar-thumb {
+  background: var(--条滑块焦点);
+  cursor: var(--条光标);
 }
 
 ::-webkit-scrollbar-corner {
-  background: var(--纸);
+  background: var(--条角落);
+  cursor: var(--条光标);
 }
 
 @supports not selector(::-webkit-scrollbar) {
   * {
     scrollbar-width: thin;
-    scrollbar-color: var(--淡墨) var(--面二);
+    scrollbar-color: var(--条滑块) var(--条轨道);
   }
 }
 
@@ -202,28 +252,58 @@ select {
   flex: 1 1 150px;
 }
 
-.输入,
-.选择 {
-  background: var(--纸);
-  border: 1px solid var(--线);
+:is(.输入, .选择, textarea, [contenteditable]) {
+  --线色: var(--输入底线常态);
+  --线宽: var(--输入底线宽);
+  border: 1px solid var(--线色);
+  border-bottom: var(--线宽) solid var(--线色);
   border-radius: var(--圆小);
   padding: 9px 12px;
   min-height: 42px;
-  transition: border-color var(--时长短) var(--缓匀);
+  transition: border-bottom-color var(--时长短) var(--缓匀);
 }
 
-input.输入:not([type='number'], [type='datetime-local']) {
-  appearance: none;
+:is(.输入, .选择, textarea):read-only,
+[contenteditable]:not([contenteditable='false'])[aria-readonly='true'] {
+  --线色: var(--输入底线只读);
+  --线宽: var(--输入底线宽);
+  background-color: var(--面);
 }
 
-input.输入:-webkit-autofill {
+:is(.输入, .选择, textarea, [contenteditable]):focus-visible {
+  --线色: var(--输入底线聚焦);
+  --线宽: var(--入宽);
+}
+
+:is(.输入, .选择, textarea):not(:focus-visible) {
+  --线色: var(--输入底线失焦);
+  --线宽: 0px;
+}
+
+:is(.输入, .选择, textarea):disabled,
+[contenteditable]:not([contenteditable='false'])[aria-disabled='true'] {
+  --线色: var(--输入底线禁用);
+  --线宽: var(--输入底线宽);
+  background-color: var(--面二);
+  color: var(--淡墨);
+  cursor: not-allowed;
+}
+
+input.输入:-webkit-autofill, textarea:-webkit-autofill {
+  --线色: var(--输入底线自动填充);
+  --线宽: var(--输入底线宽);
   -webkit-text-fill-color: currentColor;
   transition: background-color 5000s ease-in-out;
 }
 
-.输入:focus,
-.选择:focus {
-  border-color: var(--焦点环色);
+[aria-invalid='true'],
+:is(.输入, .选择, textarea, [contenteditable]):user-invalid {
+  --线色: var(--输入底线错误);
+  --线宽: var(--输入底线宽);
+}
+
+input.输入:not([type='number'], [type='datetime-local']) {
+  appearance: none;
 }
 
 .按钮主,
@@ -282,6 +362,12 @@ input.输入:-webkit-autofill {
   transform: none;
 }
 
+.表滚 {
+  container-type: inline-size;
+  overflow-x: auto;
+  margin-bottom: 14px;
+}
+
 .账簿表 {
   width: 100%;
   border-collapse: separate;
@@ -291,7 +377,6 @@ input.输入:-webkit-autofill {
   border-radius: var(--圆中);
   overflow: hidden;
   box-shadow: var(--影);
-  margin-bottom: 14px;
 }
 
 .账簿表 th {
@@ -414,6 +499,11 @@ input.输入:-webkit-autofill {
   border-color: var(--印);
   color: var(--印);
   font-weight: 700;
+}
+
+.错误详情 {
+  display: grid;
+  gap: 10px;
 }
 
 .加载条 {
@@ -661,6 +751,7 @@ input.输入:-webkit-autofill {
   text-align: right;
   font-variant-numeric: tabular-nums;
   overflow-wrap: anywhere;
+  min-width: min(150px, 24vw);
 }
 
 .图框 {
@@ -738,6 +829,16 @@ input.输入:-webkit-autofill {
   grid-template-columns: 1fr;
   align-items: start;
   margin-bottom: 18px;
+}
+
+@container (max-width: 56rem) {
+  .账簿表 td {
+    white-space: nowrap;
+  }
+
+  .账簿表 td.操作 {
+    flex-wrap: nowrap;
+  }
 }
 
 @media (min-width: 768px) {

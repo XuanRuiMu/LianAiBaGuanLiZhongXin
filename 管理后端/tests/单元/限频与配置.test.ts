@@ -44,7 +44,7 @@ describe('限频与热重载', () => {
   });
 
   it('密钥不在热重载键内生产绝不热重载', async () => {
-    const { 启动环境监听 } = await import('../../src/配置');
+    const { 启动环境监听 } = await import('../../src/配置.js');
     expect(typeof 启动环境监听).toBe('function');
     const 旧密钥 = String(process.env.JWT_SECRET);
     const 令牌 = 签发管理令牌();
@@ -59,7 +59,7 @@ describe('限频与热重载', () => {
   });
 
   it('代理目标缺失启动校验拦截', async () => {
-    const { 校验启动配置, 当前配置 } = await import('../../src/配置');
+    const { 校验启动配置, 当前配置 } = await import('../../src/配置.js');
     const 旧值 = process.env.VITE_API_PROXY_TARGET;
     const 旧兼容 = process.env.DAI_LI_MU_BIAO;
     delete process.env.VITE_API_PROXY_TARGET;

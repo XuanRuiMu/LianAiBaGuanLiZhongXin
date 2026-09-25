@@ -1,13 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
-import { Pool } from 'pg';
-import dotenv from 'dotenv';
+import { 创建隔离数据库池 } from '../测试数据库';
 
 const 后端根 = path.resolve(__dirname, '..', '..');
 const 思考源 = path.join(后端根, 'src', '路由', '思考.ts');
 const 迁移根 = path.resolve(后端根, '..', '..', '和我恋爱吧', 'backend', 'database');
-const 假连接串标记 = 'localhost:5432/test';
 const 思考记录表 = '思考记录';
 const 目标表名 = ['记忆', '对话摘要', '关键事件', '夺舍日志', '评估', 思考记录表];
 
@@ -266,45 +264,10 @@ function 对账列(
   return 违例;
 }
 
-function 取真实连接串(): string {
-  const 注入值 = (process.env.TEST_DATABASE_URL ?? '').trim();
-  if (注入值 !== '') {
-    return 注入值;
-  }
-  const 运行值 = (process.env.DATABASE_URL ?? '').trim();
-  if (运行值 !== '' && !运行值.includes(假连接串标记)) {
-    return 运行值;
-  }
-  try {
-    const 解析 = dotenv.parse(fs.readFileSync(path.join(后端根, '.env')));
-    return (解析['DATABASE_URL'] ?? '').trim();
-  } catch {
-    return '';
-  }
-}
-
-async function 取真实池(): Promise<Pool | null> {
-  const 连接串 = 取真实连接串();
-  if (连接串 === '') {
-    console.warn('[透传列清单] 未配置真实库连接串（TEST_DATABASE_URL / DATABASE_URL / 管理后端/.env），真库模式核对跳过');
-    return null;
-  }
-  const 池 = new Pool({ connectionString: 连接串, connectionTimeoutMillis: 3000 });
-  try {
-    await 池.query('SELECT 1');
-    return 池;
-  } catch {
-    await 池.end().catch(() => undefined);
-    throw new Error('[透传列清单] 已配置真实库连接串但不可达，禁止静默跳过');
-  }
-}
 
 describe('FP-11 透传列清单与真实库模式双向一致', () => {
   it('五个透传页签的显式列清单等于 information_schema 的实际列集合', async () => {
-    const 池 = await 取真实池();
-    if (!池) {
-      return;
-    }
+    const 池 = await 创建隔离数据库池();
     const 源 = 读思考源();
     try {
       for (const 项 of 取透传绑定(源)) {

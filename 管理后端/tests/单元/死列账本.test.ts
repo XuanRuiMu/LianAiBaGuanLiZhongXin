@@ -1,8 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
-import { Pool } from 'pg';
-import dotenv from 'dotenv';
+import { 创建隔离数据库池 } from '../测试数据库';
 
 const 后端根 = path.resolve(__dirname, '..', '..');
 const 管理端根 = path.resolve(后端根, '..');
@@ -118,30 +117,8 @@ const 前端列定义源 = fs.readFileSync(path.join(管理端根, '管理前端
 const 前端枚举出口源 = fs.readFileSync(path.join(管理端根, '管理前端', 'src', '枚举映射.ts'), 'utf8');
 const 账号列清单 = 取常量列(后端账号源, '列表列');
 
-function 真库连接串(): string {
-  const 显式 = (process.env.TEST_DATABASE_URL ?? '').trim();
-  if (显式 !== '') {
-    return 显式;
-  }
-  const 运行 = (process.env.DATABASE_URL ?? '').trim();
-  if (运行 !== '' && !运行.includes('localhost:5432/test')) {
-    return 运行;
-  }
-  try {
-    const 解析 = dotenv.parse(fs.readFileSync(path.join(后端根, '.env')));
-    return (解析['DATABASE_URL'] ?? '').trim();
-  } catch {
-    return '';
-  }
-}
-
-async function 取表列(表: string): Promise<Set<string> | null> {
-  const 连接 = 真库连接串();
-  if (连接 === '') {
-    console.warn('[死列账本] 未配置真实库连接串（TEST_DATABASE_URL / DATABASE_URL / 管理后端/.env），真库只读核对跳过');
-    return null;
-  }
-  const 池 = new Pool({ connectionString: 连接, connectionTimeoutMillis: 3000 });
+async function 取表列(表: string): Promise<Set<string>> {
+  const 池 = await 创建隔离数据库池();
   try {
     const 结果 = await 池.query(
       'SELECT column_name FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = $1',
@@ -191,18 +168,14 @@ describe('FP-28a 用户.性别 死列读取账本（管理中心删列前置条�
 
   it('真库只读核对：账号列清单的每一列都在真实库存在，且清单里没有 `性别`', async () => {
     const 用户列 = await 取表列('用户');
-    if (用户列 === null) {
-      return;
-    }
     const 封禁列 = await 取表列('账号封禁');
-    expect(封禁列).not.toBeNull();
     const 缺列: string[] = [];
     for (const 段 of 账号列清单) {
       const 命中 = /^(?:u|f)\."([^"]+)"(?:\s+AS\s+"([^"]+)")?$/.exec(段);
       if (命中 === null) {
         throw new Error(`账号列清单解析不出片段：${段}`);
       }
-      const 表列 = 段.startsWith('u.') ? 用户列 : (封禁列 as Set<string>);
+      const 表列 = 段.startsWith('u.') ? 用户列 : 封禁列;
       if (!表列.has(命中[1])) {
         缺列.push(`${段.startsWith('u.') ? '用户' : '账号封禁'}.${命中[1]}`);
       }

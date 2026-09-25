@@ -6,61 +6,82 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+
 jobs:
-  # job ID 必须 ASCII（GitHub Actions 限制），中文显示名放在 name 字段
-  tts-test:
-    name: 语音服务单测
+  n8n-test:
+    name: n8n节点构建测试
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
-          python-version: '3.12'
-      - name: TTS 单测（含覆盖率门禁）
+          node-version: '26.10.0'
+          cache: npm
+          cache-dependency-path: n8n-nodes-liaolian/package-lock.json
+      - name: 冻结安装构建并执行非零测试
+        working-directory: n8n-nodes-liaolian
         run: |
-          python -m pip install -r tts-service/requirements.txt
-          python -m pytest tts-service/tests -q
+          npm ci
+          npm run build
+          npm test
+
+  tts-test:
+    name: 语音服务冻结测试
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.14.7'
+      - name: 安装锁文件工具
+        run: python -m pip install --disable-pip-version-check uv==0.12.18
+      - name: 校验锁导出并执行全量测试
+        working-directory: tts-service
+        run: |
+          uv lock --check
+          uv export --frozen --all-groups --no-emit-project --no-header --output-file "$RUNNER_TEMP/requirements.lock"
+          cmp requirements.lock "$RUNNER_TEMP/requirements.lock"
+          uv sync --frozen --all-groups --python 3.14.7
+          uv run --frozen python -VV
+          uv run --frozen python -m pytest
 
   compose-check:
     name: 编排配置校验
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    env:
+      MIGRATIONS_ROOT: ${{ github.workspace }}/和我恋爱吧
+      N8N_OWNER_EMAIL: fp04b-ci@example.invalid
+      N8N_OWNER_FIRST_NAME: FP04B
+      N8N_OWNER_LAST_NAME: CI
+      N8N_OWNER_PASSWORD_HASH: '$2b$12$yhGxMaIIGa5.KldNteEuqu/Me5fdF7wq0AFtHgv9rrRrKajYxaZFq'
+      N8N_ENCRYPTION_KEY: fp04b-compose-encryption-key-32b
     steps:
-      - uses: actions/checkout@v4
-      - name: 校验同源编排
-        working-directory: infra
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: 校验生产与隔离编排
         run: |
-          cp envs/.env.dev .env
-          docker compose config
-  # YH-128 镜像冒烟：构建问题不到生产才爆，加镜像构建+readyz+图片冒烟
-  image-smoke:
-    name: 镜像构建冒烟
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@v4
-      - name: 构建管理后端镜像并冒烟readyz
-        run: |
-          docker build -t love-management-backend:ci ./管理后端
-          docker run -d --name love-ci-smoke -p 3100:3100 love-management-backend:ci || true
-          sleep 5
-          docker logs love-ci-smoke 2>&1 | head -n 50 || true
-          docker rm -f love-ci-smoke || true
+          docker compose --file infra/docker-compose.yml config --quiet
+          docker compose --file infra/docker-compose.test.yml config --quiet
 
   management-backend:
     name: 管理后端构建测试
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
-          node-version: '20'
-      - name: 构建 lint 测试
+          node-version: '26.10.0'
+          cache: npm
+          cache-dependency-path: 管理后端/package-lock.json
+      - name: 冻结安装构建检查并测试
         working-directory: 管理后端
         run: |
-          npm ci --ignore-scripts
+          npm ci
           npm run build
           npm run lint
           npm test
@@ -70,14 +91,43 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
-          node-version: '20'
-      - name: 构建 lint 测试
+          node-version: '26.10.0'
+          cache: npm
+          cache-dependency-path: 管理前端/package-lock.json
+      - name: 冻结安装构建检查并测试
         working-directory: 管理前端
         run: |
-          npm ci --ignore-scripts
+          npm ci
           npm run build
           npm run lint
           npm test
+
+  isolated-stack:
+    name: 隔离迁移构建健康门禁
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      MIGRATIONS_ROOT: ${{ github.workspace }}/和我恋爱吧
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: XuanRuiMu/HeWoLianAiBa
+          ref: 3b28d2e5c3abe6e35fe51e6c860c246618f231c2
+          path: 和我恋爱吧
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '26.10.0'
+          cache: npm
+          cache-dependency-path: 管理后端/package-lock.json
+      - name: 安装迁移执行器依赖
+        working-directory: 管理后端
+        run: npm ci
+      - name: 执行隔离迁移构建健康与节点加载门禁
+        run: bash infra/scripts/verify-isolated.sh

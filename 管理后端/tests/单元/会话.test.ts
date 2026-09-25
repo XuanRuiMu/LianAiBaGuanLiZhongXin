@@ -252,7 +252,7 @@ describe('FP-03 服务端注销吊销凭证', () => {
     };
     const 建 = 创建测试应用({ 池, 缓存: 坏缓存 });
     const 注销 = await request(建.应用).post(登出路径).set('Cookie', 头).send({});
-    expect(注销.status).toBe(500);
+    expect(注销.status).toBe(503);
     expect(注销.body.cuo_wu_ma).toBe('HUAN_CUN_BU_KE_YONG');
     expect(String(曲奇段(注销, 'guan_li_ling_pai'))).toContain('guan_li_ling_pai=;');
   });

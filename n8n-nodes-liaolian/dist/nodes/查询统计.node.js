@@ -1,7 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.查询统计 = void 0;
-const __1 = require("./\u516C\u5171");
+const ______1 = require("./\u516C\u5171");
 class 查询统计 {
     constructor() {
         this.description = {
@@ -14,7 +14,7 @@ class 查询统计 {
             inputs: ['main'],
             outputs: ['main'],
             properties: [
-                ...(0, __1.通用参数)(),
+                ...(0, ______1.通用参数)(),
                 {
                     displayName: '查询',
                     name: '查询',
@@ -30,7 +30,7 @@ class 查询统计 {
     }
     async execute() {
         const 查询 = this.getNodeParameter('查询', 0);
-        const 数据 = await (0, __1.调开放接口)(this, 查询 === '总览' ? '公开概览' : '公开趋势');
+        const 数据 = await (0, ______1.调开放接口)(this, 查询 === '总览' ? '公开概览' : '公开趋势');
         return [[{ json: 数据 }]];
     }
 }

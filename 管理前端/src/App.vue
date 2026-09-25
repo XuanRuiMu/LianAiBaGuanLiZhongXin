@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch, type Component as 组件类型 } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { 使用登录仓库 } from './stores/登录';
 import { 取管理角色文案 } from './枚举映射/管理角色';
-import { 我的身份 } from './api/管理';
+import { 我的身份 } from './api/会话';
+import TuBiao from './components/TuBiao.vue';
 import { 应用主题, 深色, 浅色, 读初始主题, type 主题名 } from './主题模式';
 import { 页面过渡名, 过渡前进, type 过渡名, type 页面端点 } from './动效';
-import TuBiao from './components/TuBiao.vue';
 import { 通用文案 } from './文案/通用';
 import { 导航文案 } from './文案/导航';
 
@@ -19,6 +19,9 @@ const 身份请求中 = ref(false);
 const 身份已复核 = ref(false);
 const 页面过渡 = ref<过渡名>(过渡前进);
 const 已提交端点 = ref<页面端点 | null>(null);
+const 就绪错误条 = shallowRef<组件类型 | null>(null);
+const 就绪条已装载 = computed(() => 就绪错误条.value !== null);
+let 就绪装载中 = false;
 
 const 导航 = [
   { 路径: '/zhang-hao', 文案键: '账号管理', 图标名: 'zhang-hao', 需能力: 'cha_kan' },
@@ -55,6 +58,20 @@ watch(
   { immediate: true },
 );
 
+/** 首帧之后再动态装载就绪错误条：首屏分块不得含探针路径与错误状态机 */
+async function 装载就绪(): Promise<void> {
+  if (就绪装载中 || 是否登录页.value || 就绪条已装载.value) {
+    return;
+  }
+  就绪装载中 = true;
+  try {
+    await nextTick();
+    就绪错误条.value = (await import('./components/就绪错误条.vue')).default;
+  } finally {
+    就绪装载中 = false;
+  }
+}
+
 /** YH-108 权限视图重建：角色与能力只取服务端身份接口，前端隐藏入口不是安全边界 */
 async function 同步身份(强制 = false): Promise<void> {
   if (!登录仓库.已登录 || (!强制 && 登录仓库.管理角色 !== null) || 身份请求中.value) {
@@ -64,6 +81,7 @@ async function 同步身份(强制 = false): Promise<void> {
   try {
     const 身份 = await 我的身份();
     登录仓库.设置身份(身份.jiao_se, 身份.neng_li);
+    void 装载就绪();
   } catch {
     return;
   } finally {
@@ -76,6 +94,7 @@ watch(
   () => 当前路由.path,
   () => {
     登录仓库.同步存储();
+    void 装载就绪();
     void 同步身份();
   },
 );
@@ -93,6 +112,7 @@ async function 退出(): Promise<void> {
     await 登录仓库.注销会话();
   }
   登录仓库.退出登录();
+  就绪错误条.value = null;
   void 路由器.push('/deng-lu');
 }
 
@@ -104,6 +124,9 @@ onMounted(async () => {
   await 登录仓库.冷启动会话();
   // 每次装载都向服务端复核身份，本地缓存的角色只作首屏提示
   void 同步身份(true);
+  if (登录仓库.已登录 && 登录仓库.管理角色 !== null) {
+    void 装载就绪();
+  }
   登录仓库.启动续期巡查();
 });
 
@@ -174,6 +197,10 @@ onBeforeUnmount(() => {
     </Transition>
     <div class="正文区">
       <main class="正文">
+        <component
+          :is="就绪错误条"
+          v-if="!是否登录页 && 就绪条已装载"
+        />
         <router-view v-slot="{ Component }">
           <Transition
             :name="页面过渡"
@@ -340,6 +367,18 @@ onBeforeUnmount(() => {
 
   .栏导航 {
     flex: 1;
+  }
+}
+
+@media (max-width: 719px) {
+  .栏导航 {
+    flex-direction: row;
+    overflow-x: auto;
+  }
+
+  .栏导航 a,
+  .栏占位 {
+    flex: none;
   }
 }
 </style>

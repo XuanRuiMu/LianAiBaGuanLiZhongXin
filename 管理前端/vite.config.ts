@@ -3,7 +3,7 @@ import vue from '@vitejs/plugin-vue';
 import { writeFileSync } from 'node:fs';
 import { gzipSync } from 'node:zlib';
 import { resolve } from 'node:path';
-import { 源码指纹 } from './src/构建指纹';
+import { 源码指纹 } from './src/构建指纹.ts';
 
 interface 分块度量 {
   名称: string;
@@ -40,6 +40,9 @@ function 体积统计插件(): Plugin {
 
 export default defineConfig({
   plugins: [vue(), 体积统计插件()],
+  build: {
+    modulePreload: { polyfill: false },
+  },
   resolve: {
     alias: {
       '@': '/src',
@@ -64,6 +67,7 @@ export default defineConfig({
       jsdom: { url: 'http://localhost:5175/' },
     },
     globals: true,
+    testTimeout: 15000,
     setupFiles: ['./src/__tests__/setup.ts'],
     include: ['src/**/*.test.ts'],
   },

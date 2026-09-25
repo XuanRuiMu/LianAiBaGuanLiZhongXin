@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { 账号详情, type 表格行 } from '../api/管理';
-import { 取错误展示 } from '../api/请求';
+import { 创建前端错误 } from '../api/请求';
+import { 创建请求错误状态, 执行请求 } from '../api/错误展示';
 import { 取管理角色文案, 取管理角色色调 } from '../枚举映射/管理角色';
 import { 单元格文本, 单元格色调, 列定义登记, 取列映射, 响应行键, 表头文本, 渲染为徽标 } from '../列定义';
 import YeMei from '../components/YeMei.vue';
@@ -15,39 +16,43 @@ const 当前路由 = useRoute();
 const 路由器 = useRouter();
 const 详情 = ref<表格行 | null>(null);
 const 加载中 = ref(false);
-const 错误提示 = ref('');
-const 错误码 = ref('');
+const 错误状态 = 创建请求错误状态();
+const {
+  错误闸门,
+  清空: 清空错误,
+  作废: 作废错误,
+} = 错误状态;
 
 const 详情行 = computed<表格行>(() => 详情.value ?? {});
 const 概览列 = 取列映射('账号概览');
 
 async function 查询(): Promise<void> {
+  错误闸门.开始();
   const 用户编号 = 当前路由.params.yongHuId;
   if (typeof 用户编号 !== 'string' || 用户编号.length === 0) {
-    错误提示.value = 通用文案.请求失败;
-    错误码.value = '';
+    清空错误(创建前端错误(通用文案.请求失败));
     return;
   }
-  加载中.value = true;
-  错误提示.value = '';
-  错误码.value = '';
-  try {
-    详情.value = await 账号详情(用户编号);
-  } catch (错误) {
-    const 展示 = 取错误展示(错误);
-    错误提示.value = 展示.提示;
-    错误码.value = 展示.错误码;
-    if (展示.提示 === 通用文案.登录过期) {
-      void 路由器.push('/deng-lu');
-    }
-  } finally {
-    加载中.value = false;
-  }
+  await 执行请求(错误状态, 加载中, () => 账号详情(用户编号), (结果) => {
+    详情.value = 结果;
+  }, 查询);
 }
 
 function 返回(): void {
   void 路由器.push('/zhang-hao');
 }
+
+watch(
+  () => 当前路由.params.yongHuId,
+  () => {
+    详情.value = null;
+    void 查询();
+  },
+);
+
+onBeforeUnmount(() => {
+  作废错误();
+});
 
 onMounted(() => {
   void 查询();
@@ -63,8 +68,7 @@ onMounted(() => {
     />
     <XiaoXiTiao
       xing-tai="cuo-wu"
-      :wen-ben="错误提示"
-      :cuo-wu-ma="错误码"
+      :错误状态="错误状态"
     />
     <Transition name="块">
       <div

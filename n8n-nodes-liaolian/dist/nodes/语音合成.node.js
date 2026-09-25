@@ -1,7 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.语音合成 = void 0;
-const __1 = require("./\u516C\u5171");
+const ______1 = require("./\u516C\u5171");
 class 语音合成 {
     constructor() {
         this.description = {
@@ -14,7 +14,7 @@ class 语音合成 {
             inputs: ['main'],
             outputs: ['main'],
             properties: [
-                ...(0, __1.通用参数)(),
+                ...(0, ______1.通用参数)(),
                 {
                     displayName: '文本',
                     name: '文本',
@@ -26,7 +26,7 @@ class 语音合成 {
     }
     async execute() {
         const 文本 = this.getNodeParameter('文本', 0);
-        const 数据 = await (0, __1.调开放接口)(this, '语音合成', 'POST', {}, { 文本 });
+        const 数据 = await (0, ______1.调开放接口)(this, '语音合成', 'POST', {}, { 文本 });
         return [[{ json: 数据 }]];
     }
 }

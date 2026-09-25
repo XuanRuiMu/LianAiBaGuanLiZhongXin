@@ -37,10 +37,10 @@ export function 创建封禁路由(写限流: RequestHandler): Router {
   const 路由 = Router();
   // FP-17 按契约第8行扩权：封禁/解封归 feng_jin（运营/超管），封禁申诉审核归 feng_jin_shen_he（审核员/超管）
   const 封禁门禁: RequestHandler = (请求, 响应, 下一步) => {
-    void import('../中间件/管理员').then(({ 封禁操作门禁 }) => 封禁操作门禁(请求, 响应, 下一步));
+    void import('../中间件/管理员.js').then(({ 封禁操作门禁 }) => 封禁操作门禁(请求, 响应, 下一步));
   };
   const 封禁审核门禁: RequestHandler = (请求, 响应, 下一步) => {
-    void import('../中间件/管理员').then(({ 封禁审核操作门禁 }) => 封禁审核操作门禁(请求, 响应, 下一步));
+    void import('../中间件/管理员.js').then(({ 封禁审核操作门禁 }) => 封禁审核操作门禁(请求, 响应, 下一步));
   };
 
   路由.get('/feng-jin-ji-lu', async (请求: Request, 响应: Response): Promise<void> => {
@@ -308,13 +308,13 @@ export function 创建封禁路由(写限流: RequestHandler): Router {
           return { hang: 更新.rowCount ?? 0 };
         });
         if (结果.hang === 0) {
-          失败响应(响应, 404, 取文案('封禁', '无待审申诉'), 错误码.无待审申诉);
+          失败响应(响应, 409, 取文案('封禁', '无待审申诉'), 错误码.无待审申诉);
           return;
         }
       } else {
         const 更新 = await 池.query('UPDATE "账号封禁" SET "申诉状态" = \'bo_hui\', "更新时间" = NOW() WHERE "用户ID" = $1 AND "申诉状态" = \'shen_su_zhong\'', [用户编号]);
         if ((更新.rowCount ?? 0) === 0) {
-          失败响应(响应, 404, 取文案('封禁', '无待审申诉'), 错误码.无待审申诉);
+          失败响应(响应, 409, 取文案('封禁', '无待审申诉'), 错误码.无待审申诉);
           return;
         }
         await 写审计((文本, 参数) => 池.query(文本, 参数));

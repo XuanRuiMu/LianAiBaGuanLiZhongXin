@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import { onBeforeUnmount, onMounted, ref } from 'vue';
 import { 审计日志, 审计保留, type 表格行 } from '../api/管理';
-import { 取错误展示, type 分页信息 } from '../api/请求';
+import type { 分页信息 } from '../api/请求';
+import { 创建请求错误状态, 执行请求 } from '../api/错误展示';
 import { 默认每页条数, 默认页码 } from '../配置';
 import { 列定义登记, 命名值文本 } from '../列定义';
 import { 审计事件选项 } from '../枚举映射/审计事件';
@@ -24,21 +25,21 @@ const 行列表 = ref<表格行[]>([]);
 const 分页 = ref<分页信息 | undefined>(undefined);
 const 保留信息 = ref<表格行 | null>(null);
 const 加载中 = ref(false);
-const 错误提示 = ref('');
-const 错误码 = ref('');
-
-function 显示错误(错误: unknown): void {
-  const 展示 = 取错误展示(错误);
-  错误提示.value = 展示.提示;
-  错误码.value = 展示.错误码;
-}
+const 错误状态 = 创建请求错误状态();
+const {
+  当前错误,
+  作废: 作废错误,
+} = 错误状态;
+const 保留错误状态 = 创建请求错误状态();
+const {
+  作废: 作废保留错误,
+} = 保留错误状态;
 
 async function 查询(页码: number = 默认页码): Promise<void> {
-  加载中.value = true;
-  错误提示.value = '';
-  错误码.value = '';
-  try {
-    const 结果 = await 审计日志({
+  await 执行请求(
+    错误状态,
+    加载中,
+    () => 审计日志({
       ye_ma: 页码,
       mei_ye_tiao_shu: 默认每页条数,
       shi_jian_lei_xing: 事件类型.value.trim() === '' ? undefined : 事件类型.value.trim(),
@@ -46,22 +47,19 @@ async function 查询(页码: number = 默认页码): Promise<void> {
       lei_xing: 类型名.value.trim() === '' ? undefined : 类型名.value.trim(),
       kai_shi_shi_jian: 开始时间.value.trim() === '' ? undefined : 开始时间.value.trim(),
       jie_shu_shi_jian: 结束时间.value.trim() === '' ? undefined : 结束时间.value.trim(),
-    });
-    行列表.value = 结果.行;
-    分页.value = 结果.分页;
-  } catch (错误) {
-    显示错误(错误);
-  } finally {
-    加载中.value = false;
-  }
+    }),
+    (结果) => {
+      行列表.value = 结果.行;
+      分页.value = 结果.分页;
+    },
+    () => 查询(页码),
+  );
 }
 
 async function 查询保留(): Promise<void> {
-  try {
-    保留信息.value = await 审计保留();
-  } catch {
-    保留信息.value = null;
-  }
+  await 执行请求(保留错误状态, undefined, 审计保留, (结果) => {
+    保留信息.value = 结果;
+  }, 查询保留);
 }
 
 function 上一页(): void {
@@ -75,6 +73,11 @@ function 下一页(): void {
   const 当前 = 分页.value?.ye_ma ?? 默认页码;
   void 查询(当前 + 1);
 }
+
+onBeforeUnmount(() => {
+  作废错误();
+  作废保留错误();
+});
 
 onMounted(() => {
   void 查询保留();
@@ -157,17 +160,20 @@ onMounted(() => {
       </p>
     </Transition>
     <XiaoXiTiao
+      xing-tai="cuo-wu"
+      :错误状态="保留错误状态"
+    />
+    <XiaoXiTiao
       xing-tai="jia-zai"
       :xian-shi="加载中"
     />
     <XiaoXiTiao
       xing-tai="cuo-wu"
-      :wen-ben="错误提示"
-      :cuo-wu-ma="错误码"
+      :错误状态="错误状态"
     />
     <XiaoXiTiao
       xing-tai="kong"
-      :xian-shi="!加载中 && 行列表.length === 0"
+      :xian-shi="当前错误 === null && !加载中 && 行列表.length === 0"
     />
     <ShuJuBiaoGe
       :lie="列定义登记.审计日志"

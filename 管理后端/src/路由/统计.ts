@@ -51,7 +51,7 @@ export function 创建统计路由(): Router {
   const 路由 = Router();
   // FP-17 按契约第8行：统计族（含读审计写侧）归 tong_ji_xie（运营/超管），审核员只读域不再含统计
   const 统计门禁: RequestHandler = (请求, 响应, 下一步) => {
-    void import('../中间件/管理员').then(({ 统计操作门禁 }) => 统计操作门禁(请求, 响应, 下一步));
+    void import('../中间件/管理员.js').then(({ 统计操作门禁 }) => 统计操作门禁(请求, 响应, 下一步));
   };
 
   路由.get('/tong-ji/zhu-ce', 统计门禁, async (请求: Request, 响应: Response): Promise<void> => {

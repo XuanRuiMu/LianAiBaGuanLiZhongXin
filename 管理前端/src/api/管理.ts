@@ -92,12 +92,6 @@ export type 健康状态 = {
   shi_jian: string;
 };
 
-export type 就绪状态 = {
-  zhuang_tai: string;
-  jiu_xu: boolean;
-  kui: string[];
-};
-
 export type 指标状态 = Record<string, unknown>;
 
 export type 审核查询 = 分页查询 & {
@@ -217,59 +211,6 @@ export async function 写入封禁(正文: 封禁写入): Promise<封禁写入�
   return 解析包络<封禁写入结果>(响应.data).数据;
 }
 
-export type 管理登录请求 = {
-  shou_ji_hao: string;
-  mi_ma: string;
-  /** FP-03「记住密码」：true 时服务端签发持久刷新 Cookie，会话跨浏览器重开仍然有效 */
-  chi_jiu_hui_hua: boolean;
-};
-
-export type 注销结果 = {
-  yi_tui_chu: boolean;
-};
-
-export type 管理登录结果 = {
-  ling_pai?: string;
-  shua_xin_ling_pai?: string;
-  yong_hu_id: string;
-  yong_hu_ming: string | null;
-  // YH-108 三角色口径：登录回传角色标识与服务端能力位，而非管理员二值旗标
-  jiao_se: string | null;
-  neng_li: string[];
-};
-
-export type 当前身份 = {
-  yong_hu_id: string;
-  jiao_se: string | null;
-  neng_li: string[];
-};
-
-export async function 管理登录(正文: 管理登录请求): Promise<管理登录结果> {
-  const 响应: 响应包装 = await 请求实例.post('/api/guan-li/deng-lu', 正文);
-  return 解析包络<管理登录结果>(响应.data).数据;
-}
-
-/** YH-108 身份以服务端查库结果为准，供刷新页面后重建权限视图 */
-export async function 我的身份(): Promise<当前身份> {
-  const 响应: 响应包装 = await 请求实例.get('/api/guan-li/wo-de-jiao-se');
-  return 解析包络<当前身份>(响应.data).数据;
-}
-
-/** 刷新号在 httpOnly Cookie 里，前端读不到：缺省不发正文键，由 Cookie 承载 */
-export async function 刷新管理令牌(刷新令牌?: string): Promise<管理登录结果> {
-  const 响应: 响应包装 = await 请求实例.post(
-    '/api/guan-li/shua-xin',
-    刷新令牌 === undefined ? {} : { shua_xin_ling_pai: 刷新令牌 },
-    { buTuiDengLu: true },
-  );
-  return 解析包络<管理登录结果>(响应.data).数据;
-}
-
-export async function 管理登出(): Promise<注销结果> {
-  const 响应: 响应包装 = await 请求实例.post('/api/guan-li/tui-chu', {}, { buTuiDengLu: true });
-  return 解析包络<注销结果>(响应.data).数据;
-}
-
 export type 编号请求 = {
   yong_hu_id: string;
   que_ren?: boolean;
@@ -344,10 +285,6 @@ export function 埋点字典(): Promise<表格行> {
 
 export function 审计保留(): Promise<表格行> {
   return 取详情<表格行>('/api/guan-li/shen-ji-bao-liu');
-}
-
-export function 就绪检查(): Promise<就绪状态> {
-  return 取详情<就绪状态>('/api/ready');
 }
 
 export function 指标概览(): Promise<指标状态> {

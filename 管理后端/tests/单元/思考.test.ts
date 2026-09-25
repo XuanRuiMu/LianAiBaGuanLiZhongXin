@@ -34,14 +34,14 @@ describe('AI思考接口', () => {
     expect(正文).not.toContain('undefined');
   });
 
-  it('思考记录列表缺表降级不500', async () => {
+  it('思考记录列表缺表返回503失败包络', async () => {
     const { 池 } = 创建模拟池((_文本) => {
       if (_文本.includes('SELECT "管理员"')) return [{ 管理员: true }];
       throw new Error('relation "思考记录" does not exist');
     });
     const { 应用 } = 创建测试应用({ 池 });
     const 响应 = await request(应用).get('/api/guan-li/si-kao-ji-lu').set(授权头(签发管理令牌()));
-    expect(响应.status).toBe(200);
+    expect(响应.status).toBe(503);
     expect(响应.body.cuo_wu_ma).toBe('BIAO_QUE_SHI_JIANG_JI');
   });
 

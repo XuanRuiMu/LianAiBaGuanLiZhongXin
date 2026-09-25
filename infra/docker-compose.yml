@@ -42,7 +42,7 @@ services:
 
   n8n:
     # YH-136 镜像浮动收敛：全pin digest，禁今天构建明天变
-    image: n8nio/n8n:2.37.10
+    image: n8nio/n8n:2.40.6@sha256:9c7871d5cc4fc2565bb905e4df5bf7d6a5a4bf2f4313fb99a2b3fa380f331d7c
     container_name: love-management-n8n
     restart: unless-stopped
     # YH-134 资源上限：单容器异常禁拖垮宿主
@@ -54,10 +54,11 @@ services:
       N8N_HOST: localhost
       N8N_PORT: 5678
       N8N_PROTOCOL: http
-      N8N_BASIC_AUTH_ACTIVE: "true"
-      N8N_BASIC_AUTH_USER: ${N8N_USER:?请在环境中设置N8N_USER}
-      # YH-120 弱口令禁入库：无默认值，缺失即compose变量替换报错，禁admin123入库
-      N8N_BASIC_AUTH_PASSWORD: ${N8N_PASSWORD:?请在环境中设置N8N_PASSWORD}
+      N8N_INSTANCE_OWNER_MANAGED_BY_ENV: "true"
+      N8N_INSTANCE_OWNER_EMAIL: ${N8N_OWNER_EMAIL:?请在环境中设置N8N_OWNER_EMAIL}
+      N8N_INSTANCE_OWNER_FIRST_NAME: ${N8N_OWNER_FIRST_NAME:-Management}
+      N8N_INSTANCE_OWNER_LAST_NAME: ${N8N_OWNER_LAST_NAME:-Owner}
+      N8N_INSTANCE_OWNER_PASSWORD_HASH: ${N8N_OWNER_PASSWORD_HASH:?请在环境中设置N8N_OWNER_PASSWORD_HASH}
       N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY:?请在环境中设置N8N_ENCRYPTION_KEY}
       N8N_CUSTOM_EXTENSIONS: /home/node/.n8n/custom
     volumes:

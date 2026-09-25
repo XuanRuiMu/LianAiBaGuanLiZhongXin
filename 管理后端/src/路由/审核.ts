@@ -277,7 +277,7 @@ async function 评审审核(请求: Request, 响应: Response, 目标类型: str
     ? await 池.用事务(async (事务查) => 落库(事务查))
     : await 落库((文本, 参数) => 池.query(文本, 参数));
   if (命中 === 0) {
-    失败响应(响应, 404, 取文案('审核', '对象已变化'), 错误码.审核对象已变);
+    失败响应(响应, 409, 取文案('审核', '对象已变化'), 错误码.审核对象已变);
     return;
   }
   日志.信息('审核运营', '评审审核单', { 目标类型, 目标编号, 轮次, 结果 });
@@ -382,7 +382,7 @@ async function 发布下线(请求: Request, 响应: Response, 目标类型: 'go
     ? await 池.用事务(async (事务查) => 落库(事务查))
     : await 落库((文本, 参数) => 池.query(文本, 参数));
   if (命中 === 0) {
-    失败响应(响应, 404, 取文案('审核', '对象已变化'), 错误码.审核对象已变);
+    失败响应(响应, 409, 取文案('审核', '对象已变化'), 错误码.审核对象已变);
     return;
   }
   成功响应(响应, { yi_chu_li: true });
@@ -391,7 +391,7 @@ async function 发布下线(请求: Request, 响应: Response, 目标类型: 'go
 export function 创建审核路由(写限流: RequestHandler): Router {
   const 路由 = Router();
   const 高危门禁: RequestHandler = (请求, 响应, 下一步) => {
-    void import('../中间件/管理员').then(({ 高危操作门禁 }) => 高危操作门禁(请求, 响应, 下一步));
+    void import('../中间件/管理员.js').then(({ 高危操作门禁 }) => 高危操作门禁(请求, 响应, 下一步));
   };
 
   const 注册目标 = (目标类型: string, 路径段: string): void => {

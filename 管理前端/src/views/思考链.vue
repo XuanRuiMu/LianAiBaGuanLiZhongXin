@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import { onBeforeUnmount, onMounted, ref } from 'vue';
 import {
   记忆列表,
   对话摘要列表,
@@ -12,7 +12,8 @@ import {
   type 表格行,
   type 思考说明 as 思考说明类型,
 } from '../api/管理';
-import { 取错误展示, type 分页信息 } from '../api/请求';
+import type { 分页信息 } from '../api/请求';
+import { 创建请求错误状态, 执行请求 } from '../api/错误展示';
 import { 默认每页条数, 默认页码 } from '../配置';
 import { 单元格文本, 单元格色调, 取列映射, 行快照文本, 响应行键, 页签快照表, type 思考页签 } from '../列定义';
 import { 思考事件选项 } from '../枚举映射/思考事件';
@@ -47,14 +48,16 @@ const 分页 = ref<分页信息 | undefined>(undefined);
 const 说明 = ref<思考说明类型 | null>(null);
 const 原文内容 = ref<Record<string, string>>({});
 const 加载中 = ref(false);
-const 错误提示 = ref('');
-const 错误码 = ref('');
-
-function 显示错误(错误: unknown): void {
-  const 展示 = 取错误展示(错误);
-  错误提示.value = 展示.提示;
-  错误码.value = 展示.错误码;
-}
+const 错误状态 = 创建请求错误状态();
+const {
+  当前错误,
+  作废: 作废错误,
+} = 错误状态;
+const 说明错误状态 = 创建请求错误状态();
+const {
+  当前错误: 说明错误,
+  作废: 作废说明错误,
+} = 说明错误状态;
 
 const 记录列 = 取列映射('思考记录');
 
@@ -84,62 +87,56 @@ async function 展开思考记录(记录编号: unknown): Promise<void> {
   if (typeof 记录编号 !== 'string' || 记录编号.length === 0) {
     return;
   }
-  try {
-    const 详情 = await 思考记录详情(记录编号);
-    原文内容.value = { ...原文内容.value, [记录编号]: 取原文(详情[响应行键.内容]) };
-  } catch (错误) {
-    显示错误(错误);
-  }
+  await 执行请求(
+    错误状态,
+    undefined,
+    () => 思考记录详情(记录编号),
+    (详情) => {
+      原文内容.value = { ...原文内容.value, [记录编号]: 取原文(详情[响应行键.内容]) };
+    },
+    () => 展开思考记录(记录编号),
+  );
 }
 
 async function 查询(页码: number = 默认页码): Promise<void> {
-  加载中.value = true;
-  错误提示.value = '';
-  错误码.value = '';
-  try {
-    const 基础 = {
-      ye_ma: 页码,
-      mei_ye_tiao_shu: 默认每页条数,
-      ...当前查询参数(),
-    };
-    if (当前标签.value === 'si-kao-ji-lu') {
-      const 结果 = await 思考记录列表({ ye_ma: 基础.ye_ma, mei_ye_tiao_shu: 基础.mei_ye_tiao_shu, yong_hu_id: 基础.yong_hu_id, jiao_se_id: 基础.jiao_se_id, shi_jian: 基础.shi_jian });
+  await 执行请求(
+    错误状态,
+    加载中,
+    async () => {
+      const 基础 = {
+        ye_ma: 页码,
+        mei_ye_tiao_shu: 默认每页条数,
+        ...当前查询参数(),
+      };
+      if (当前标签.value === 'si-kao-ji-lu') {
+        return 思考记录列表({ ye_ma: 基础.ye_ma, mei_ye_tiao_shu: 基础.mei_ye_tiao_shu, yong_hu_id: 基础.yong_hu_id, jiao_se_id: 基础.jiao_se_id, shi_jian: 基础.shi_jian });
+      }
+      if (当前标签.value === 'ji-yi') {
+        return 记忆列表(基础);
+      }
+      if (当前标签.value === 'dui-hua-zhai-yao') {
+        return 对话摘要列表(基础);
+      }
+      if (当前标签.value === 'guan-jian-shi-jian') {
+        return 关键事件列表(基础);
+      }
+      if (当前标签.value === 'duo-she-ri-zhi') {
+        return 接管记录列表(基础);
+      }
+      return 评估列表(基础);
+    },
+    (结果) => {
       行列表.value = 结果.行;
       分页.value = 结果.分页;
-    } else if (当前标签.value === 'ji-yi') {
-      const 结果 = await 记忆列表(基础);
-      行列表.value = 结果.行;
-      分页.value = 结果.分页;
-    } else if (当前标签.value === 'dui-hua-zhai-yao') {
-      const 结果 = await 对话摘要列表(基础);
-      行列表.value = 结果.行;
-      分页.value = 结果.分页;
-    } else if (当前标签.value === 'guan-jian-shi-jian') {
-      const 结果 = await 关键事件列表(基础);
-      行列表.value = 结果.行;
-      分页.value = 结果.分页;
-    } else if (当前标签.value === 'duo-she-ri-zhi') {
-      const 结果 = await 接管记录列表(基础);
-      行列表.value = 结果.行;
-      分页.value = 结果.分页;
-    } else {
-      const 结果 = await 评估列表(基础);
-      行列表.value = 结果.行;
-      分页.value = 结果.分页;
-    }
-  } catch (错误) {
-    显示错误(错误);
-  } finally {
-    加载中.value = false;
-  }
+    },
+    () => 查询(页码),
+  );
 }
 
 async function 查询说明(): Promise<void> {
-  try {
-    说明.value = await 思考说明();
-  } catch {
-    说明.value = null;
-  }
+  await 执行请求(说明错误状态, undefined, 思考说明, (结果) => {
+    说明.value = 结果;
+  }, 查询说明);
 }
 
 function 切换标签(目标: 标签页): void {
@@ -161,6 +158,11 @@ function 下一页(): void {
   const 当前 = 分页.value?.ye_ma ?? 默认页码;
   void 查询(当前 + 1);
 }
+
+onBeforeUnmount(() => {
+  作废错误();
+  作废说明错误();
+});
 
 onMounted(() => {
   void 查询说明();
@@ -205,8 +207,12 @@ onMounted(() => {
         </div>
       </Transition>
       <XiaoXiTiao
+        xing-tai="cuo-wu"
+        :错误状态="说明错误状态"
+      />
+      <XiaoXiTiao
         xing-tai="kong"
-        :xian-shi="!说明 || 说明.dai_bu_chong.length === 0"
+        :xian-shi="说明错误 === null && (!说明 || 说明.dai_bu_chong.length === 0)"
         :wen-ben="通用文案.待补充"
         ce-shi-biao-shi="kong-tai-dai-bu-chong"
       />
@@ -284,12 +290,11 @@ onMounted(() => {
     />
     <XiaoXiTiao
       xing-tai="cuo-wu"
-      :wen-ben="错误提示"
-      :cuo-wu-ma="错误码"
+      :错误状态="错误状态"
     />
     <XiaoXiTiao
       xing-tai="kong"
-      :xian-shi="!加载中 && 行列表.length === 0"
+      :xian-shi="当前错误 === null && !加载中 && 行列表.length === 0"
     />
     <Transition name="块">
       <ol

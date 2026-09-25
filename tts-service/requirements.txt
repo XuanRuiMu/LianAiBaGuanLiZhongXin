@@ -1,12 +1,1 @@
-fastapi==0.115.0
-uvicorn[standard]==0.32.0
-httpx==0.28.1
-pydantic==2.9.2
-pydantic-settings==2.5.2
-redis==8.1.0
-python-dotenv==1.0.1
-edge-tts==7.2.8
-PyJWT==2.10.1
-pytest==8.3.3
-pytest-asyncio==0.24.0
-pytest-cov==7.1.0
+-r requirements.lock

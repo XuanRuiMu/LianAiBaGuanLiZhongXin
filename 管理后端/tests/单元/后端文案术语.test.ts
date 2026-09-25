@@ -383,7 +383,8 @@ describe('FP-07 后端可见提示跨端术语护栏', () => {
     if (起 < 0) {
       throw new Error('docs/契约.md 缺「十五、管理端错误码表」，码无出处');
     }
-    const 表段 = 源.slice(起);
+    const 前端起点 = 源.indexOf('\n### 前端', 起);
+    const 表段 = 源.slice(起, 前端起点 < 0 ? undefined : 前端起点);
     const 表码 = [...表段.matchAll(/^\|\s*([A-Z][A-Z0-9_]{3,})\s*\|/gm)].map((匹配) => 匹配[1]);
     expect([...表码].sort()).toEqual([...全部错误码].sort());
     for (const 码 of 全部错误码) {
@@ -504,7 +505,11 @@ describe('FP-07 改写后的可见提示与稳定码成对锁死', () => {
     const 响应 = await request(应用).get('/api/guan-li/zhang-hao-lie-biao');
     expect(响应.status).toBe(401);
     expect(响应.body.ti_shi).toBe(取文案('通用', '未授权'));
+    expect(响应.body.message).toBe(响应.body.ti_shi);
     expect(响应.body.cuo_wu_ma).toBe(错误码.未授权);
+    expect(响应.body.code).toBe(错误码.未授权);
+    expect(响应.body.traceId).toBe(响应.headers['x-trace-id']);
+    expect(响应.body.retryable).toBe(false);
   });
 
   it('依赖未就绪与缓存不可用各带自己的码，提示无内部名词', async () => {
@@ -512,7 +517,7 @@ describe('FP-07 改写后的可见提示与稳定码成对锁死', () => {
     const 缺库 = await request(创建应用({ 缓存: 有缓存.缓存 as never }))
       .get('/api/guan-li/zhang-hao-lie-biao')
       .set(授权());
-    expect(缺库.status).toBe(500);
+    expect(缺库.status).toBe(503);
     expect(缺库.body.ti_shi).toBe(取文案('通用', '依赖未就绪'));
     expect(缺库.body.cuo_wu_ma).toBe(错误码.依赖未就绪);
     expect(JSON.stringify(缺库.body)).not.toMatch(/数据库|注入/);
@@ -521,13 +526,13 @@ describe('FP-07 改写后的可见提示与稳定码成对锁死', () => {
     const 缺缓存 = await request(创建应用({ 池: 有池.池 }))
       .get('/api/guan-li/zhang-hao-lie-biao')
       .set(授权());
-    expect(缺缓存.status).toBe(500);
+    expect(缺缓存.status).toBe(503);
     expect(缺缓存.body.ti_shi).toBe(取文案('通用', '缓存不可用'));
     expect(缺缓存.body.cuo_wu_ma).toBe(错误码.缓存服务不可用);
     expect(JSON.stringify(缺缓存.body)).not.toMatch(/Redis|REDIS_URL/);
   });
 
-  it('五族表缺失降级只剩一句结论，迁移编号不上屏', async () => {
+  it('五族表缺失返回503失败包络，迁移编号不上屏', async () => {
     const 用例: Array<[string, string, string]> = [
       ['思考', '/api/guan-li/si-kao-ji-lu', '思考记录'],
       ['封禁', '/api/guan-li/zhang-hao-feng-jin', '账号封禁'],
@@ -538,31 +543,31 @@ describe('FP-07 改写后的可见提示与稳定码成对锁死', () => {
     for (const [分组, 路径, 表名] of 用例) {
       const { 应用 } = 创建测试应用({ 池: 缺表池(表名) });
       const 响应 = await request(应用).get(路径).set(授权());
-      expect(响应.status, `${分组} 降级状态码不得回退成 5xx`).toBe(200);
+      expect(响应.status, `${分组} 表缺失必须是503失败包络`).toBe(503);
       expect(响应.body.ti_shi).toBe(取文案(分组 as never, '表缺失降级' as never));
       expect(响应.body.cuo_wu_ma).toBe(错误码.数据表未就绪);
       expect(JSON.stringify(响应.body)).not.toMatch(/018|021|迁移|relation|MySQL|Postgres/);
     }
   });
 
-  it('参数错误只出显示名，接口键名不外泄', async () => {
+  it('参数错误消息只出显示名，fieldErrors 保留机器字段', async () => {
     const { 应用 } = 创建测试应用();
     const 用户编号 = await request(应用).get('/api/guan-li/si-kao-ji-lu?yong_hu_id=bu-shi-uuid').set(授权());
     expect(用户编号.status).toBe(400);
     expect(用户编号.body.ti_shi).toBe(`${取文案('通用', '参数错误')}：用户编号`);
     expect(用户编号.body.cuo_wu_ma).toBe(错误码.参数有误);
-    expect(JSON.stringify(用户编号.body)).not.toContain('yong_hu_id');
+    expect(用户编号.body.fieldErrors).toEqual({ yong_hu_id: '用户编号格式不正确' });
 
     const 页码 = await request(应用).get('/api/guan-li/zhang-hao-lie-biao?ye_ma=0').set(授权());
     expect(页码.body.ti_shi).toBe(`${取文案('通用', '参数错误')}：页码`);
-    expect(JSON.stringify(页码.body)).not.toContain('ye_ma');
+    expect(页码.body.fieldErrors).toEqual({ ye_ma: '页码格式不正确' });
 
     const 记录 = await request(应用).get('/api/guan-li/si-kao-ji-lu/bu-cun-zai').set(授权());
     expect(记录.body.ti_shi).toBe(`${取文案('通用', '参数错误')}：思考记录编号`);
 
     const 地址 = await request(应用).get('/api/guan-li/feng-jin-ji-lu?ip=bucun').set(授权());
     expect(地址.body.ti_shi).toBe(`${取文案('通用', '参数错误')}：IP 地址`);
-    expect(JSON.stringify(地址.body)).not.toContain('"ip"');
+    expect(地址.body.fieldErrors).toEqual({ ip: 'IP 地址格式不正确' });
   });
 
   it('再次确认与审批单两个专用码带改写后的提示', async () => {
@@ -579,7 +584,7 @@ describe('FP-07 改写后的可见提示与稳定码成对锁死', () => {
     expect(缺单.body.cuo_wu_ma).toBe(错误码.需审批单);
   });
 
-  it('三类 404 分码：不存在与状态已变不再共用「账号不存在」', async () => {
+  it('不存在与状态冲突分码：404 与 409 不再混用', async () => {
     const 空更新 = 创建模拟池((文本) => {
       if (文本.includes('SELECT "管理员"')) {
         return [{ 管理员: true, 运营: false, 审核员: false }];
@@ -599,7 +604,7 @@ describe('FP-07 改写后的可见提示与稳定码成对锁死', () => {
       .post('/api/guan-li/shen-su/shen-he')
       .set(授权())
       .send({ yong_hu_id: 编号, tong_guo: false });
-    expect(驳回.status).toBe(404);
+    expect(驳回.status).toBe(409);
     expect(驳回.body.ti_shi).toBe(取文案('封禁', '无待审申诉'));
     expect(驳回.body.cuo_wu_ma).toBe(错误码.无待审申诉);
 
@@ -607,7 +612,7 @@ describe('FP-07 改写后的可见提示与稳定码成对锁死', () => {
       .post('/api/guan-li/ju-bao-yi-shen')
       .set(授权())
       .send({ mu_biao_id: 编号, tong_guo: true });
-    expect(评审.status).toBe(404);
+    expect(评审.status).toBe(409);
     expect(评审.body.ti_shi).toBe(取文案('审核', '对象已变化'));
     expect(评审.body.cuo_wu_ma).toBe(错误码.审核对象已变);
   });

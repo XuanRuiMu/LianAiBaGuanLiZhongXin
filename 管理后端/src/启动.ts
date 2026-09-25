@@ -31,8 +31,10 @@ async function 启动(): Promise<void> {
     if ((权限位 & 0o077) !== 0) {
       日志.警告('启动', '环境文件权限过宽，仅所有者可读写更安全', { 权限位: 权限位.toString(8) });
     }
-  } catch {
-    return;
+  } catch (错误) {
+    if ((错误 as NodeJS.ErrnoException).code !== 'ENOENT') {
+      throw 错误;
+    }
   }
   const 应用 = 创建应用({ 池, 缓存 });
   try {

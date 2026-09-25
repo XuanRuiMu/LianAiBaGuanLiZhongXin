@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { 业务错误, 传输错误, 归一请求错误, 请求实例 } from '../api/请求';
+import { 业务错误, 传输错误, 归一请求错误, 请求实例, 前端错误码 } from '../api/请求';
 import { 通用文案 } from '../文案/通用';
 
 class 内存存储 implements Storage {
@@ -38,6 +38,10 @@ const 会话存储 = new 内存存储();
 const 跳转记录: string[] = [];
 
 let 当前路径 = '/zhang-hao';
+
+function 失败包络(message: string, code: string, retryable = false): Record<string, unknown> {
+  return { cheng_gong: false, shu_ju: null, code, message, traceId: 'trace-server', retryable };
+}
 
 Object.defineProperty(globalThis, 'window', {
   configurable: true,
@@ -78,12 +82,13 @@ beforeEach(() => {
 });
 
 describe('FP-09 401 兜底跳转的可观察契约', () => {
-  it('普通 401：清两个存储的会话标记并跳 /deng-lu，提示走登录过期原子且不带码', () => {
+  it('普通 401：清会话并跳转，保留非包络稳定码与追踪编号', () => {
     装会话();
     const 错误 = 归一请求错误(new 传输错误('Request failed with status code 401', 401, '', false));
     expect(错误).toBeInstanceOf(业务错误);
     expect(错误.message).toBe(通用文案.登录过期);
-    expect(错误.cuo_wu_ma).toBe('');
+    expect(错误.code).toBe(前端错误码.非包络响应);
+    expect(错误.traceId).toMatch(/^qian-duan-/);
     expect(跳转记录).toEqual(['/deng-lu']);
     expect(会话存储.getItem(会话键)).toBeNull();
     expect(局部存储.getItem(会话键)).toBeNull();
@@ -110,12 +115,7 @@ describe('FP-09 401 兜底跳转的可观察契约', () => {
   it('429 与请求未到达服务端都不触发跳转，也不清会话', () => {
     装会话();
     归一请求错误(
-      new 传输错误('Request failed with status code 429', 429, {
-        cheng_gong: false,
-        shu_ju: null,
-        ti_shi: '请求过于频繁，请稍后再试',
-        cuo_wu_ma: 'XIAN_LIU',
-      }, false),
+      new 传输错误('Request failed with status code 429', 429, 失败包络('请求过于频繁，请稍后再试', 'XIAN_LIU', true), false),
     );
     归一请求错误(new 传输错误('Failed to fetch', null, undefined, false));
     expect(跳转记录).toEqual([]);
@@ -125,14 +125,9 @@ describe('FP-09 401 兜底跳转的可观察契约', () => {
   it('凭证失效码走服务端否定这一支：401 带 LING_PAI_WU_XIAO 时清会话、跳转且码上屏', () => {
     装会话();
     const 错误 = 归一请求错误(
-      new 传输错误('Request failed with status code 401', 401, {
-        cheng_gong: false,
-        shu_ju: null,
-        ti_shi: '登录续期已过期，请重新登录',
-        cuo_wu_ma: 'LING_PAI_WU_XIAO',
-      }, false),
+      new 传输错误('Request failed with status code 401', 401, 失败包络('登录续期已过期，请重新登录', 'LING_PAI_WU_XIAO'), false),
     );
-    expect(错误.cuo_wu_ma).toBe('LING_PAI_WU_XIAO');
+    expect(错误.code).toBe('LING_PAI_WU_XIAO');
     expect(跳转记录).toEqual(['/deng-lu']);
     expect(会话存储.getItem(会话键)).toBeNull();
   });

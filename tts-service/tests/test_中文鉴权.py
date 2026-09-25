@@ -1,8 +1,7 @@
+import httpx2
 import pytest
 import jwt as PyJWT
 import time
-
-from fastapi.testclient import TestClient
 
 from app import 文案
 from app.main import app
@@ -72,23 +71,23 @@ class Test合成鉴权:
     def setup_method(self):
         合成限流器.重置()
 
-    def test_无凭证拒收(self):
-        客户端 = TestClient(app, raise_server_exceptions=False)
-        响应 = 客户端.post("/api/tts/synthesize", json={"text": "你好"})
+    async def test_无凭证拒收(self):
+        async with httpx2.AsyncClient(transport=httpx2.ASGITransport(app=app, raise_app_exceptions=False), base_url="http://testserver") as 客户端:
+            响应 = await 客户端.post("/api/tts/synthesize", json={"text": "你好"})
         assert 响应.status_code == 401
         assert 响应.json()["提示"] == 文案.缺凭证
 
-    def test_伪造令牌拒收(self):
-        客户端 = TestClient(app, raise_server_exceptions=False)
-        响应 = 客户端.post("/api/tts/synthesize", json={"text": "你好"},
-                            headers={"Authorization": "Bearer fake.token.value"})
+    async def test_伪造令牌拒收(self):
+        async with httpx2.AsyncClient(transport=httpx2.ASGITransport(app=app, raise_app_exceptions=False), base_url="http://testserver") as 客户端:
+            响应 = await 客户端.post("/api/tts/synthesize", json={"text": "你好"},
+                                     headers={"Authorization": "Bearer fake.token.value"})
         assert 响应.status_code == 401
 
-    def test_健康与音色免凭证(self):
-        客户端 = TestClient(app, raise_server_exceptions=False)
-        assert 客户端.get("/api/tts/health").status_code == 200
-        assert 客户端.get("/health").status_code == 200
-        音色响应 = 客户端.get("/api/tts/voices")
+    async def test_健康与音色免凭证(self):
+        async with httpx2.AsyncClient(transport=httpx2.ASGITransport(app=app, raise_app_exceptions=False), base_url="http://testserver") as 客户端:
+            assert (await 客户端.get("/api/tts/health")).status_code == 200
+            assert (await 客户端.get("/health")).status_code == 200
+            音色响应 = await 客户端.get("/api/tts/voices")
         assert 音色响应.status_code == 200
         assert "音色列表" in 音色响应.json()
 
@@ -103,16 +102,16 @@ class Test合成鉴权:
         finally:
             monkeypatch.setattr(鉴权模块.settings, "令牌密钥", "")
 
-    def test_离线模式凭证通过可合成(self, monkeypatch):
+    async def test_离线模式凭证通过可合成(self, monkeypatch):
         import app.鉴权 as 鉴权模块
         from app.provider import 合成服务单例
         # YH-114 内部令牌长度门禁16字节：测试令牌需满足长度校验
         monkeypatch.setattr(鉴权模块.settings, "内部令牌", "test-internal-token-16p0")
         monkeypatch.setattr(合成服务单例, "_模式", "offline")
         try:
-            客户端 = TestClient(app, raise_server_exceptions=False)
-            响应 = 客户端.post("/api/tts/synthesize", json={"text": "你好世界"},
-                                headers={"X-Internal-Token": "test-internal-token-16p0"})
+            async with httpx2.AsyncClient(transport=httpx2.ASGITransport(app=app, raise_app_exceptions=False), base_url="http://testserver") as 客户端:
+                响应 = await 客户端.post("/api/tts/synthesize", json={"text": "你好世界"},
+                                         headers={"X-Internal-Token": "test-internal-token-16p0"})
             assert 响应.status_code == 200
             assert 响应.json()["format"] == "wav"
         finally:
@@ -226,15 +225,15 @@ class Test契约对齐:
         finally:
             monkeypatch.setattr(鉴权模块.settings, "令牌密钥", "")
 
-    def test_吊销令牌接口返回401(self, monkeypatch):
+    async def test_吊销令牌接口返回401(self, monkeypatch):
         import app.鉴权 as 鉴权模块
         monkeypatch.setattr(鉴权模块.settings, "令牌密钥", 契约密钥)
         monkeypatch.setattr(鉴权模块, "读吊销值", lambda 键: "1")
         try:
-            客户端 = TestClient(app, raise_server_exceptions=False)
             令牌 = _签发契约载荷(_契约载荷(), 契约密钥)
-            响应 = 客户端.post("/api/tts/synthesize", json={"text": "你好"},
-                                headers={"Authorization": f"Bearer {令牌}"})
+            async with httpx2.AsyncClient(transport=httpx2.ASGITransport(app=app, raise_app_exceptions=False), base_url="http://testserver") as 客户端:
+                响应 = await 客户端.post("/api/tts/synthesize", json={"text": "你好"},
+                                         headers={"Authorization": f"Bearer {令牌}"})
             assert 响应.status_code == 401
             assert 响应.json()["提示"] == 文案.令牌无效
         finally:

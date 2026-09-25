@@ -1,7 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.触发流程 = void 0;
-const __1 = require("./\u516C\u5171");
+const ______1 = require("./\u516C\u5171");
 class 触发流程 {
     constructor() {
         this.description = {
@@ -14,7 +14,7 @@ class 触发流程 {
             inputs: ['main'],
             outputs: ['main'],
             properties: [
-                ...(0, __1.通用参数)(),
+                ...(0, ______1.通用参数)(),
                 {
                     displayName: '流程名称',
                     name: '流程名称',
@@ -40,7 +40,7 @@ class 触发流程 {
         catch {
             throw new Error('输入不是合法 JSON');
         }
-        const 数据 = await (0, __1.调开放接口)(this, '触发编排', 'POST', {}, { 流程名称, 输入 });
+        const 数据 = await (0, ______1.调开放接口)(this, '触发编排', 'POST', {}, { 流程名称, 输入 });
         return [[{ json: 数据 }]];
     }
 }

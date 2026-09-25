@@ -4,10 +4,12 @@ import { 当前配置 } from './配置';
 
 export class 校验失败 extends Error {
   readonly 状态码 = 400;
+  readonly fieldErrors?: Record<string, string>;
 
-  constructor(消息: string) {
+  constructor(消息: string, 字段错误?: Record<string, string>) {
     super(消息);
     this.name = '校验失败';
+    this.fieldErrors = 字段错误;
   }
 }
 
@@ -76,6 +78,16 @@ export function 参数错误提示(字段标识: string): string {
   return 显示名 === '' ? 前缀 : `${前缀}：${显示名}`;
 }
 
+function 抛参数错误(字段标识: string): never {
+  const 显示名 = 取字段显示名(字段标识);
+  if (显示名 === '') {
+    throw new 校验失败(参数错误提示(字段标识));
+  }
+  throw new 校验失败(参数错误提示(字段标识), {
+    [字段标识]: `${显示名}${取文案('通用', '字段格式不正确')}`,
+  });
+}
+
 export function 取可选字符串(值: unknown): string | undefined {
   if (typeof 值 !== 'string' || 值.length === 0) {
     return undefined;
@@ -85,18 +97,18 @@ export function 取可选字符串(值: unknown): string | undefined {
 
 export function 取必填字符串(值: unknown, 字段标识: string, 上限 = 500): string {
   if (typeof 值 !== 'string' || 值.trim().length === 0) {
-    throw new 校验失败(参数错误提示(字段标识));
+    抛参数错误(字段标识);
   }
   const 修剪 = 值.trim();
   if (修剪.length > 上限) {
-    throw new 校验失败(参数错误提示(字段标识));
+    抛参数错误(字段标识);
   }
   return 修剪;
 }
 
 export function 校验UUID(字段标识: string, 值: unknown): string {
   if (typeof 值 !== 'string' || !UUID表达式.test(值)) {
-    throw new 校验失败(参数错误提示(字段标识));
+    抛参数错误(字段标识);
   }
   return 值;
 }
@@ -111,14 +123,14 @@ export function 校验可选UUID(字段标识: string, 值: unknown): string | u
 
 export function 校验手机号(字段标识: string, 值: unknown): string {
   if (typeof 值 !== 'string' || !手机号表达式.test(值)) {
-    throw new 校验失败(参数错误提示(字段标识));
+    抛参数错误(字段标识);
   }
   return 值;
 }
 
 export function 校验IP(字段标识: string, 值: unknown): string {
   if (typeof 值 !== 'string' || net.isIP(值) === 0) {
-    throw new 校验失败(参数错误提示(字段标识));
+    抛参数错误(字段标识);
   }
   return 值;
 }
@@ -136,7 +148,7 @@ function 取正整数(值: unknown, 默认值: number, 字段标识: string): nu
   const 文本 = Array.isArray(值) ? String(值[0]) : String(值);
   const 解析 = Number(文本);
   if (!Number.isInteger(解析) || 解析 <= 0) {
-    throw new 校验失败(参数错误提示(字段标识));
+    抛参数错误(字段标识);
   }
   return 解析;
 }
@@ -163,14 +175,14 @@ export function 解析时间范围(查询: unknown): 时间范围 {
   if (开始文本 !== undefined) {
     const 毫秒 = Date.parse(开始文本);
     if (Number.isNaN(毫秒)) {
-      throw new 校验失败(参数错误提示('kai_shi_shi_jian'));
+      抛参数错误('kai_shi_shi_jian');
     }
     开始 = new Date(毫秒).toISOString();
   }
   if (结束文本 !== undefined) {
     const 毫秒 = Date.parse(结束文本);
     if (Number.isNaN(毫秒)) {
-      throw new 校验失败(参数错误提示('jie_shu_shi_jian'));
+      抛参数错误('jie_shu_shi_jian');
     }
     结束 = new Date(毫秒).toISOString();
   }
@@ -186,7 +198,7 @@ export function 校验发送方(值: unknown): string {
     return '';
   }
   if (!发送方白名单.includes(文本)) {
-    throw new 校验失败(参数错误提示('fa_song_fang'));
+    抛参数错误('fa_song_fang');
   }
   return 文本;
 }
@@ -194,14 +206,14 @@ export function 校验发送方(值: unknown): string {
 export function 校验排序方向(值: unknown): 'ASC' | 'DESC' {
   const 文本 = 取可选字符串(值) ?? 'desc';
   if (!排序方向白名单.includes(文本)) {
-    throw new 校验失败(参数错误提示('pai_xu'));
+    抛参数错误('pai_xu');
   }
   return 文本 === 'asc' ? 'ASC' : 'DESC';
 }
 
 export function 校验白名单(字段标识: string, 值: string, 白名单: readonly string[]): string {
   if (!白名单.includes(值)) {
-    throw new 校验失败(参数错误提示(字段标识));
+    抛参数错误(字段标识);
   }
   return 值;
 }
@@ -209,7 +221,7 @@ export function 校验白名单(字段标识: string, 值: string, 白名单: re
 export function 校验天数(值: unknown, 上限 = 90): number {
   const 天数 = 取正整数(值 === undefined || 值 === '' ? 30 : 值, 30, 'tian_shu');
   if (天数 > 上限) {
-    throw new 校验失败(参数错误提示('tian_shu'));
+    抛参数错误('tian_shu');
   }
   return 天数;
 }

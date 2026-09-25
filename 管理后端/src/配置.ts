@@ -2,7 +2,9 @@ import dotenv from 'dotenv';
 import fs from 'node:fs';
 import path from 'node:path';
 
-dotenv.config();
+if (process.env.NODE_ENV !== 'test') {
+  dotenv.config();
+}
 
 export interface 管理后端配置 {
   端口: number;

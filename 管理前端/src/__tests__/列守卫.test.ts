@@ -337,6 +337,10 @@ vi.mock('../api/管理', () => ({
   我的身份: vi.fn().mockResolvedValue({ yong_hu_id: 'yi', jiao_se: 'chao_guan', neng_li: ['cha_kan'] }),
 }));
 
+vi.mock('../api/会话', () => ({
+  我的身份: vi.fn().mockResolvedValue({ yong_hu_id: 'yi', jiao_se: 'chao_guan', neng_li: ['cha_kan'] }),
+}));
+
 async function 挂账号列表(行: Record<string, unknown>[]) {
   const 接口 = await import('../api/管理');
   vi.mocked(接口.账号列表).mockResolvedValue({ 行, 分页: undefined });

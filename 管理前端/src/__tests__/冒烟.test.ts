@@ -9,16 +9,16 @@ import {
   业务错误,
   请求实例,
   归一请求错误,
-  取错误展示,
   传输错误,
+  前端错误码,
 } from '../api/请求';
+import { 取错误展示 } from '../api/错误展示';
+import { 管理登录 as 管理登录接口, 我的身份 as 我的身份接口 } from '../api/会话';
 import {
   思考说明 as 获取思考说明,
   封禁记录 as 封禁记录接口,
   账号封禁列表 as 账号封禁列表接口,
-  管理登录 as 管理登录接口,
   账号列表 as 账号列表接口,
-  我的身份 as 我的身份接口,
   type 思考说明,
 } from '../api/管理';
 import { 取管理角色文案, 管理角色选项 } from '../枚举映射';
@@ -26,6 +26,10 @@ import { 文案 } from '../文案/聚合';
 import { 注册守卫, 路由表 } from '../router';
 import 思考链 from '../views/思考链.vue';
 import App from '../App.vue';
+
+vi.mock('../api/探针', () => ({
+  就绪检查: vi.fn().mockResolvedValue({ zhuang_tai: 'jiu_xu', jiu_xu: true, kui: [] }),
+}));
 
 vi.mock('../api/管理', () => ({
   账号列表: vi.fn(),
@@ -71,7 +75,6 @@ vi.mock('../api/管理', () => ({
   留存统计: vi.fn().mockResolvedValue({}),
   用量统计: vi.fn().mockResolvedValue({}),
   埋点字典: vi.fn().mockResolvedValue({}),
-  就绪检查: vi.fn(),
   指标概览: vi.fn(),
   审核列表: vi.fn().mockResolvedValue({ 行: [] }),
   审核新建: vi.fn(),
@@ -79,6 +82,13 @@ vi.mock('../api/管理', () => ({
   审核复审: vi.fn(),
   审核多项处理: vi.fn(),
   处理记录列表: vi.fn().mockResolvedValue({ 行: [] }),
+}));
+
+vi.mock('../api/会话', () => ({
+  我的身份: vi.fn().mockResolvedValue({ yong_hu_id: 'yi', jiao_se: 'chao_guan', neng_li: ['cha_kan', 'feng_jin', 'feng_jin_shen_he', 'tong_ji_xie', 'gao_we'] }),
+  管理登录: vi.fn(),
+  刷新管理令牌: vi.fn().mockRejectedValue(new Error('wei-deng-lu')),
+  管理登出: vi.fn().mockResolvedValue({ yi_tui_chu: true }),
 }));
 
 const 线路说明符 = /from\s*['"]axios['"]|import\(['"]axios['"]\)/;
@@ -155,18 +165,37 @@ describe('登录态存储', () => {
     expect(axios引用清单()).toEqual([]);
     expect(依赖回流清单()).toEqual([]);
     const 未达 = 归一请求错误(new 传输错误('Failed to fetch', null, undefined, false));
-    expect(取错误展示(未达)).toEqual({ 提示: 文案.通用.请求失败, 错误码: '' });
-    const 过期 = 归一请求错误(new 传输错误('Request failed with status code 401', 401, '', false));
-    expect(取错误展示(过期)).toEqual({ 提示: 文案.通用.登录过期, 错误码: '' });
+    expect(取错误展示(未达)).toMatchObject({
+      消息: 文案.通用.网络中断,
+      错误码: 前端错误码.传输中断,
+      可重试: true,
+    });
+    const 过期 = 归一请求错误(new 传输错误('Request failed with status code 401', 401, '', true));
+    expect(取错误展示(过期)).toMatchObject({
+      消息: 文案.通用.登录过期,
+      错误码: 前端错误码.非包络响应,
+      可重试: false,
+    });
     const 带包络 = 归一请求错误(
       new 传输错误(
         'Request failed with status code 403',
         403,
-        { cheng_gong: false, shu_ju: null, ti_shi: '无管理身份，请联系超级管理员授予角色', cuo_wu_ma: 'WU_GUAN_LI_QUAN_XIAN' },
+        {
+          cheng_gong: false,
+          shu_ju: null,
+          code: 'WU_GUAN_LI_QUAN_XIAN',
+          message: '无管理身份，请联系超级管理员授予角色',
+          traceId: 'trace-server',
+          retryable: false,
+        },
         false,
       ),
     );
-    expect(取错误展示(带包络)).toEqual({ 提示: '无管理身份，请联系超级管理员授予角色', 错误码: 'WU_GUAN_LI_QUAN_XIAN' });
+    expect(取错误展示(带包络)).toMatchObject({
+      消息: '无管理身份，请联系超级管理员授予角色',
+      错误码: 'WU_GUAN_LI_QUAN_XIAN',
+      追踪编号: 'trace-server',
+    });
   });
 });
 
@@ -189,7 +218,14 @@ describe('包络解析', () => {
 
   it('失败包络抛出携带提示与错误码的业务错误', () => {
     try {
-      解析包络({ cheng_gong: false, shu_ju: null, ti_shi: '无权限', cuo_wu_ma: 'WU_GUAN_LI_QUAN_XIAN' });
+      解析包络({
+        cheng_gong: false,
+        shu_ju: null,
+        code: 'WU_GUAN_LI_QUAN_XIAN',
+        message: '无权限',
+        traceId: 'trace-server',
+        retryable: false,
+      });
       expect.unreachable();
     } catch (错误) {
       expect(错误).toBeInstanceOf(业务错误);

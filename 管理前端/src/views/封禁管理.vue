@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import { onBeforeUnmount, onMounted, ref } from 'vue';
 import { 封禁记录, 写入封禁, 账号封禁列表, 解封账号, 审核申诉, type 表格行 } from '../api/管理';
 import { 使用登录仓库 } from '../stores/登录';
-import { 取错误展示, type 分页信息 } from '../api/请求';
+import { 创建前端错误, type 分页信息 } from '../api/请求';
+import { 创建请求错误状态, 执行请求 } from '../api/错误展示';
 import { 默认每页条数, 默认页码 } from '../配置';
 import { 封禁级别默认, 封禁级别选项 } from '../枚举映射/封禁级别';
 import { 严重程度选项, 严重程度默认 } from '../枚举映射/严重程度';
@@ -21,8 +22,19 @@ const 登录仓库 = 使用登录仓库();
 const 行列表 = ref<表格行[]>([]);
 const 分页 = ref<分页信息 | undefined>(undefined);
 const 加载中 = ref(false);
-const 错误提示 = ref('');
-const 错误码 = ref('');
+const 错误状态 = 创建请求错误状态();
+const {
+  当前错误,
+  错误闸门,
+  清空: 清空错误,
+  显示: 显示错误,
+  作废: 作废错误,
+} = 错误状态;
+const 账号错误状态 = 创建请求错误状态();
+const {
+  当前错误: 账号错误,
+  作废: 作废账号错误,
+} = 账号错误状态;
 const 成功提示 = ref('');
 const 写入用户 = ref('');
 const 写入地址 = ref('');
@@ -33,39 +45,31 @@ const 写入解封时间 = ref('');
 const 账号封禁行 = ref<表格行[]>([]);
 const 账号封禁分页 = ref<分页信息 | undefined>(undefined);
 
-function 显示错误(错误: unknown): void {
-  const 展示 = 取错误展示(错误);
-  错误提示.value = 展示.提示;
-  错误码.value = 展示.错误码;
-}
-
 function 提示错误(文本: string): void {
-  错误提示.value = 文本;
-  错误码.value = '';
+  错误闸门.开始();
+  清空错误(创建前端错误(文本));
 }
 
 async function 查询(页码: number = 默认页码): Promise<void> {
-  加载中.value = true;
-  错误提示.value = '';
-  错误码.value = '';
-  try {
-    const 结果 = await 封禁记录({
+  await 执行请求(
+    错误状态,
+    加载中,
+    () => 封禁记录({
       ye_ma: 页码,
       mei_ye_tiao_shu: 默认每页条数,
       ip: 查询地址.value.trim() === '' ? undefined : 查询地址.value.trim(),
-    });
-    行列表.value = 结果.行;
-    分页.value = 结果.分页;
-  } catch (错误) {
-    显示错误(错误);
-  } finally {
-    加载中.value = false;
-  }
+    }),
+    (结果) => {
+      行列表.value = 结果.行;
+      分页.value = 结果.分页;
+    },
+    () => 查询(页码),
+  );
 }
 
 async function 提交封禁(): Promise<void> {
-  错误提示.value = '';
-  错误码.value = '';
+  const 批次 = 错误闸门.开始();
+  清空错误();
   成功提示.value = '';
   const 用户编号 = 写入用户.value.trim() === '' ? undefined : 写入用户.value.trim();
   const 地址 = 写入地址.value.trim() === '' ? undefined : 写入地址.value.trim();
@@ -94,30 +98,35 @@ async function 提交封禁(): Promise<void> {
     写入解封时间.value = '';
     await 查询();
   } catch (错误) {
-    显示错误(错误);
+    显示错误(错误, 批次, 提交封禁);
   }
 }
 
 async function 查询账号封禁(页码: number = 默认页码): Promise<void> {
-  try {
-    const 结果 = await 账号封禁列表({ ye_ma: 页码, mei_ye_tiao_shu: 默认每页条数 });
-    账号封禁行.value = 结果.行;
-    账号封禁分页.value = 结果.分页;
-  } catch (错误) {
-    显示错误(错误);
-  }
+  await 执行请求(
+    账号错误状态,
+    undefined,
+    () => 账号封禁列表({ ye_ma: 页码, mei_ye_tiao_shu: 默认每页条数 }),
+    (结果) => {
+      账号封禁行.value = 结果.行;
+      账号封禁分页.value = 结果.分页;
+    },
+    () => 查询账号封禁(页码),
+  );
 }
 
 async function 解封(用户编号: unknown): Promise<void> {
   if (typeof 用户编号 !== 'string' || 用户编号.length === 0) {
     return;
   }
+  const 批次 = 错误闸门.开始();
+  清空错误();
   try {
     await 解封账号({ yong_hu_id: 用户编号 });
     成功提示.value = 封禁文案.解封成功;
     await 查询账号封禁();
   } catch (错误) {
-    显示错误(错误);
+    显示错误(错误, 批次, () => 解封(用户编号));
   }
 }
 
@@ -125,12 +134,14 @@ async function 审核(用户编号: unknown, 通过: boolean): Promise<void> {
   if (typeof 用户编号 !== 'string' || 用户编号.length === 0) {
     return;
   }
+  const 批次 = 错误闸门.开始();
+  清空错误();
   try {
     await 审核申诉({ yong_hu_id: 用户编号, tong_guo: 通过 });
     成功提示.value = 通过 ? 封禁文案.申诉通过成功 : 封禁文案.申诉驳回成功;
     await 查询账号封禁();
   } catch (错误) {
-    显示错误(错误);
+    显示错误(错误, 批次, () => 审核(用户编号, 通过));
   }
 }
 
@@ -145,6 +156,11 @@ function 下一页(): void {
   const 当前 = 分页.value?.ye_ma ?? 默认页码;
   void 查询(当前 + 1);
 }
+
+onBeforeUnmount(() => {
+  作废错误();
+  作废账号错误();
+});
 
 onMounted(() => {
   void 查询();
@@ -164,8 +180,7 @@ onMounted(() => {
     />
     <XiaoXiTiao
       xing-tai="cuo-wu"
-      :wen-ben="错误提示"
-      :cuo-wu-ma="错误码"
+      :错误状态="错误状态"
     />
     <div class="双栏">
       <!-- FP-17 封禁写入按矩阵归 feng_jin（运营/超管）可见，级别以迁移为准禁正常态 -->
@@ -266,7 +281,7 @@ onMounted(() => {
         />
         <XiaoXiTiao
           xing-tai="kong"
-          :xian-shi="!加载中 && 行列表.length === 0"
+          :xian-shi="当前错误 === null && !加载中 && 行列表.length === 0"
         />
         <ShuJuBiaoGe
           :lie="列定义登记.封禁记录"
@@ -288,8 +303,12 @@ onMounted(() => {
       {{ 封禁文案.账号封禁标题 }}
     </h3>
     <XiaoXiTiao
+      xing-tai="cuo-wu"
+      :错误状态="账号错误状态"
+    />
+    <XiaoXiTiao
       xing-tai="kong"
-      :xian-shi="账号封禁行.length === 0"
+      :xian-shi="账号错误 === null && 账号封禁行.length === 0"
     />
     <ShuJuBiaoGe
       :lie="列定义登记.账号封禁"

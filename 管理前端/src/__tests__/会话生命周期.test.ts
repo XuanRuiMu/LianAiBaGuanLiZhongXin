@@ -18,19 +18,22 @@ import {
 } from '../stores/登录';
 import { 守卫判定, 注册守卫, 路由表 } from '../router';
 import { 业务错误 } from '../api/请求';
-import { 我的身份, 管理登录, 管理登出, 刷新管理令牌, type 当前身份, type 管理登录结果 } from '../api/管理';
+import { 我的身份, 管理登录, 管理登出, 刷新管理令牌, type 当前身份, type 管理登录结果 } from '../api/会话';
 import { 登录选项存储键, 记住账号存储键, 会话续期间隔毫秒 } from '../配置';
 import { 取文案 } from '../文案/聚合';
 import { 过渡前进 } from '../动效';
 import App from '../App.vue';
 
-vi.mock('../api/管理', () => ({
+vi.mock('../api/会话', () => ({
   管理登录: vi.fn(),
   管理登出: vi.fn().mockResolvedValue({ yi_tui_chu: true }),
   刷新管理令牌: vi.fn(),
   我的身份: vi.fn().mockResolvedValue({ yong_hu_id: 'yi', jiao_se: 'chao_guan', neng_li: ['cha_kan', 'gao_we'] }),
 }));
 
+vi.mock('../api/探针', () => ({
+  就绪检查: vi.fn().mockResolvedValue({ zhuang_tai: 'jiu_xu', jiu_xu: true, kui: [] }),
+}));
 const 选项键清单: (keyof 登录选项)[] = ['记住账号', '记住密码', '自动登录'];
 
 function 组合布尔(序号: number): 登录选项 {
@@ -493,7 +496,7 @@ describe('FP-03 死代码清除结论', () => {
     const 存储模块 = await import('../stores/登录');
     expect('存令牌' in 存储模块).toBe(false);
     expect(typeof 存储模块.使用登录仓库).toBe('function');
-    const 接口模块 = await import('../api/管理');
+    const 接口模块 = await import('../api/会话');
     expect(typeof 接口模块.刷新管理令牌).toBe('function');
     expect(typeof 接口模块.管理登出).toBe('function');
   });

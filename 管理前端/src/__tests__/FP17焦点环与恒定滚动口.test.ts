@@ -7,11 +7,15 @@ import App from '../App.vue';
 import { 路由表 } from '../router';
 import { 应用主题, 深色, 浅色 } from '../主题模式';
 
-vi.mock('../api/管理', () => ({
+vi.mock('../api/会话', () => ({
   我的身份: vi.fn().mockResolvedValue({ jiao_se: 'chao_guan', neng_li: ['cha_kan'] }),
   管理登录: vi.fn(),
   刷新管理令牌: vi.fn().mockRejectedValue(new Error('wei_deng_lu')),
   管理登出: vi.fn().mockResolvedValue({ yi_tui_chu: true }),
+}));
+
+vi.mock('../api/探针', () => ({
+  就绪检查: vi.fn().mockResolvedValue({ zhuang_tai: 'jiu_xu', jiu_xu: true, kui: [] }),
 }));
 
 /**
@@ -600,19 +604,29 @@ describe('FP-17③ 主题.css 已落地产物在解析层生效且不重复', ()
     现场.包装.unmount();
   });
 
-  it('滚动条套件全库只住 主题.css 一处，三档底色解析后可分辨、光标三态与 Firefox 分支独一份', async () => {
+  it('滚动条套件全库只住 主题.css 一处，三档底色解析后可分辨、光标全态为 default 与 Firefox 分支独一份', async () => {
     待撤.push(注入登录链样式());
     const 规则们 = 全部规则();
     const 本体 = 规则们.filter((项) => 末段(项.选择器).includes('::-webkit-scrollbar'));
     expect(new Set(本体.map((项) => 项.路径)), 本体.map((项) => 项.路径).join(',')).toEqual(new Set(['src/主题.css']));
     expect(本体.map((项) => 末段(项.选择器)).sort()).toEqual(
-      ['::-webkit-scrollbar', '::-webkit-scrollbar-corner', '::-webkit-scrollbar-thumb', '::-webkit-scrollbar-thumb:hover', '::-webkit-scrollbar-track'].sort(),
+      [
+        '::-webkit-scrollbar',
+        '::-webkit-scrollbar-corner',
+        '::-webkit-scrollbar-thumb',
+        '::-webkit-scrollbar-thumb:hover',
+        ':focus-visible::-webkit-scrollbar-thumb',
+        '::-webkit-scrollbar-track',
+      ].sort(),
     );
     const 取声明 = (选择器: string, 属性: string): string => 非空(本体.find((项) => 末段(项.选择器) === 选择器)?.声明.get(属性) ?? '', `${选择器} 的 ${属性}`);
     const 光标档: Record<string, string> = {
-      '::-webkit-scrollbar': 'default',
-      '::-webkit-scrollbar-thumb': 'grab',
-      '::-webkit-scrollbar-track': 'pointer',
+      '::-webkit-scrollbar': 'var(--条光标)',
+      '::-webkit-scrollbar-track': 'var(--条光标)',
+      '::-webkit-scrollbar-thumb': 'var(--条光标)',
+      '::-webkit-scrollbar-thumb:hover': 'var(--条光标)',
+      ':focus-visible::-webkit-scrollbar-thumb': 'var(--条光标)',
+      '::-webkit-scrollbar-corner': 'var(--条光标)',
     };
     for (const [选择器, 值] of Object.entries(光标档)) {
       expect(取声明(选择器, 'cursor'), `${选择器} 的 cursor 不是 ${值}`).toBe(值);
@@ -625,12 +639,12 @@ describe('FP-17③ 主题.css 已落地产物在解析层生效且不重复', ()
           expect(通道差和(三档[甲].rgb, 三档[乙].rgb), `${档} 档滚动条 ${['thumb', 'track', 'corner'][甲]}/${['thumb', 'track', 'corner'][乙]} 糊成一片`).toBeGreaterThanOrEqual(24);
         }
       }
-      expect(像素(令牌原值('--滚动条宽', 环境), '条宽', 环境)).toBeGreaterThanOrEqual(7);
+      expect(像素(令牌原值('--条宽', 环境), '条宽', 环境)).toBeGreaterThanOrEqual(7);
     }
     const 标准档 = 规则们.filter((项) => 项.声明.has('scrollbar-width') || 项.声明.has('scrollbar-color'));
     expect(标准档.map((项) => `${项.路径}#${项.选择器}`)).toHaveLength(1);
     expect(标准档[0]?.选择器.startsWith('@supports not selector(::-webkit-scrollbar) ⇒')).toBe(true);
-    expect(标准档[0]?.声明.get('scrollbar-color')).toBe('var(--淡墨) var(--面二)');
+    expect(标准档[0]?.声明.get('scrollbar-color')).toBe('var(--条滑块) var(--条轨道)');
   });
 
   it('appearance:none 只关文本框的原生外观，select/number/datetime-local/checkbox 的原生指示器保留', async () => {

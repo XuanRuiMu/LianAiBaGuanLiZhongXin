@@ -60,7 +60,7 @@ Backend security design: JWT auth + admin-permission middleware + global rate li
 
 ### Bundle size and browser baseline
 
-Vite measures the artifacts in memory at build time and writes `dist/build-stats.json`; `体积预算.test.ts` binds the measurement to the current sources via a source fingerprint: first-screen index gzip **48,670 B** (budget 49,160 B), first-screen raw **125,639 B** (budget 126,070 B), site-wide js+css gzip **84,046 B** (budget 84,530 B). On the browser side only `fetch` with `credentials:'include'` and `AbortSignal.timeout` are required (thresholds: [deploy manual §1.2](docs/部署手册.md)).
+Vite measures the artifacts in memory at build time and writes `dist/build-stats.json`; `体积预算.test.ts` binds the measurement to the current sources via a source fingerprint: first-screen index gzip **48,936 B** (hard limit 49,160 B), first-screen raw **125,143 B** (hard limit 126,070 B), site-wide js+css gzip **87,630 B** (budget 88,000 B, 370 B headroom). Compared with the pre-FP-15 baseline, the new chain adds **3,330 B** site-wide and **168 B** to the measured first-screen lock; first-screen remains below its hard limit. On the browser side only `fetch` with `credentials:'include'` and `AbortSignal.timeout` are required (thresholds: [deploy manual §1.2](docs/部署手册.md)).
 
 ---
 

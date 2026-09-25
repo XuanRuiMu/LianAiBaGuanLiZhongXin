@@ -1,8 +1,8 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import fs from 'node:fs';
 import { createPinia, setActivePinia } from 'pinia';
 import { createMemoryHistory, createRouter, type Router } from 'vue-router';
-import { flushPromises, mount } from '@vue/test-utils';
+import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils';
 import { 文案, 取文案 } from '../文案/聚合';
 import {
   严重程度默认,
@@ -14,7 +14,12 @@ import {
 } from '../枚举映射';
 import { 通用文案 } from '../文案/通用';
 import { 单元格文本, 列定义登记, 表头文本, type 列, type 表名 } from '../列定义';
-import { 业务错误, 取错误展示, 归一请求错误, 解析包络, 传输错误 } from '../api/请求';
+import {
+  创建前端错误,
+  前端错误码,
+  解析包络,
+} from '../api/请求';
+import { 取错误展示 } from '../api/错误展示';
 import { 使用登录仓库 } from '../stores/登录';
 import { 路由表 } from '../router';
 import XiaoXiTiao from '../components/XiaoXiTiao.vue';
@@ -202,8 +207,8 @@ function 扫描说明字段(源: string, 允许: readonly string[]): string[] {
 
 function 扫描错误码接线(源: string): string[] {
   const 违例: string[] = [];
-  if (/xing-tai="cuo-wu"/.test(源) && !/:cuo-wu-ma="错误码"/.test(源)) {
-    违例.push('错误条未接服务端错误码');
+  if (/xing-tai="cuo-wu"/.test(源) && !/(?::错误展示|:错误状态)=/.test(源)) {
+    违例.push('错误条未接结构化错误展示对象');
   }
   if (/instanceof Error/.test(源)) {
     违例.push('页面自行拆分错误，未走 取错误展示 单点');
@@ -419,6 +424,10 @@ async function 建路由(路径: string): Promise<Router> {
   return 路由器;
 }
 
+vi.mock('../api/探针', () => ({
+  就绪检查: vi.fn().mockResolvedValue({ zhuang_tai: 'jiu_xu', jiu_xu: true, kui: [] }),
+}));
+
 vi.mock('../api/管理', () => ({
   账号列表: vi.fn().mockResolvedValue({ 行: [], 分页: undefined }),
   账号详情: vi.fn().mockResolvedValue({}),
@@ -463,7 +472,6 @@ vi.mock('../api/管理', () => ({
   留存统计: vi.fn().mockResolvedValue({ lie_biao: [] }),
   用量统计: vi.fn().mockResolvedValue({ lie_biao: [] }),
   埋点字典: vi.fn().mockResolvedValue({}),
-  就绪检查: vi.fn(),
   指标概览: vi.fn(),
   审核列表: vi.fn().mockResolvedValue({ 行: [], 分页: undefined }),
   审核新建: vi.fn(),
@@ -473,13 +481,37 @@ vi.mock('../api/管理', () => ({
   处理记录列表: vi.fn().mockResolvedValue({ 行: [], 分页: undefined }),
 }));
 
+vi.mock('../api/会话', () => ({
+  我的身份: vi.fn().mockResolvedValue({ yong_hu_id: 'yi', jiao_se: 'chao_guan', neng_li: ['cha_kan', 'gao_we'] }),
+  管理登录: vi.fn(),
+  刷新管理令牌: vi.fn().mockRejectedValue(new Error('wei-deng-lu')),
+  管理登出: vi.fn().mockResolvedValue({ yi_tui_chu: true }),
+}));
+
 const 接口 = await import('../api/管理');
 
+// 视图守卫按文件跑在同一 worker：自动卸载上一用例的挂载树，避免异步尾巴落进下一条断言
+enableAutoUnmount(afterEach);
+
 beforeEach(() => {
-  setActivePinia(createPinia());
-  window.localStorage.clear();
+  setActivePinia(createPinia());  window.localStorage.clear();
   window.sessionStorage.clear();
   vi.clearAllMocks();
+  vi.mocked(接口.账号列表).mockReset().mockResolvedValue({ 行: [], 分页: undefined });
+  vi.mocked(接口.聊天消息).mockReset().mockResolvedValue({ 行: [], 分页: undefined });
+  vi.mocked(接口.思考记录列表).mockReset().mockResolvedValue({ 行: [], 分页: undefined });
+  vi.mocked(接口.思考记录详情).mockReset();
+  vi.mocked(接口.思考说明).mockReset().mockResolvedValue({
+    you_du_li_si_kao_chi_jiu_hua_biao: true,
+    sheng_ming: '思考链回放口径',
+    hui_fang_zhun_ze: '回放以已保存记录为准',
+    shi_shi_shi_jian: [],
+    shi_shi_shuo_ming: '实时说明',
+    dan_tiao_jie_duan_zi_fu_shu: 1500,
+    yi_chi_jiu_hua_cha_xun: [],
+    dai_bu_chong_shuo_ming: '',
+    dai_bu_chong: [],
+  });
   使用登录仓库().设置身份('chao_guan', ['cha_kan', 'gao_we']);
 });
 
@@ -526,126 +558,121 @@ describe('FP-04 登录页与应用外壳不再渲染装饰文字', () => {
   });
 });
 
-describe('FP-04 错误码上屏', () => {
-  it('错误条在有码时拼成提示（错误码），无码时不留空括号', () => {
-    const 有码 = mount(XiaoXiTiao, {
-      props: {
-        xingTai: 'cuo-wu',
-        wenBen: '当前账号无此权限',
-        cuoWuMa: 'WU_GUAN_LI_QUAN_XIAN',
-        ceShiBiaoShi: 'cuo-wu-ti-shi',
-      },
+describe('FP-15 结构化错误展示', () => {
+  it('错误条结构化展示消息、错误码、影响、下一步、可重试性与追踪编号', () => {
+    const 展示 = 取错误展示(创建前端错误('当前账号无此权限', 'WU_GUAN_LI_QUAN_XIAN', false));
+    const 包装 = mount(XiaoXiTiao, {
+      props: { xingTai: 'cuo-wu', 错误展示: 展示, ceShiBiaoShi: 'cuo-wu-ti-shi' },
     });
-    expect(有码.text()).toBe('当前账号无此权限（WU_GUAN_LI_QUAN_XIAN）');
-    expect(有码.classes()).toContain('错误条');
-    expect(有码.attributes('role')).toBe('alert');
-    expect(有码.attributes('aria-live')).toBe('polite');
-    expect(有码.attributes('data-testid')).toBe('cuo-wu-ti-shi');
-    const 无码 = mount(XiaoXiTiao, { props: { xingTai: 'cuo-wu', wenBen: '请求失败，请稍后再试' } });
-    expect(无码.text()).toBe('请求失败，请稍后再试');
-    expect(无码.text()).not.toContain('（）');
-    expect(无码.text()).not.toContain('undefined');
+    const 文本 = 包装.text();
+    expect(文本).toContain('当前账号无此权限');
+    expect(文本).toContain('WU_GUAN_LI_QUAN_XIAN');
+    expect(文本).toContain(展示.影响);
+    expect(文本).toContain(展示.下一步);
+    expect(文本).toContain(展示.追踪编号);
+    expect(文本).toContain(通用文案.不可重试);
+    expect(包装.find('[role="alert"]').exists()).toBe(true);
+    expect(包装.find('[data-testid="cuo-wu-ti-shi"]').exists()).toBe(true);
+    expect(包装.get('[data-testid="cuo-wu-chong-shi"]').attributes('hidden')).toBeDefined();
   });
 
-  it('取错误展示是提示与错误码的唯一拆分点，且前端不自造码', () => {
-    expect(取错误展示(new 业务错误('无权限', 'A-4031'))).toEqual({ 提示: '无权限', 错误码: 'A-4031' });
-    expect(取错误展示(new Error('网络不可达'))).toEqual({ 提示: '网络不可达', 错误码: '' });
-    expect(取错误展示('未知')).toEqual({ 提示: 取文案('通用', '请求失败'), 错误码: '' });
-    try {
-      解析包络({ cheng_gong: false, shu_ju: null, ti_shi: '无权限', cuo_wu_ma: 'A-4031' });
-      expect.unreachable();
-    } catch (错误) {
-      expect(取错误展示(错误).错误码).toBe('A-4031');
-    }
-    try {
-      解析包络({ cheng_gong: false, shu_ju: null, ti_shi: '', cuo_wu_ma: '' });
-      expect.unreachable();
-    } catch (错误) {
-      const 展示 = 取错误展示(错误);
-      expect(展示.提示).toBe(取文案('通用', '请求失败'));
-      expect(展示.错误码).toBe('');
-      expect(展示.错误码).not.toMatch(/CUO_WU/);
-      expect(mount(XiaoXiTiao, { props: { xingTai: 'cuo-wu', wenBen: 展示.提示, cuoWuMa: 展示.错误码 } }).text()).not.toContain('（');
-    }
-    try {
-      解析包络({ cheng_gong: true, shu_ju: null });
-      expect.unreachable();
-    } catch (错误) {
-      const 展示 = 取错误展示(错误);
-      expect(展示.提示).toBe(取文案('通用', '请求失败'));
-      expect(展示.错误码).toBe('');
+  it('可重试错误显示语义明确的当前操作重试按钮并派发事件', async () => {
+    const 展示 = 取错误展示(创建前端错误('网络连接已中断', 前端错误码.传输中断, true));
+    const 包装 = mount(XiaoXiTiao, { props: { xingTai: 'cuo-wu', 错误展示: 展示 } });
+    const 按钮 = 包装.get('[data-testid="cuo-wu-chong-shi"]');
+    expect(按钮.text()).toBe(通用文案.重试当前操作);
+    await 按钮.trigger('click');
+    expect(包装.emitted('重试')).toHaveLength(1);
+  });
+
+  it('取错误展示是唯一拆分点，任何失败都保留稳定非空码', () => {
+    expect(取错误展示(new Error('Failed to fetch')).错误码).toBe(前端错误码.未归类);
+    expect(取错误展示('未知').错误码).toBe(前端错误码.未归类);
+    const 本地 = 创建前端错误('请填写手机号', 前端错误码.本地校验, false);
+    expect(取错误展示(本地)).toMatchObject({
+      消息: '请填写手机号',
+      错误码: 前端错误码.本地校验,
+      可重试: false,
+    });
+    for (const 错误 of [new Error('boom'), 'boom', 解析包络]) {
+      expect(取错误展示(错误).错误码).not.toBe('');
     }
   });
 
-  it('无失败包络的英文错误不得上屏，渲染文本除错误码括号外不含拉丁字母', () => {
-    for (const 原文 of [
-      'Network Error',
-      'The operation was aborted due to timeout',
-      'Request failed with status code 500',
-    ]) {
-      const 裸英文 = new Error(原文);
-      const 展示 = 取错误展示(裸英文);
-      expect(展示.提示).toBe(取文案('通用', '请求失败'));
-      expect(展示.错误码).toBe('');
-      const 包装 = mount(XiaoXiTiao, { props: { xingTai: 'cuo-wu', wenBen: 展示.提示, cuoWuMa: 展示.错误码 } });
-      expect(包装.text()).toBe(取文案('通用', '请求失败'));
-      expect(包装.text()).not.toMatch(/[A-Za-z]/);
-      expect(包装.text()).not.toContain(原文);
-      expect(包装.text()).not.toContain('（');
-      const 带码 = 取错误展示(new 业务错误(原文, 'NEI_BU_CUO_WU'));
-      expect(带码.提示).toBe(取文案('通用', '请求失败'));
-      expect(带码.错误码).toBe('NEI_BU_CUO_WU');
-      const 带码包装 = mount(XiaoXiTiao, { props: { xingTai: 'cuo-wu', wenBen: 带码.提示, cuoWuMa: 带码.错误码 } });
-      expect(带码包装.text).toBeDefined();
-      expect(带码包装.text().replace(/（[A-Z_]+）$/, '')).not.toMatch(/[A-Za-z]/);
-      expect(带码包装.text()).toBe(`${取文案('通用', '请求失败')}（NEI_BU_CUO_WU）`);
-    }
-    expect(取错误展示(new Error('请填写用户编号或 IP 地址')).提示).toBe('请填写用户编号或 IP 地址');
-    for (const 原文 of ['Network Error', 'The operation was aborted due to timeout']) {
-      const 展示 = 取错误展示(归一请求错误(new 传输错误(原文, null, undefined, false)));
-      expect(展示).toEqual({ 提示: 取文案('通用', '请求失败'), 错误码: '' });
-      const 包装 = mount(XiaoXiTiao, { props: { xingTai: 'cuo-wu', wenBen: 展示.提示, cuoWuMa: 展示.错误码 } });
-      expect(包装.text()).not.toMatch(/[A-Za-z]/);
-      expect(包装.text()).not.toContain(原文);
-    }
-    const 网关 = 归一请求错误(
-      new 传输错误('Request failed with status code 504', 504, '<html>Gateway Time-out</html>', false),
+  it('内部原文、路径与第三方信息不进入最终中文界面', () => {
+    const 危险 = 创建前端错误(
+      'SELECT password FROM users at D:\\service\\api.js Redis token=秘密',
+      'NEI_BU_CUO_WU',
+      true,
     );
-    expect(取错误展示(网关)).toEqual({ 提示: 取文案('通用', '请求失败'), 错误码: '' });
-    const 过期 = 归一请求错误(new 传输错误('Request failed with status code 401', 401, '', false));
-    expect(取错误展示(过期)).toEqual({ 提示: 取文案('通用', '登录过期'), 错误码: '' });
-    const 带包络 = 归一请求错误(
-      new 传输错误('Request failed with status code 403', 403, {
-        cheng_gong: false,
-        shu_ju: null,
-        ti_shi: '当前账号没有管理身份',
-        cuo_wu_ma: 'WU_GUAN_LI_QUAN_XIAN',
-      }, false),
-    );
-    expect(取错误展示(带包络)).toEqual({ 提示: '当前账号没有管理身份', 错误码: 'WU_GUAN_LI_QUAN_XIAN' });
+    const 展示 = 取错误展示(危险);
+    const 包装 = mount(XiaoXiTiao, { props: { xingTai: 'cuo-wu', 错误展示: 展示 } });
+    expect(展示.消息).toBe(通用文案.请求失败);
+    expect(包装.text()).not.toMatch(/SELECT|password|Redis|token|D:\\|api\.js/i);
   });
 
-  it('账号列表与登录页把服务端错误码带到错误条上', async () => {
-    vi.mocked(接口.账号列表).mockRejectedValue(new 业务错误('当前账号无此权限', 'WU_GUAN_LI_QUAN_XIAN'));
+  it('可重试网络错误在账号列表点击后只重放最新查询', async () => {
+    vi.mocked(接口.账号列表)
+      .mockRejectedValueOnce(创建前端错误('网络连接已中断', 前端错误码.传输中断, true))
+      .mockResolvedValueOnce({ 行: [{ ID: '新行', 昵称: '重试成功' }], 分页: undefined });
     const { default: 账号列表页 } = await import('../views/账号列表.vue');
     const 包装 = mount(账号列表页, { global: { plugins: [await 建路由('/zhang-hao')] } });
     await flushPromises();
-    expect(包装.find('.错误条').text()).toBe('当前账号无此权限（WU_GUAN_LI_QUAN_XIAN）');
-
-    vi.mocked(接口.管理登录).mockRejectedValue(new Error('网络不可达'));
-    const { default: 登录页 } = await import('../views/登录页.vue');
-    const 登录包装 = mount(登录页, { global: { plugins: [createPinia(), await 建路由('/deng-lu')] } });
-    await 登录包装.find('[data-testid="shou-ji-hao-shu-ru"]').setValue('13800000000');
-    await 登录包装.find('[data-testid="mi-ma-shu-ru"]').setValue('mi-ma-123');
-    await 登录包装.find('[data-testid="deng-lu-an-niu"]').trigger('click');
+    const 重试 = 包装.findAll('[data-testid="cuo-wu-chong-shi"]').find((项) => 项.attributes('hidden') === undefined);
+    expect(重试?.text()).toBe(通用文案.重试当前操作);
+    const 重试前次数 = vi.mocked(接口.账号列表).mock.calls.length;
+    await 重试?.trigger('click');
     await flushPromises();
-    expect(登录包装.find('[data-testid="cuo-wu-ti-shi"]').text()).toBe('网络不可达');
+    expect(重试前次数).toBe(1);
+    expect(vi.mocked(接口.账号列表)).toHaveBeenCalledTimes(2);
+    expect(包装.text()).toContain('重试成功');
+    await vi.waitFor(() => {
+      expect(包装.find('.错误详情').exists()).toBe(false);
+    });
   });
 
-  it('成功条与空态不带错误码', () => {
+  it('并发请求的旧错误不得覆盖新结果', async () => {
+    let 拒绝旧请求: (原因: unknown) => void = () => undefined;
+    let 完成新请求: (值: { 行: Array<Record<string, unknown>>; 分页: undefined }) => void = () => undefined;
+    const 旧请求 = new Promise<{ 行: Array<Record<string, unknown>>; 分页: undefined }>((_解决, 拒绝) => {
+      拒绝旧请求 = 拒绝;
+    });
+    const 新请求 = new Promise<{ 行: Array<Record<string, unknown>>; 分页: undefined }>((解决) => {
+      完成新请求 = 解决;
+    });
+    vi.mocked(接口.账号列表).mockReturnValueOnce(旧请求).mockReturnValueOnce(新请求);
+    const { default: 账号列表页 } = await import('../views/账号列表.vue');
+    const 包装 = mount(账号列表页, { global: { plugins: [await 建路由('/zhang-hao')] } });
+    const 查询按钮 = 包装.findAll('button').find((项) => 项.text().includes(通用文案.查询));
+    await 查询按钮?.trigger('click');
+    完成新请求({ 行: [{ ID: '新行', 昵称: '新页面结果' }], 分页: undefined });
+    await flushPromises();
+    拒绝旧请求(创建前端错误('旧请求失败', 前端错误码.请求超时, true));
+    await flushPromises();
+    expect(包装.text()).toContain('新页面结果');
+    expect(包装.find('.错误详情').exists()).toBe(false);
+  });
+
+  it('切换路由并卸载旧页后，旧请求错误不得污染新页', async () => {
+    let 拒绝旧请求: (原因: unknown) => void = () => undefined;
+    const 旧请求 = new Promise<{ 行: Array<Record<string, unknown>>; 分页: undefined }>((_解决, 拒绝) => {
+      拒绝旧请求 = 拒绝;
+    });
+    vi.mocked(接口.账号列表).mockReturnValueOnce(旧请求);
+    const { default: 账号列表页 } = await import('../views/账号列表.vue');
+    const { default: 登录页 } = await import('../views/登录页.vue');
+    const 旧页 = mount(账号列表页, { global: { plugins: [await 建路由('/zhang-hao')] } });
+    const 新页 = mount(登录页, { global: { plugins: [createPinia(), await 建路由('/deng-lu')] } });
+    旧页.unmount();
+    拒绝旧请求(创建前端错误('旧页面错误', 前端错误码.请求超时, true));
+    await flushPromises();
+    expect(新页.find('.错误详情').exists()).toBe(false);
+  });
+
+  it('成功条与空态保持原行为', () => {
     const 成功 = mount(XiaoXiTiao, { props: { xingTai: 'cheng-gong', wenBen: 取文案('账号', '授予角色成功') } });
     expect(成功.text()).toBe(取文案('账号', '授予角色成功'));
-    const 空 = mount(XiaoXiTiao, { props: { xingTai: 'kong', cuoWuMa: 'WU_GUAN_LI_QUAN_XIAN' } });
+    const 空 = mount(XiaoXiTiao, { props: { xingTai: 'kong', 错误展示: null } });
     expect(空.text()).toBe(取文案('通用', '暂无数据'));
   });
 });
@@ -880,12 +907,15 @@ describe('FP-05 三视图渲染收口', () => {
     expect(文本.split(取文案('思考', '实时推送提示'))).toHaveLength(2);
   });
 
-  it('聊天记录把服务端错误码带到错误条', async () => {
-    vi.mocked(接口.聊天消息).mockRejectedValue(new 业务错误('数据表尚未就绪，无法查询', 'BIAO_QUE_SHI_JIANG_JI'));
+  it('聊天记录把服务端错误码带到结构化错误条', async () => {
+    vi.mocked(接口.聊天消息).mockRejectedValue(
+      创建前端错误('数据表尚未就绪，无法查询', 'BIAO_QUE_SHI_JIANG_JI', true),
+    );
     const { default: 聊天记录页 } = await import('../views/聊天记录.vue');
     const 包装 = mount(聊天记录页);
     await flushPromises();
-    expect(包装.find('.错误条').text()).toBe('数据表尚未就绪，无法查询（BIAO_QUE_SHI_JIANG_JI）');
+    expect(包装.find('.错误详情').text()).toContain('数据表尚未就绪，无法查询');
+    expect(包装.find('.错误详情').text()).toContain('BIAO_QUE_SHI_JIANG_JI');
   });
 
   it('封禁管理的两个 IP 地址输入分处具名组，互斥组标题下渲染组说明', async () => {
@@ -1382,6 +1412,18 @@ function 令牌表(块: string): Record<string, string> {
   return 表;
 }
 
+function 解析令牌值(值: string, 表: Record<string, string>): string {
+  let 当前 = 值;
+  for (let 轮 = 0; 轮 < 8 && 当前.startsWith('var('); 轮++) {
+    const 名 = /^var\((--[^)]+)\)$/.exec(当前)?.[1]?.slice(2);
+    if (名 === undefined || 表[名] === undefined) {
+      break;
+    }
+    当前 = 表[名];
+  }
+  return 当前;
+}
+
 function 十六进制(值: string): number[] | null {
   const 匹 = /^#([0-9a-f]{6})$/i.exec(值);
   if (匹 === null) {
@@ -1426,7 +1468,7 @@ function 焦点反馈缺陷(样式: string): string[] {
 
 function 滚动条缺陷(样式: string): string[] {
   const 缺: string[] = [];
-  const 宽匹 = /--滚动条宽:\s*(\d+(?:\.\d+)?)px/.exec(样式);
+  const 宽匹 = /--条宽:\s*(\d+(?:\.\d+)?)px/.exec(样式);
   if (宽匹 === null || Number(宽匹[1]) < 7) {
     缺.push(`滚动条条宽 ${宽匹?.[1] ?? '未声明'}px 不足 7px`);
   }
@@ -1445,9 +1487,9 @@ function 滚动条缺陷(样式: string): string[] {
     缺.push(`thumb/track/corner 三档令牌必须互不相同，实为 ${档名.join(',')}`);
   }
   const 光标档: Record<string, string> = {
-    '::-webkit-scrollbar': 'default',
-    '::-webkit-scrollbar-thumb': 'grab',
-    '::-webkit-scrollbar-track': 'pointer',
+    '::-webkit-scrollbar': 'var(--条光标)',
+    '::-webkit-scrollbar-thumb': 'var(--条光标)',
+    '::-webkit-scrollbar-track': 'var(--条光标)',
   };
   for (const [选择器, 值] of Object.entries(光标档)) {
     if (!规则块(样式, 选择器).includes(`cursor: ${值}`)) {
@@ -1458,12 +1500,12 @@ function 滚动条缺陷(样式: string): string[] {
     缺.push('scrollbar-width 泄漏到 @supports 分支之外，Chromium 会放弃自绘档');
   }
   const 分支 = /@supports not selector\(::-webkit-scrollbar\) \{([\s\S]*?)\n\}/.exec(样式)?.[1] ?? '';
-  if (!分支.includes('scrollbar-width: thin') || !分支.includes('scrollbar-color: var(--淡墨) var(--面二)')) {
+  if (!分支.includes('scrollbar-width: thin') || !分支.includes('scrollbar-color: var(--条滑块) var(--条轨道)')) {
     缺.push('缺 Firefox 标准档分支（scrollbar-width + scrollbar-color）');
   }
   for (const 档 of ['浅', '深']) {
     const 令牌 = 令牌表(规则块(样式, 档 === '浅' ? ':root' : '.dark'));
-    const 取色 = (名: string) => 十六进制(令牌[名] ?? '');
+    const 取色 = (名: string) => 十六进制(解析令牌值(令牌[名] ?? '', 令牌));
     const 底 = 取色(档色['corner'] ?? '');
     const 轨 = 取色(档色['track'] ?? '');
     const 块 = 取色(档色['thumb'] ?? '');
@@ -1494,7 +1536,7 @@ function 原生外观缺陷(样式: string): string[] {
   if (!/input\.输入:not\(\[type='number'\], \[type='datetime-local'\]\)/.test(样式)) {
     缺.push('未把 number 与 datetime-local 排除在 appearance:none 之外，原生步进器与日历指示器会被抹掉');
   }
-  const 填块 = 规则块(样式, 'input.输入:-webkit-autofill');
+  const 填块 = 规则块(样式, 'input.输入:-webkit-autofill, textarea:-webkit-autofill');
   if (!填块.includes('-webkit-text-fill-color') || !/transition:\s*background-color/.test(填块)) {
     缺.push('缺 :-webkit-autofill 兜底（文本色 + 背景色长过渡）');
   }
@@ -1576,13 +1618,13 @@ describe('FP-17 管理端等价修复：色方案/焦点环/滚动条/居中单�
   });
 
   it('反证：条宽压到 4px、撤掉 Firefox 分支、把 outline:none 塞回输入框、appearance 抹到 select 上，都必须判红', () => {
-    expect(滚动条缺陷(主题样式表.replace('--滚动条宽: 10px', '--滚动条宽: 4px'))).not.toEqual([]);
+    expect(滚动条缺陷(主题样式表.replace('--条宽: 10px', '--条宽: 4px'))).not.toEqual([]);
     expect(滚动条缺陷(主题样式表.replace(/@supports not selector\(::-webkit-scrollbar\) \{[\s\S]*?\n\}/, ''))).not.toEqual([]);
-    expect(滚动条缺陷(主题样式表.replace('cursor: grab', 'cursor: text'))).not.toEqual([]);
-    expect(滚动条缺陷(主题样式表.replace('background: var(--淡墨);\n  border-radius', 'background: var(--面二);\n  border-radius'))).not.toEqual([]);
+    expect(滚动条缺陷(主题样式表.replace('cursor: var(--条光标)', 'cursor: text'))).not.toEqual([]);
+    expect(滚动条缺陷(主题样式表.replace('background: var(--条滑块);', 'background: var(--条轨道);'))).not.toEqual([]);
     expect(焦点反馈缺陷(`${主题样式表}\n.输入:focus{outline:none}`)).not.toEqual([]);
     expect(焦点反馈缺陷(主题样式表.replace('outline: var(--焦点环宽) solid var(--焦点环色)', 'outline: 2px solid var(--印)'))).not.toEqual([]);
-    expect(焦点反馈缺陷(主题样式表.replace('  --焦点环色: var(--印);\n', ''))).not.toEqual([]);
+    expect(焦点反馈缺陷(主题样式表.replace(/^\s*--焦点环色:\s*var\(--印\);\r?\n/m, ''))).not.toEqual([]);
     expect(原生外观缺陷(主题样式表.replace('input.输入:not', '.输入:not'))).not.toEqual([]);
     expect(色方案缺陷(主题样式表.replace('color-scheme: dark', 'color-scheme: light'))).not.toEqual([]);
     expect(色方案缺陷(主题样式表.replace(':root {', '.dark {'))).not.toEqual([]);

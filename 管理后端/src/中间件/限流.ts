@@ -81,8 +81,12 @@ function 创建限流器(默认窗口毫秒: number, 默认上限: number, 选�
     // YH-016 限流迁Redis：有缓存走共享计数，无缓存回退内存（测试/单机）
     ...(缓存 ? { store: 取缓存作存储(缓存) as never } : {}),
     keyGenerator: (请求: Request): string => 取请求标识(请求),
-    handler: (_请求: Request, 响应: Response): void => {
-      失败响应(响应, 429, 取文案('通用', '请求过于频繁'), 错误码.请求过频);
+    handler: (请求: Request, 响应: Response): void => {
+      const 限流信息 = (请求 as Request & { rateLimit?: { resetTime?: Date } }).rateLimit;
+      const retryAfterMs = 限流信息?.resetTime === undefined
+        ? 选项.窗口毫秒 ?? 默认窗口毫秒
+        : Math.max(0, 限流信息.resetTime.getTime() - Date.now());
+      失败响应(响应, 429, 取文案('通用', '请求过于频繁'), 错误码.请求过频, { retryAfterMs });
     },
   });
 }

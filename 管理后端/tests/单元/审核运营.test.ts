@@ -30,7 +30,7 @@ describe('FP-11审核运营', () => {
     expect(响应.status).toBe(400);
   });
 
-  it('举报一审二审状态机：二审越级404', async () => {
+  it('举报一审二审状态机：二审越级409', async () => {
     const 越级池 = 创建模拟池((文本) => {
       if (文本.includes('SELECT "管理员"')) return [{ 管理员: true, 运营: false, 审核员: false }];
       if (文本.includes('COUNT(*)')) return [{ 总数: '1' }];
@@ -44,7 +44,7 @@ describe('FP-11审核运营', () => {
     expect(新建.status).toBe(201);
     const 目标编号 = String((新建.body.shu_ju as Record<string, unknown>)['mu_biao_id'] ?? 有效编号);
     const 越级 = await request(应用).post('/api/guan-li/ju-bao-er-shen').set(头).send({ mu_biao_id: 目标编号, tong_guo: true });
-    expect(越级.status).toBe(404);
+    expect(越级.status).toBe(409);
   });
 
   it('举报一审通过转二审并记双留痕', async () => {
@@ -133,7 +133,7 @@ describe('FP-11审核运营', () => {
   });
 
   it('埋点字典二十事件版本校验', async () => {
-    const { 埋点事件字典, 校验埋点事件 } = await import('../../src/埋点');
+    const { 埋点事件字典, 校验埋点事件 } = await import('../../src/埋点.js');
     expect(埋点事件字典.length).toBeGreaterThanOrEqual(20);
     const 名称集合 = new Set(埋点事件字典.map((项) => 项.名称));
     expect(名称集合.size).toBe(埋点事件字典.length);

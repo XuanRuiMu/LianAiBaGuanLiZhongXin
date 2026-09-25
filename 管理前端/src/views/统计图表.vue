@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { 注册统计, 消息统计, 好感度统计, 留存统计, 用量统计, type 表格行 } from '../api/管理';
-import { 取错误展示 } from '../api/请求';
+import { 创建前端错误 } from '../api/请求';
+import { 创建请求错误状态, 执行请求 } from '../api/错误展示';
 import { 统计默认天数 } from '../配置';
 import { 单元格文本, 命名值文本, 表头文本, 列定义登记, 取列映射 } from '../列定义';
 import YeMei from '../components/YeMei.vue';
@@ -26,18 +27,16 @@ const 留存行 = ref<表格行[]>([]);
 const 用量行 = ref<表格行[]>([]);
 const 注册总数 = ref<number | null>(null);
 const 加载中 = ref(false);
-const 错误提示 = ref('');
-const 错误码 = ref('');
-
-function 显示错误(错误: unknown): void {
-  const 展示 = 取错误展示(错误);
-  错误提示.value = 展示.提示;
-  错误码.value = 展示.错误码;
-}
+const 错误状态 = 创建请求错误状态();
+const {
+  当前错误,
+  错误闸门,
+  清空: 清空错误,
+  作废: 作废错误,
+} = 错误状态;
 
 function 提示错误(文本: string): void {
-  错误提示.value = 文本;
-  错误码.value = '';
+  清空错误(创建前端错误(文本));
 }
 
 function 取数值(行: 表格行, 键: string | null): number {
@@ -156,32 +155,35 @@ function 阶段条宽(行: 表格行): number {
 async function 查询(): Promise<void> {
   const 天 = Number(天数.value);
   if (!Number.isInteger(天) || 天 <= 0 || 天 > 90) {
+    错误闸门.开始();
     提示错误(通用文案.请求失败);
     return;
   }
-  加载中.value = true;
-  错误提示.value = '';
-  错误码.value = '';
-  try {
-    const [注册包, 消息包, 好感, 留存包, 用量包] = await Promise.all([
+  await 执行请求(
+    错误状态,
+    加载中,
+    () => Promise.all([
       注册统计(天),
       消息统计(天),
       好感度统计(),
       留存统计(天),
       用量统计(),
-    ]);
-    注册行.value = Array.isArray(注册包['lie_biao']) ? (注册包['lie_biao'] as 表格行[]) : [];
-    注册总数.value = typeof 注册包['zong_shu'] === 'number' ? (注册包['zong_shu'] as number) : null;
-    消息行.value = Array.isArray(消息包['lie_biao']) ? (消息包['lie_biao'] as 表格行[]) : [];
-    好感度.value = 好感;
-    留存行.value = Array.isArray(留存包['lie_biao']) ? (留存包['lie_biao'] as 表格行[]) : [];
-    用量行.value = Array.isArray(用量包['lie_biao']) ? (用量包['lie_biao'] as 表格行[]) : [];
-  } catch (错误) {
-    显示错误(错误);
-  } finally {
-    加载中.value = false;
-  }
+    ]),
+    ([注册包, 消息包, 好感, 留存包, 用量包]) => {
+      注册行.value = Array.isArray(注册包['lie_biao']) ? (注册包['lie_biao'] as 表格行[]) : [];
+      注册总数.value = typeof 注册包['zong_shu'] === 'number' ? (注册包['zong_shu'] as number) : null;
+      消息行.value = Array.isArray(消息包['lie_biao']) ? (消息包['lie_biao'] as 表格行[]) : [];
+      好感度.value = 好感;
+      留存行.value = Array.isArray(留存包['lie_biao']) ? (留存包['lie_biao'] as 表格行[]) : [];
+      用量行.value = Array.isArray(用量包['lie_biao']) ? (用量包['lie_biao'] as 表格行[]) : [];
+    },
+    查询,
+  );
 }
+
+onBeforeUnmount(() => {
+  作废错误();
+});
 
 onMounted(() => {
   void 查询();
@@ -217,15 +219,14 @@ onMounted(() => {
     />
     <XiaoXiTiao
       xing-tai="cuo-wu"
-      :wen-ben="错误提示"
-      :cuo-wu-ma="错误码"
+      :错误状态="错误状态"
     />
     <h3 class="图题">
       {{ 统计文案.注册趋势 }}
     </h3>
     <XiaoXiTiao
       xing-tai="kong"
-      :xian-shi="注册行.length === 0"
+      :xian-shi="当前错误 === null && !加载中 && 注册行.length === 0"
     />
     <Transition name="块">
       <div
@@ -301,7 +302,7 @@ onMounted(() => {
     </h3>
     <XiaoXiTiao
       xing-tai="kong"
-      :xian-shi="消息行.length === 0"
+      :xian-shi="当前错误 === null && !加载中 && 消息行.length === 0"
     />
     <Transition name="块">
       <div v-if="消息行.length > 0">
@@ -377,7 +378,7 @@ onMounted(() => {
     </h3>
     <XiaoXiTiao
       xing-tai="kong"
-      :xian-shi="好感总览 === null"
+      :xian-shi="当前错误 === null && !加载中 && 好感总览 === null"
     />
     <Transition name="块">
       <div
@@ -423,7 +424,7 @@ onMounted(() => {
     </h3>
     <XiaoXiTiao
       xing-tai="kong"
-      :xian-shi="好感分阶段.length === 0"
+      :xian-shi="当前错误 === null && !加载中 && 好感分阶段.length === 0"
     />
     <Transition name="块">
       <div
@@ -455,7 +456,7 @@ onMounted(() => {
     </h3>
     <XiaoXiTiao
       xing-tai="kong"
-      :xian-shi="留存行.length === 0"
+      :xian-shi="当前错误 === null && !加载中 && 留存行.length === 0"
     />
     <ShuJuBiaoGe
       :lie="列定义登记.留存统计"
@@ -467,7 +468,7 @@ onMounted(() => {
     </h3>
     <XiaoXiTiao
       xing-tai="kong"
-      :xian-shi="用量行.length === 0"
+      :xian-shi="当前错误 === null && !加载中 && 用量行.length === 0"
     />
     <ShuJuBiaoGe
       :lie="列定义登记.用量统计"

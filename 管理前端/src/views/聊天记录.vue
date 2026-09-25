@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { 聊天消息, 好友消息, type 表格行 } from '../api/管理';
-import { 取错误展示, type 分页信息 } from '../api/请求';
+import type { 分页信息 } from '../api/请求';
+import { 创建请求错误状态, 执行请求 } from '../api/错误展示';
 import { 气泡方位码, 默认每页条数, 默认页码 } from '../配置';
 import { 发送方选项, 取发送方码 } from '../枚举映射/发送方';
 import { 单元格文本, 单元格原值, 取列映射, 响应行键 } from '../列定义';
@@ -25,14 +26,11 @@ const 结束时间 = ref('');
 const 行列表 = ref<表格行[]>([]);
 const 分页 = ref<分页信息 | undefined>(undefined);
 const 加载中 = ref(false);
-const 错误提示 = ref('');
-const 错误码 = ref('');
-
-function 显示错误(错误: unknown): void {
-  const 展示 = 取错误展示(错误);
-  错误提示.value = 展示.提示;
-  错误码.value = 展示.错误码;
-}
+const 错误状态 = 创建请求错误状态();
+const {
+  当前错误,
+  作废: 作废错误,
+} = 错误状态;
 
 const 单聊列 = 取列映射('单聊消息');
 const 好友列 = 取列映射('好友消息');
@@ -65,12 +63,11 @@ function 可选文本(原始: string): string | undefined {
 }
 
 async function 查询(页码: number = 默认页码): Promise<void> {
-  加载中.value = true;
-  错误提示.value = '';
-  错误码.value = '';
-  try {
-    if (模式.value === 'dan-liao') {
-      const 结果 = await 聊天消息({
+  await 执行请求(
+    错误状态,
+    加载中,
+    async () => 模式.value === 'dan-liao'
+      ? 聊天消息({
         ye_ma: 页码,
         mei_ye_tiao_shu: 默认每页条数,
         yong_hu_id: 可选文本(用户编号.value),
@@ -79,26 +76,21 @@ async function 查询(页码: number = 默认页码): Promise<void> {
         kai_shi_shi_jian: 可选文本(开始时间.value),
         jie_shu_shi_jian: 可选文本(结束时间.value),
         pai_xu: 排序.value,
-      });
-      行列表.value = 结果.行;
-      分页.value = 结果.分页;
-    } else {
-      const 结果 = await 好友消息({
+      })
+      : 好友消息({
         ye_ma: 页码,
         mei_ye_tiao_shu: 默认每页条数,
         fa_song_zhe_id: 可选文本(发送者编号.value),
         jie_shou_zhe_id: 可选文本(接收者编号.value),
         kai_shi_shi_jian: 可选文本(开始时间.value),
         jie_shu_shi_jian: 可选文本(结束时间.value),
-      });
+      }),
+    (结果) => {
       行列表.value = 结果.行;
       分页.value = 结果.分页;
-    }
-  } catch (错误) {
-    显示错误(错误);
-  } finally {
-    加载中.value = false;
-  }
+    },
+    () => 查询(页码),
+  );
 }
 
 function 切换模式(目标: 'dan-liao' | 'hao-you'): void {
@@ -119,6 +111,10 @@ function 下一页(): void {
   const 当前 = 分页.value?.ye_ma ?? 默认页码;
   void 查询(当前 + 1);
 }
+
+onBeforeUnmount(() => {
+  作废错误();
+});
 
 onMounted(() => {
   void 查询();
@@ -258,12 +254,11 @@ onMounted(() => {
     />
     <XiaoXiTiao
       xing-tai="cuo-wu"
-      :wen-ben="错误提示"
-      :cuo-wu-ma="错误码"
+      :错误状态="错误状态"
     />
     <XiaoXiTiao
       xing-tai="kong"
-      :xian-shi="!加载中 && 行列表.length === 0"
+      :xian-shi="当前错误 === null && !加载中 && 行列表.length === 0"
     />
     <Transition name="块">
       <div

@@ -1,6 +1,6 @@
 import { vi } from 'vitest';
 import { config } from '@vue/test-utils';
-import { defineComponent, h, type App } from 'vue';
+import { defineComponent, h, type ComponentPublicInstance } from 'vue';
 
 const 路由链接桩 = defineComponent({
   name: 'RouterLink',
@@ -10,14 +10,22 @@ const 路由链接桩 = defineComponent({
   },
 });
 
-const 路由链接桩插件 = {
-  install(应用: App): void {
-    应用.component('RouterLink', 路由链接桩);
+export const 路由链接桩组件名 = 'RouterLink';
+
+export const 路由链接桩混入 = {
+  beforeCreate(this: ComponentPublicInstance): void {
+    const 应用 = this.$.appContext.app;
+    if (!应用.component(路由链接桩组件名)) {
+      应用.component(路由链接桩组件名, 路由链接桩);
+    }
   },
 };
 
-config.global.plugins = [...config.global.plugins, 路由链接桩插件];
+export function 注册路由链接桩混入(混入列表: typeof config.global.mixins): typeof config.global.mixins {
+  return [...混入列表.filter((混入) => 混入 !== 路由链接桩混入), 路由链接桩混入];
+}
 
+config.global.mixins = 注册路由链接桩混入(config.global.mixins);
 config.global.stubs = { ...config.global.stubs, transition: false, 'transition-group': false };
 
 class NeiCunCunChu implements Storage {

@@ -35,8 +35,8 @@ describe('FP-02 YH-016管理端信任代理+Redis限流+YH-021正则统一', () 
       subscribe: async (): Promise<() => void> => () => undefined,
     };
     const { 池 } = 创建模拟池();
-    const { 创建应用 } = await import('../../src/应用');
-    const { 清空管理员缓存 } = await import('../../src/中间件/管理员');
+    const { 创建应用 } = await import('../../src/应用.js');
+    const { 清空管理员缓存 } = await import('../../src/中间件/管理员.js');
     清空管理员缓存();
     const 应用 = 创建应用({ 池, 缓存: 共享缓存, 读限流: { 窗口毫秒: 60000, 上限: 2 } });
     const 头 = 授权头(签发管理令牌());
@@ -46,7 +46,7 @@ describe('FP-02 YH-016管理端信任代理+Redis限流+YH-021正则统一', () 
   });
 
   it('管理端手机号正则与主仓统一：12开头拒绝', async () => {
-    const { 校验手机号 } = await import('../../src/校验');
+    const { 校验手机号 } = await import('../../src/校验.js');
     expect(() => 校验手机号('手机号', '12000000000')).toThrow();
     expect(校验手机号('手机号', '13800000000')).toBe('13800000000');
   });

@@ -15,7 +15,7 @@ const 词典目录 = 'src/文案';
 const 术语表源路径 = '../docs/术语表.md';
 const 扫描目录 = ['src/views', 'src/components', 'src/router', 'src/stores', 'src/api', 'src/枚举映射'];
 const 扫描文件 = ['src/App.vue', 'src/枚举映射.ts', 'src/列定义.ts'];
-const 首屏可达文件 = ['src/App.vue', 'src/main.ts', 'src/router/index.ts', 'src/api/请求.ts', 'src/api/管理.ts', 'src/stores/登录.ts'];
+const 首屏可达文件 = ['src/App.vue', 'src/main.ts', 'src/router/index.ts', 'src/api/请求.ts', 'src/api/探针.ts', 'src/stores/登录.ts'];
 
 function 读(路径: string): string {
   return fs.readFileSync(路径, 'utf8');

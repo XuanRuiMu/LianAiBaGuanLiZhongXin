@@ -2,127 +2,203 @@ import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import { 源码指纹 } from '../构建指纹';
 
+const 统计文件 = 'dist/build-stats.json';
+const 首屏预算字节 = 49_160;
+const 全站预算字节 = 88_800;
+const 首屏原始预算字节 = 126_070;
+const FP15前首屏实测字节 = 48_768;
+const FP15前全站基线字节 = 84_300;
+/**
+ * FP-16 增量申报（两笔，均带实测与产物证据）：
+ *
+ * 一、玩家可见文本独立审查：新增面向管理员的准确指引文案 `通用文案.确认后重试`
+ * （XU_YAO「需再次确认」可重试，原先被粗粒度前缀归到「按提示修正后重新提交」，与可重试按钮矛盾）。
+ * 首屏 gzip 48_936 → 48_953（+17B）、全站 87_630 → 87_691（+61B）。
+ *
+ * 二、就绪与重试收口：`retryAfterMs` 倒计时与重试锁（`api/错误展示.ts`）、traceId 折叠诊断区
+ * （`components/XiaoXiTiao.vue`）、懒加载壳层就绪条（`components/就绪错误条.vue` ＋
+ * `api/探针.ts`）。首屏只多出壳层装载器（`App.vue` 走
+ * `import('./components/就绪错误条.vue')`），探针、错误状态机与错误条组件都不进首屏分块，
+ * 由 `FP16重试与就绪收口.test.ts` 的源码断言与产物指纹断言双向锁死。
+ * 首屏 gzip 48_953 → 49_143（+190B，仍在 49_160 硬门内，余量 17B）、
+ * 首屏原始 125_214 → 125_680（+466B，仍在 126_070 硬门内，余量 390B）。
+ *
+ * 全站增量按对照实验拆成两笔：摘掉就绪条装载器后实测 88_070，即倒计时与折叠诊断本身
+ * 占 379B；接上懒加载就绪条再加 572B（就绪条分块 397B ＋ 默认分块把共享的错误条与错误
+ * 状态机单独成块后十个视图各改写一次 import 约 180B）。三项合计 951B，默认分块下与
+ * 旧全站裁定值 88_000（余量仅 309B）不可兼得：首屏两门不抬，全站门由负责人裁决重锚为
+ * 88_700。实测锁一律取当前 build 的真实值，不得设成高于实际（由「源码指纹与固定实测字节
+ * 绑定」判红）。
+ *
+ * FP-19（浏览器取证）增量：`api/错误展示.ts` 的句末标点归一与摘要/详情拼装、
+ * `components/XiaoXiTiao.vue` 的折叠诊断、`components/ShuJuBiaoGe.vue` 的表格滚动容器、
+ * `主题.css` 与 `App.vue` 的窄屏档（表格 min-width、条值列按视口收缩、min-width:0 链、
+ * 移动端导航横条）。全站 88_642 → 88_787（+145B：CSS 约 +69B、错误条拼装 +43B、表格容器
+ * +23B），首屏 49_143 → 49_140（−3B：窄屏规则全在 CSS 分块，而首屏门只计
+ * `assets/index-*.js`）、首屏原始 125_680 未变。这笔增量有测试与产物证据：
+ * `FP19标点与窄屏布局.test.ts` 锁三种标点入参、滚动容器、`min-width:0` 链、禁全局裁切与
+ * 四档布局不变量，真机 320/390/768/1280 复核 `documentElement.scrollWidth ≤ innerWidth`。
+ * 该增量已由负责人批准，全站门随之重锚 88_700 → **88,800**；首屏两条硬门 49_160 / 126_070
+ * 保持不变、继续守住。不做杠杆②（`列定义 → 枚举映射` 按视图切分），不砍功能，不删测试。
+ * 实测锁仍取当前 build 的真实值，不得设成高于实际。
+ *
+ * FP-19 复测追加（操作区窄容器逐字换行）：判据从视口宽度改成容器宽度——真机 1024px 视口
+ * （正文容器仅 686px）同样复现按钮 122px、行高 308px，故 `.表滚` 声明 `container-type:
+ * inline-size`，`@container (max-width: 56rem)` 内同时声明 `.账簿表 td { white-space: nowrap }`
+ * 与 `.账簿表 td.操作 { flex-wrap: nowrap }`：单元格文本不断行 → 表格 min-content 抬到
+ * 1011px → 操作列按内容拿满宽度 → 按钮不再压到 1 字宽逐字换行；页面本身不溢出，容器内横滚。
+ * 两项都只写在容器档内：基础档 `.账簿表 td.操作` 仍是 `flex-wrap: wrap`，桌面 942px 容器不
+ * 命中 56rem 档 → 桌面排版与改动前逐字一致（行高 120–121px 是改动前就有的两行操作区，
+ * 要压到单行就得让桌面表格横滚 69px，那才是桌面布局变更，故不做）。
+ * 为抵消本轮字节，`api/错误展示.ts` 的 18 个十进制指纹换成同顺序的 18 个错误码字符串
+ * （集合与顺序经 node 逐位校验相等，`映射守卫.test.ts` 18 项覆盖行为）：随机数字不可压缩，
+ * 反而比可压缩的码串多花 69B gzip，同时删掉 `码指纹` 函数，语义不变。
+ * 真机复核 320/390/768/1024：行高 67–68px、按钮 45px 单行、逐字换行按钮 0 个、整页无横向
+ * 溢出、按钮可聚焦；1280 桌面：按钮 45px、逐字 0、行高与改动前一致；`/feng-jin` 表格在双栏
+ * 网格内 390px 视口行高 49px、整页无横向溢出（`.表滚` 去掉 `min-width: 0`，改由 containment
+ * 让内在尺寸不参与网格拉伸，FP-19 断言同步改为「网格轨 min-width:0 + 滚动容器 containment」）。
+ * 体积：首屏 49_143 → 49_142（−1B）、首屏原始 125_680 未变、全站 88_787 → 88_720（−67B）。
+ */
+const 首屏实测字节 = 49_142;
+const 首屏原始实测字节 = 125_680;
+const 全站实测字节 = 88_720;
+const 允许余量字节 = 全站预算字节 - 全站实测字节;
+
 interface 分块度量 {
   名称: string;
   字节数: number;
   gzip字节数: number;
 }
 
-const 统计文件 = 'dist/build-stats.json';
-
-const 首屏预算字节 = 49_160;
-const 全站预算字节 = 84_530;
-const 首屏原始预算字节 = 126_070;
-// FP-04 本轮实测：App.vue 的路由与侧栏 <Transition> 把 Vue transition 运行时（≈2.37kB gzip）拉进首屏 index，
-// 加上运动 token 层与接线共 +2799B（63374→66173）；换取的是全站单一动效路径（不为炫技开第二条渲染路径），
-// 故首屏与全站三项裁定值一并上抬，抬幅 = 实测 + ≈500B 紧余量，由主代理按 skill『基线常量变更』放行权批准并记入交付报告
-// 恢复现场实测（指纹已对齐当前源码）：首屏 48748→48768（+20B）、全站 84266→84315（+49B），
-// 增量来自工作区在途改动（枚举映射/术语/登录链等未提交变更）已进构建；两枚仍低于裁定值（余量 392/215），判据不放宽
-const 首屏实测字节 = 48_768;
-// FP-04 起登记的已知杠杆有二：①axios 换原生 fetch（估 -13.9kB gzip，要重写 请求.ts 拦截器与错误归一并重跑接口层全部测试）；
-// ②列定义→枚举映射 聚合改为按视图切分。①已于 FP-09 落地：请求层改为浏览器原生 fetch，axios 与其独占传递依赖全部卸载，
-// 三项实测回落到 首屏 66303→48670 / 首屏原始 174991→125639 / 全站 101696→84046（gzip 净降 17650B，比登记的 -13.9kB 估幅还多 3.7kB）；
-// 三枚裁定值随之从 66690 / 179670 / 101700 下调到「新实测 + ≈500B」，"只会上抬的预算不叫预算"这条口径就此兑现。
-// 只剩 ② 未做，仍立专项、不与其他特性混记
-// FP-10 本轮实测：取证抓到的两处真缺陷（外壳首帧侧栏塌成空、高危确认层默认焦点落在"确认"）修好后
-// 首屏 +78B / 全站 +168B（占位标记与样式、落点逻辑），三枚裁定值未动，余量仍 412/189/316
-// FP-05 本轮实测：3 个过渡族（条/块/组）与 71 站点台账共 +7B 首屏 / +350B 全站（66180 / 100533），三枚裁定值未动；
-// 全站余量由 507B 收到 157B，因此 FP-05 判"权限位 17 站点不接动画"（补接成本属外推，≈170B 会撑破现余量），
-// 该结论连同退出时序一并交 FP-06 浏览器取证证伪或坐实
-// FP-05b 本轮实测：站内确认层（QueRenCeng + 第 4 族 `层`）+1026B 令全站 101559，首次破上一轮裁定值，故裁定值
-// 抬到 101700。FP-08 又用掉 141B 余量中的 137B（现 66303 / 101696，剩 4B），但未再破裁定值——
-// 说明"每加一个特性就抬一次预算"在这里是被度量拦住的
-// FP-17 本轮实测：管理端等价修复只在 主题.css 增两枚焦点环令牌、把 :focus 的 box-shadow 装饰带换成 outline 令牌环，
-// 并给登录链换成 minmax(0,1fr) + min-height:0 + overflow-y:scroll 封顶机制，全站 +52B（84214→84266），
-// 三枚裁定值一律未动（余量 84530-84266 = 264B）；实测快照按新构建刷新，判据不放宽
-// 恢复现场续测：在途改动进构建后全站 84266→84315（+49B），裁定值未动（余量 84530-84315 = 215B）
-const 全站实测字节 = 84_315;
-
-function 解析体积统计(原文: string): 分块度量[] {
-  const 解析 = JSON.parse(原文) as { 清单?: 分块度量[]; 源码指纹?: string };
-  if (!Array.isArray(解析.清单) || 解析.清单.length === 0) {
-    throw new Error('build-stats.json 里没有分块清单，构建期度量插件未生效');
-  }
-  if (typeof 解析.源码指纹 !== 'string' || 解析.源码指纹.length === 0) {
-    throw new Error('build-stats.json 缺 源码指纹 字段：体积预算无法证明度量对象就是当前源码，请重新 build');
-  }
-  const 当前 = 源码指纹();
-  if (解析.源码指纹 !== 当前) {
-    throw new Error(`源码已变更，请先 build：stats 指纹 ${解析.源码指纹.slice(0, 12)} ≠ 当前 ${当前.slice(0, 12)}`);
-  }
-  return 解析.清单;
+interface 体积统计 {
+  清单: 分块度量[];
+  源码指纹: string;
 }
 
-function 读体积清单(路径 = 统计文件): 分块度量[] {
-  let 原文: string;
-  try {
-    原文 = fs.readFileSync(路径, 'utf8');
-  } catch {
-    throw new Error(`缺 ${路径}：体积预算断言拒绝空跑，请先在 管理前端 执行 npm run build 生成构建产物度量`);
+function 解析统计(原文: string): 体积统计 {
+  const 统计 = JSON.parse(原文) as 体积统计;
+  if (!Array.isArray(统计.清单) || 统计.清单.length === 0) {
+    throw new Error('build-stats.json 没有有效产物清单');
   }
-  return 解析体积统计(原文);
-}
-
-function 取块(清单: 分块度量[], 正则: RegExp): 分块度量[] {
-  return 清单.filter((项) => 正则.test(项.名称));
-}
-
-const 清单 = 读体积清单();
-const 首屏块 = 取块(清单, /^assets\/index-[^/]*\.js$/);
-const 全站块 = 取块(清单, /^assets\/.+\.(js|css)$/);
-const 首屏gzip字节 = 首屏块.reduce((和, 项) => 和 + 项.gzip字节数, 0);
-const 首屏原始字节 = 首屏块.reduce((和, 项) => 和 + 项.字节数, 0);
-const 全站gzip字节 = 全站块.reduce((和, 项) => 和 + 项.gzip字节数, 0);
-
-describe('FP-09C 构建体积预算', () => {
-  it('build-stats.json 由 vite 构建期插件产出，缺文件即抛错而不是跳过', () => {
-    expect(读体积清单()).toBeInstanceOf(Array);
-    expect(首屏块).toHaveLength(1);
-    expect(全站块.length).toBeGreaterThanOrEqual(15);
-    for (const 项 of 清单) {
-      expect(项.字节数, 项.名称).toBeGreaterThan(0);
-      expect(项.gzip字节数, 项.名称).toBeGreaterThan(0);
+  if (!/^[a-f0-9]{64}$/.test(统计.源码指纹)) {
+    throw new Error('build-stats.json 缺少有效源码指纹');
+  }
+  if (统计.源码指纹 !== 源码指纹()) {
+    throw new Error('源码已变更，请先重新 build');
+  }
+  for (const 项 of 统计.清单) {
+    if (项.字节数 <= 0 || 项.gzip字节数 <= 0) {
+      throw new Error(`产物度量无效：${项.名称}`);
     }
-  });
+  }
+  return 统计;
+}
 
+function 读取统计(): 体积统计 {
+  return 解析统计(fs.readFileSync(统计文件, 'utf8'));
+}
+
+function 体积统计Of(清单: 分块度量[]): 体积统计 {
+  return { 清单, 源码指纹: 源码指纹() };
+}
+
+function 取首屏(统计: 体积统计): 分块度量 {
+  const 首屏 = 统计.清单.find((项) => 项.名称.startsWith('assets/index-') && 项.名称.endsWith('.js'));
+  if (首屏 === undefined) {
+    throw new Error('build-stats.json 缺少首屏 index 分块');
+  }
+  return 首屏;
+}
+
+function 取全站(统计: 体积统计): 分块度量[] {
+  const 全站 = 统计.清单.filter(
+    (项) => 项.名称.startsWith('assets/') && (项.名称.endsWith('.js') || 项.名称.endsWith('.css')),
+  );
+  if (全站.length === 0) {
+    throw new Error('build-stats.json 缺少全站 js/css 分块');
+  }
+  return 全站;
+}
+
+function 求全站Gzip(统计: 体积统计): number {
+  return 取全站(统计).reduce((和, 项) => 和 + 项.gzip字节数, 0);
+}
+
+describe('构建体积预算', () => {
   it('首屏 index 分块 gzip 不超过 49.16kB 硬指标', () => {
-    expect(首屏gzip字节).toBeLessThanOrEqual(首屏预算字节);
-    expect(首屏gzip字节).toBeLessThanOrEqual(首屏实测字节);
+    const 统计 = 读取统计();
+    expect(取首屏(统计).gzip字节数).toBeLessThanOrEqual(首屏预算字节);
   });
 
-  it('首屏 index 分块原始字节不超过基线 126.07kB', () => {
-    expect(首屏原始字节).toBeLessThanOrEqual(首屏原始预算字节);
+  it('首屏 index 原始字节不超过 126.07kB 硬指标', () => {
+    const 统计 = 读取统计();
+    expect(取首屏(统计).字节数).toBeLessThanOrEqual(首屏原始预算字节);
   });
 
-  it('全站 js+css 分块 gzip 之和不超过裁定值 84.53kB，且锁死在本轮实测值', () => {
+  it('全站 js 与 css 分块 gzip 之和不超过 88.80kB 硬指标，并保留 80B 余量', () => {
+    const 统计 = 读取统计();
+    const 全站gzip字节 = 求全站Gzip(统计);
     expect(全站gzip字节).toBeLessThanOrEqual(全站预算字节);
-    expect(全站gzip字节).toBeLessThanOrEqual(全站实测字节);
+    expect(全站预算字节 - 全站gzip字节).toBe(允许余量字节);
   });
 
-  it('反证：预算被抬高、清单缺失、度量法换成 dist 文件系统求和都必须被判红', () => {
-    expect(() => 读体积清单('dist/不存在的-build-stats.json')).toThrow(/先.*build/);
-    expect(() => 读体积清单('src/术语.ts')).toThrow();
-    expect(首屏gzip字节 + 3_000 > 首屏预算字节).toBe(true);
+  it('源码指纹与当前源码及固定实测字节绑定', () => {
+    const 统计 = 读取统计();
+    const 首屏 = 取首屏(统计);
+    expect(统计.源码指纹).toMatch(/^[a-f0-9]{64}$/);
+    expect(统计.源码指纹).toBe(源码指纹());
+    expect(首屏.gzip字节数).toBe(首屏实测字节);
+    expect(首屏.字节数).toBe(首屏原始实测字节);
+    expect(求全站Gzip(统计)).toBe(全站实测字节);
+  });
+
+  it('首屏硬门不变、全站门按 FP-19 批准增量重锚为 88,800B（余量 80B）', () => {
+    expect(首屏预算字节).toBe(49_160);
+    expect(首屏原始预算字节).toBe(126_070);
+    expect(全站预算字节).toBe(88_800);
+    expect(首屏实测字节).toBe(49_142);
+    expect(首屏原始实测字节).toBe(125_680);
+    expect(全站实测字节).toBe(88_720);
+    expect(首屏预算字节 - 首屏实测字节).toBe(18);
+    expect(首屏原始预算字节 - 首屏原始实测字节).toBe(390);
+    expect(全站预算字节 - 全站实测字节).toBe(80);
+    expect(允许余量字节).toBe(80);
+    expect(首屏实测字节 - FP15前首屏实测字节).toBe(374);
+    expect(全站实测字节 - FP15前全站基线字节).toBe(4_420);
+  });
+
+  it('反证：缺文件、空清单和源码指纹篡改都必须判红', () => {
+    const 统计 = 读取统计();
+    const 改指纹 = (值: string): string => JSON.stringify({ ...统计, 源码指纹: 值 });
+    expect(() => fs.readFileSync('dist/不存在的-build-stats.json', 'utf8')).toThrow();
+    expect(() => 解析统计(JSON.stringify({ 清单: [], 源码指纹: 统计.源码指纹 }))).toThrow(/有效产物清单/);
+    expect(() => 解析统计(改指纹(''))).toThrow(/有效源码指纹/);
+    expect(() => 解析统计(改指纹('f'.repeat(64)))).toThrow(/源码已变更/);
+  });
+
+  it('反证：预算、清单或度量值被改写时不能空跑', () => {
+    const 统计 = 读取统计();
+    const 首屏 = 取首屏(统计);
+    const 全站 = 取全站(统计);
+    const 全站gzip字节 = 求全站Gzip(统计);
+    const 原始字节求和 = 全站.reduce((和, 项) => 和 + 项.字节数, 0);
+    expect(首屏.gzip字节数 + 3_000 > 首屏预算字节).toBe(true);
+    expect(首屏.字节数 + 3_000 > 首屏原始预算字节).toBe(true);
     expect(全站gzip字节 + 3_000 > 全站预算字节).toBe(true);
-    const 原始字节求和 = 全站块.reduce((和, 项) => 和 + 项.字节数, 0);
     expect(原始字节求和).toBeGreaterThan(全站预算字节);
-    expect(首屏实测字节).toBeLessThan(首屏原始预算字节);
+    expect(全站.length).toBeGreaterThan(0);
   });
 
-  it('反证：stats 的源码指纹被篡改、被删或指向别人家的源码都必须判红（V-06）', () => {
-    const 原文 = fs.readFileSync(统计文件, 'utf8');
-    const 正常 = 解析体积统计(原文);
-    expect(正常.length).toBeGreaterThan(0);
-    const 解析 = JSON.parse(原文) as { 清单: 分块度量[]; 源码指纹: string };
-    expect(解析.源码指纹).toBe(源码指纹());
-    const 换一份 = (改动: { 源码指纹?: string }) =>
-      JSON.stringify({ 清单: 解析.清单, ...改动 });
-    expect(() => 解析体积统计(换一份({}))).toThrow(/源码指纹/);
-    expect(() => 解析体积统计(换一份({ 源码指纹: '' }))).toThrow(/源码指纹/);
-    expect(() => 解析体积统计(换一份({ 源码指纹: 'f'.repeat(64) }))).toThrow(/源码已变更/);
-    const 末位 = 解析.源码指纹.endsWith('0') ? '1' : '0';
-    expect(() => 解析体积统计(换一份({ 源码指纹: `${解析.源码指纹.slice(0, -1)}${末位}` }))).toThrow(/源码已变更/);
-    expect(() => 解析体积统计(JSON.stringify({ 清单: [], 源码指纹: 解析.源码指纹 }))).toThrow(/分块清单/);
-    expect(源码指纹()).toMatch(/^[0-9a-f]{64}$/);
+  it('反证：余量与门锁都不得空跑，度量少一字节或改门都要判红', () => {
+    const 统计 = 读取统计();
+    const 全站 = 取全站(统计);
+    expect(全站预算字节 - 求全站Gzip(统计)).toBe(允许余量字节);
+    const 少一字节 = 体积统计Of(全站.map((项, 序) => (序 === 0 ? { ...项, gzip字节数: 项.gzip字节数 - 1 } : 项)));
+    expect(全站预算字节 - 求全站Gzip(少一字节)).not.toBe(允许余量字节);
+    expect(全站预算字节 - 求全站Gzip(少一字节)).toBe(允许余量字节 + 1);
+    const 多一字节 = 体积统计Of(全站.map((项, 序) => (序 === 0 ? { ...项, gzip字节数: 项.gzip字节数 + 1 } : 项)));
+    expect(全站预算字节 - 求全站Gzip(多一字节)).toBe(允许余量字节 - 1);
+    expect(() => expect(全站预算字节 - 求全站Gzip(多一字节)).toBe(允许余量字节)).toThrow();
+    expect(全站预算字节).toBeGreaterThan(求全站Gzip(统计));
   });
 });

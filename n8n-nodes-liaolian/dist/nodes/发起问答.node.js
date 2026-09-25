@@ -1,7 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.发起问答 = void 0;
-const __1 = require("./\u516C\u5171");
+const ______1 = require("./\u516C\u5171");
 class 发起问答 {
     constructor() {
         this.description = {
@@ -14,7 +14,7 @@ class 发起问答 {
             inputs: ['main'],
             outputs: ['main'],
             properties: [
-                ...(0, __1.通用参数)(),
+                ...(0, ______1.通用参数)(),
                 {
                     displayName: '问题',
                     name: '问题',
@@ -26,7 +26,7 @@ class 发起问答 {
     }
     async execute() {
         const 问题 = this.getNodeParameter('问题', 0);
-        const 数据 = await (0, __1.调开放接口)(this, '问答', 'POST', {}, { 问题 });
+        const 数据 = await (0, ______1.调开放接口)(this, '问答', 'POST', {}, { 问题 });
         return [[{ json: 数据 }]];
     }
 }

@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { 账号列表, 授予角色, 回收角色, 接管角色, 结束接管, type 表格行 } from '../api/管理';
 import { 使用登录仓库 } from '../stores/登录';
-import { 取错误展示, type 分页信息 } from '../api/请求';
+import { 创建请求错误状态, 执行请求 } from '../api/错误展示';
+import type { 分页信息 } from '../api/请求';
 import { 默认每页条数, 默认页码 } from '../配置';
 import { 列定义登记, 响应行键 } from '../列定义';
 import { 管理角色选项 } from '../枚举映射/管理角色';
@@ -21,8 +22,11 @@ const 登录仓库 = 使用登录仓库();
 const 行列表 = ref<表格行[]>([]);
 const 分页 = ref<分页信息 | undefined>(undefined);
 const 加载中 = ref(false);
-const 错误提示 = ref('');
-const 错误码 = ref('');
+const 错误状态 = 创建请求错误状态();
+const {
+  当前错误,
+  作废: 作废错误,
+} = 错误状态;
 
 const 总数 = computed(() => 分页.value?.zong_shu ?? 行列表.value.length);
 const 当前页 = computed(() => 分页.value?.ye_ma ?? 默认页码);
@@ -50,30 +54,22 @@ function 详情链接(行: 表格行): string {
   return `/zhang-hao/${String(行[响应行键.ID] ?? '')}`;
 }
 
-function 显示错误(错误: unknown): void {
-  const 展示 = 取错误展示(错误);
-  错误提示.value = 展示.提示;
-  错误码.value = 展示.错误码;
-}
-
 async function 查询(页码: number = 默认页码): Promise<void> {
-  加载中.value = true;
-  错误提示.value = '';
-  错误码.value = '';
-  try {
-    const 结果 = await 账号列表({
+  await 执行请求(
+    错误状态,
+    加载中,
+    () => 账号列表({
       ye_ma: 页码,
       mei_ye_tiao_shu: 默认每页条数,
       guan_jian_ci: 关键词.value.trim() === '' ? undefined : 关键词.value.trim(),
       shou_ji_hao: 手机号.value.trim() === '' ? undefined : 手机号.value.trim(),
-    });
-    行列表.value = 结果.行;
-    分页.value = 结果.分页;
-  } catch (错误) {
-    显示错误(错误);
-  } finally {
-    加载中.value = false;
-  }
+    }),
+    (结果) => {
+      行列表.value = 结果.行;
+      分页.value = 结果.分页;
+    },
+    () => 查询(页码),
+  );
 }
 
 function 重置(): void {
@@ -100,13 +96,12 @@ async function 授予(用户编号: unknown): Promise<void> {
   }
   const 编号 = 用户编号;
   请求二次确认(async () => {
-    try {
+    const 完成 = async (): Promise<void> => {
       await 授予角色({ yong_hu_id: 编号, jiao_se: 授予角色值.value, que_ren: true });
       操作提示.value = 账号文案.授予角色成功;
       await 查询(当前页.value);
-    } catch (错误) {
-      显示错误(错误);
-    }
+    };
+    await 执行请求(错误状态, undefined, 完成, () => undefined, 完成);
   });
 }
 
@@ -116,13 +111,12 @@ async function 回收(用户编号: unknown): Promise<void> {
   }
   const 编号 = 用户编号;
   请求二次确认(async () => {
-    try {
+    const 完成 = async (): Promise<void> => {
       await 回收角色({ yong_hu_id: 编号, jiao_se: 授予角色值.value, que_ren: true });
       操作提示.value = 账号文案.回收角色成功;
       await 查询(当前页.value);
-    } catch (错误) {
-      显示错误(错误);
-    }
+    };
+    await 执行请求(错误状态, undefined, 完成, () => undefined, 完成);
   });
 }
 
@@ -131,12 +125,11 @@ async function 接管(): Promise<void> {
   if (编号 === '') {
     return;
   }
-  try {
+  const 完成 = async (): Promise<void> => {
     await 接管角色({ jiao_se_id: 编号 });
     操作提示.value = 账号文案.接管角色成功;
-  } catch (错误) {
-    显示错误(错误);
-  }
+  };
+  await 执行请求(错误状态, undefined, 完成, () => undefined, 完成);
 }
 
 async function 结束接管角色(): Promise<void> {
@@ -144,13 +137,16 @@ async function 结束接管角色(): Promise<void> {
   if (编号 === '') {
     return;
   }
-  try {
+  const 完成 = async (): Promise<void> => {
     await 结束接管({ jiao_se_id: 编号 });
     操作提示.value = 账号文案.结束接管成功;
-  } catch (错误) {
-    显示错误(错误);
-  }
+  };
+  await 执行请求(错误状态, undefined, 完成, () => undefined, 完成);
 }
+
+onBeforeUnmount(() => {
+  作废错误();
+});
 
 onMounted(() => {
   void 查询();
@@ -238,12 +234,11 @@ onMounted(() => {
     />
     <XiaoXiTiao
       xing-tai="cuo-wu"
-      :wen-ben="错误提示"
-      :cuo-wu-ma="错误码"
+      :错误状态="错误状态"
     />
     <XiaoXiTiao
       xing-tai="kong"
-      :xian-shi="!加载中 && 行列表.length === 0"
+      :xian-shi="当前错误 === null && !加载中 && 行列表.length === 0"
     />
     <ShuJuBiaoGe
       :lie="列定义登记.账号列表"

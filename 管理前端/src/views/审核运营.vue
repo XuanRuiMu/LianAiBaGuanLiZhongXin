@@ -1,7 +1,8 @@
 ﻿<script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import { onBeforeUnmount, onMounted, ref } from 'vue';
 import { 审核列表, 审核新建, 审核初审, 审核复审, 审核多项处理, 处理记录列表, type 表格行 } from '../api/管理';
-import { 取错误展示, type 分页信息 } from '../api/请求';
+import type { 分页信息 } from '../api/请求';
+import { 创建请求错误状态, 执行请求 } from '../api/错误展示';
 import { 默认每页条数, 默认页码 } from '../配置';
 import { 列定义登记 } from '../列定义';
 import { 审核状态选项 } from '../枚举映射/审核状态';
@@ -45,8 +46,11 @@ const 评审目标 = ref('');
 const 评审备注 = ref('');
 const 多项目标 = ref('');
 const 加载中 = ref(false);
-const 错误提示 = ref('');
-const 错误码 = ref('');
+const 错误状态 = 创建请求错误状态();
+const {
+  当前错误,
+  作废: 作废错误,
+} = 错误状态;
 const 成功提示 = ref('');
 
 function 可选文本(原始: string): string | undefined {
@@ -54,38 +58,26 @@ function 可选文本(原始: string): string | undefined {
   return 修剪 === '' ? undefined : 修剪;
 }
 
-function 显示错误(错误: unknown): void {
-  const 展示 = 取错误展示(错误);
-  错误提示.value = 展示.提示;
-  错误码.value = 展示.错误码;
-}
-
-function 开始提交(): void {
-  错误提示.value = '';
-  错误码.value = '';
-  成功提示.value = '';
-}
-
 async function 查询(页码: number = 默认页码): Promise<void> {
-  加载中.value = true;
-  错误提示.value = '';
-  错误码.value = '';
-  try {
-    const 结果 = await 审核列表(当前标签.value, {
-      ye_ma: 页码,
-      mei_ye_tiao_shu: 默认每页条数,
-      zhuang_tai: 可选文本(状态筛选.value),
-      chao_shi: 只看超时.value ? 'true' : undefined,
-    });
-    行列表.value = 结果.行;
-    分页.value = 结果.分页;
-    const 记录 = await 处理记录列表({ ye_ma: 1, mei_ye_tiao_shu: 默认每页条数 });
-    处理记录行.value = 记录.行;
-  } catch (错误) {
-    显示错误(错误);
-  } finally {
-    加载中.value = false;
-  }
+  await 执行请求(
+    错误状态,
+    加载中,
+    async () => {
+      const 结果 = await 审核列表(当前标签.value, {
+        ye_ma: 页码,
+        mei_ye_tiao_shu: 默认每页条数,
+        zhuang_tai: 可选文本(状态筛选.value),
+        chao_shi: 只看超时.value ? 'true' : undefined,
+      });
+      return { 结果, 记录: await 处理记录列表({ ye_ma: 1, mei_ye_tiao_shu: 默认每页条数 }) };
+    },
+    ({ 结果, 记录 }) => {
+      行列表.value = 结果.行;
+      分页.value = 结果.分页;
+      处理记录行.value = 记录.行;
+    },
+    () => 查询(页码),
+  );
 }
 
 function 切换标签(目标: 目标类型名): void {
@@ -96,56 +88,45 @@ function 切换标签(目标: 目标类型名): void {
 }
 
 async function 提交新建(): Promise<void> {
-  开始提交();
-  try {
-    await 审核新建(当前标签.value, {
-      bei_ju_bao_yong_hu_id: 可选文本(被举报用户.value),
-      bei_ju_bao_nei_rong_id: 可选文本(被举报内容.value),
-      yuan_yin: 可选文本(新建原因.value),
-      biao_ti: 可选文本(新建标题.value),
-      nei_rong: 可选文本(新建内容.value),
-      ming_cheng: 可选文本(新建名称.value),
-      miao_shu: 可选文本(新建描述.value),
-    });
+  成功提示.value = '';
+  await 执行请求(错误状态, undefined, () => 审核新建(当前标签.value, {
+    bei_ju_bao_yong_hu_id: 可选文本(被举报用户.value),
+    bei_ju_bao_nei_rong_id: 可选文本(被举报内容.value),
+    yuan_yin: 可选文本(新建原因.value),
+    biao_ti: 可选文本(新建标题.value),
+    nei_rong: 可选文本(新建内容.value),
+    ming_cheng: 可选文本(新建名称.value),
+    miao_shu: 可选文本(新建描述.value),
+  }), async () => {
     成功提示.value = 审核文案.新建成功;
     await 查询();
-  } catch (错误) {
-    显示错误(错误);
-  }
+  }, 提交新建);
 }
 
 async function 提交评审(轮次: 'yi_shen' | 'er_shen', 通过: boolean): Promise<void> {
-  开始提交();
   const 目标 = 评审目标.value.trim();
   if (目标 === '') {
     return;
   }
-  try {
-    if (轮次 === 'yi_shen') {
-      await 审核初审(当前标签.value, { mu_biao_id: 目标, tong_guo: 通过, bei_zhu: 可选文本(评审备注.value) });
-    } else {
-      await 审核复审(当前标签.value, { mu_biao_id: 目标, tong_guo: 通过, bei_zhu: 可选文本(评审备注.value) });
-    }
+  成功提示.value = '';
+  await 执行请求(错误状态, undefined, () => 轮次 === 'yi_shen'
+    ? 审核初审(当前标签.value, { mu_biao_id: 目标, tong_guo: 通过, bei_zhu: 可选文本(评审备注.value) })
+    : 审核复审(当前标签.value, { mu_biao_id: 目标, tong_guo: 通过, bei_zhu: 可选文本(评审备注.value) }), async () => {
     成功提示.value = 审核文案.评审成功;
     await 查询();
-  } catch (错误) {
-    显示错误(错误);
-  }
+  }, () => 提交评审(轮次, 通过));
 }
 
 async function 提交多项处理(通过: boolean): Promise<void> {
-  开始提交();
   const 清单 = 多项目标.value.split(/[,，\s]+/).map((项) => 项.trim()).filter((项) => 项.length > 0);
   if (清单.length === 0) {
     return;
   }
-  try {
-    await 审核多项处理(当前标签.value, { mu_biao_ids: 清单, lun_ci: 'yi_shen', tong_guo: 通过 });
+  成功提示.value = '';
+  await 执行请求(错误状态, undefined, () => 审核多项处理(当前标签.value, { mu_biao_ids: 清单, lun_ci: 'yi_shen', tong_guo: 通过 }), async () => {
     成功提示.value = 审核文案.处理多项成功;
     await 查询();
-  } catch (错误) {
-    显示错误(错误);
-  }
+  }, () => 提交多项处理(通过));
 }
 
 function 上一页(): void {
@@ -159,6 +140,10 @@ function 下一页(): void {
   const 当前 = 分页.value?.ye_ma ?? 默认页码;
   void 查询(当前 + 1);
 }
+
+onBeforeUnmount(() => {
+  作废错误();
+});
 
 onMounted(() => {
   void 查询();
@@ -174,8 +159,7 @@ onMounted(() => {
     />
     <XiaoXiTiao
       xing-tai="cuo-wu"
-      :wen-ben="错误提示"
-      :cuo-wu-ma="错误码"
+      :错误状态="错误状态"
     />
     <div class="标签页">
       <button
@@ -226,7 +210,7 @@ onMounted(() => {
     />
     <XiaoXiTiao
       xing-tai="kong"
-      :xian-shi="!加载中 && 行列表.length === 0"
+      :xian-shi="当前错误 === null && !加载中 && 行列表.length === 0"
     />
     <ShuJuBiaoGe
       :lie="列定义登记.审核列表"
@@ -411,7 +395,7 @@ onMounted(() => {
     </h3>
     <XiaoXiTiao
       xing-tai="kong"
-      :xian-shi="处理记录行.length === 0"
+      :xian-shi="当前错误 === null && 处理记录行.length === 0"
     />
     <ShuJuBiaoGe
       :lie="列定义登记.审核留痕"

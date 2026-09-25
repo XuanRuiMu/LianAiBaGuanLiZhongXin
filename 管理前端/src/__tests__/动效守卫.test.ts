@@ -803,7 +803,13 @@ const 能力写点封闭 = (仓库: string): boolean => {
   return 全站 > 0 && 全站 === (允许.match(/能力列表\.value =/g) ?? []).length;
 };
 
+const 非测试源码缓存 = new Map<string, string[]>();
+
 function 非测试源码清单(目录 = 'src'): string[] {
+  const 已缓存 = 非测试源码缓存.get(目录);
+  if (已缓存 !== undefined) {
+    return 已缓存;
+  }
   const 出: string[] = [];
   for (const 名 of fs.readdirSync(目录)) {
     if (名 === '__tests__') {
@@ -816,6 +822,7 @@ function 非测试源码清单(目录 = 'src'): string[] {
       出.push(全);
     }
   }
+  非测试源码缓存.set(目录, 出);
   return 出;
 }
 
@@ -832,17 +839,30 @@ const 冷启动放行前提 = (仓库 = 读('src/stores/登录.ts'), 路由 = �
   return 单次闸门 && 守卫等待 && /export function 持久令牌冷启动\(\): boolean \{/.test(仓库);
 };
 
+let 权限位前提缓存: boolean | undefined;
+
 const 权限位前提 = (): boolean => {
+  if (权限位前提缓存 !== undefined) {
+    return 权限位前提缓存;
+  }
   const 仓库 = 读('src/stores/登录.ts');
-  return (
-    /const 能力列表 = ref<管理能力名\[\]>\(读能力\(\)\)/.test(仓库) && 能力写点封闭(仓库) && 能力读方封闭() && 冷启动放行前提()
-  );
+  权限位前提缓存 =
+    /const 能力列表 = ref<管理能力名\[\]>\(读能力\(\)\)/.test(仓库) && 能力写点封闭(仓库) && 能力读方封闭() && 冷启动放行前提();
+  return 权限位前提缓存;
 };
 
+const 随行前提缓存 = new Map<string, boolean>();
+
 function 随行前提(文件: string): boolean {
+  const 已缓存 = 随行前提缓存.get(文件);
+  if (已缓存 !== undefined) {
+    return 已缓存;
+  }
   const 源 = 读(文件).replace(/\r/g, '');
   const 切换 = [...源.matchAll(/function 切换(?:标签|模式)[^)]*\)\s*:\s*void\s*\{([\s\S]*?)\n\}/g)].map((匹) => 匹[1]);
-  return 切换.length > 0 && 切换.every((体) => /行列表\.value = \[\]/.test(体));
+  const 结果 = 切换.length > 0 && 切换.every((体) => /行列表\.value = \[\]/.test(体));
+  随行前提缓存.set(文件, 结果);
+  return 结果;
 }
 
 const 动态运算符 = /\?|&&|\|\||\.length/;
@@ -851,7 +871,12 @@ function 转短横线(名: string): string {
   return 名.replace(/[A-Z]/g, (词) => `-${词.toLowerCase()}`);
 }
 
+let vue源清单缓存: string[] | undefined;
+
 function vue源清单(): string[] {
+  if (vue源清单缓存 !== undefined) {
+    return vue源清单缓存;
+  }
   const 出: string[] = [];
   function 走(目录: string): void {
     for (const 名 of fs.readdirSync(目录)) {
@@ -866,10 +891,17 @@ function vue源清单(): string[] {
   for (const 目录 of ['src/views', 'src/components']) {
     走(目录);
   }
-  return [...出, 'src/App.vue'];
+  vue源清单缓存 = [...出, 'src/App.vue'];
+  return vue源清单缓存;
 }
 
+const 装载实参封闭缓存 = new Map<string, boolean>();
+
 const 装载实参封闭 = (属性名: string): boolean => {
+  const 已缓存 = 装载实参封闭缓存.get(属性名);
+  if (已缓存 !== undefined) {
+    return 已缓存;
+  }
   const 绑 = new RegExp(`:${转短横线(属性名)}="([^"]*)"`, 'g');
   const 实参: string[] = [];
   for (const 文件 of vue源清单()) {
@@ -877,7 +909,9 @@ const 装载实参封闭 = (属性名: string): boolean => {
       实参.push(匹[1].trim());
     }
   }
-  return 实参.length > 0 && 实参.every((式) => /^[\w\u4e00-\u9fa5]+文案\.[\w\u4e00-\u9fa5]+$/.test(式) || /^'[^']*'$/.test(式));
+  const 结果 = 实参.length > 0 && 实参.every((式) => /^[\w\u4e00-\u9fa5]+文案\.[\w\u4e00-\u9fa5]+$/.test(式) || /^'[^']*'$/.test(式));
+  装载实参封闭缓存.set(属性名, 结果);
+  return 结果;
 };
 
 const 恒定判据: { 码: string; 判定: (节点: 条件节点) => boolean; 理由: string }[] = [
@@ -911,19 +945,22 @@ function 属性门控(节点: 条件节点): boolean {
   return 声明.includes(`${节点.表达式}?`) || 声明.includes(`${节点.表达式}:`) ? !new RegExp(`const ${节点.表达式}\\s*=`).test(源) : false;
 }
 
+const 归类缓存 = new WeakMap<条件节点, string>();
+
 function 归类(节点: 条件节点): string {
+  if (归类缓存.has(节点)) {
+    return 归类缓存.get(节点) ?? '';
+  }
+  let 结果: string;
   if (节点.并生循环 || (节点.直接子 && 节点.标签 === 'template')) {
-    return '';
+    结果 = '';
+  } else if (节点.直接子 && 动效族.includes(节点.祖先族)) {
+    结果 = `族:${节点.祖先族}`;
+  } else {
+    结果 = 恒定判据.find((条) => 条.判定(节点))?.码 ?? '';
   }
-  if (节点.直接子 && 动效族.includes(节点.祖先族)) {
-    return `族:${节点.祖先族}`;
-  }
-  for (const 条 of 恒定判据) {
-    if (条.判定(节点)) {
-      return 条.码;
-    }
-  }
-  return '';
+  归类缓存.set(节点, 结果);
+  return 结果;
 }
 
 function 恒定归类的结果(站点: 条件节点[]): { 违例: string[]; 已用: Set<string> } {
@@ -948,7 +985,10 @@ function 族使用者数(站点: 条件节点[], 族: string): number {
 
 function 按判据计数(站点: 条件节点[], 判据: string): number {
   const 目标 = 判据.trim();
-  return 站点.filter((节点) => 归类(节点) === 目标 || `族:${目标}` === 归类(节点)).length;
+  return 站点.filter((节点) => {
+    const 码 = 归类(节点);
+    return 码 === 目标 || `族:${目标}` === 码;
+  }).length;
 }
 
 function ast条件节点数(目录清单: string[]): { 总数: number; 明细: Record<string, number> } {
@@ -1107,7 +1147,7 @@ describe('FP-05 组件级动效与瞬时面穷尽', () => {
     expect(恒定归类的结果(动态选形).违例.length).toBe(1);
     const 内建根站点: 条件节点[] = [...站点, { 文件: 'src/views/伪造.vue', 行: 5, 标签: 'XiaoXiTiao', 指令: 'if', 表达式: '说明', 祖先族: '', 链主判据: '', 直接子: false, 并生循环: false }];
     expect(恒定归类的结果(内建根站点).违例.some((项) => 项.includes('<XiaoXiTiao'))).toBe(true);
-    const 脏样式 = 主题样式.replace(/\.块-enter-from,\s\.块-leave-to \{/, '.块-enter-from {');
+    const 脏样式 = 主题样式.replace(/\.块-leave-to/g, '.块-removed');
     expect(选择器全集聚(主题样式).has('.块-leave-to')).toBe(true);
     expect(动效后缀.filter((后缀) => !选择器全集聚(脏样式).has(`.块-${后缀}`))).toEqual(['leave-to']);
     const 脏节奏 = 扫描裸节奏([{ 路径: '脏.css', 文本: '.条-enter-active { transition: opacity 200ms ease-out; }' }], 节奏例外);
@@ -1186,7 +1226,7 @@ describe('FP-08 离场语义与站点归类修正', () => {
     expect(恒定判据.map((条) => 条.码)).not.toContain('恒定:内建过渡');
     expect(条件节点清单().some((节点) => Object.prototype.hasOwnProperty.call(内建过渡组件, 节点.标签)), '内建过渡组件的调用点不得再写 v-if').toBe(false);
     const 外壳模板 = 读('src/views/思考链.vue');
-    expect(外壳模板).toMatch(/:xian-shi="!说明 \|\| 说明\.dai_bu_chong\.length === 0"/);
+    expect(外壳模板).toMatch(/:xian-shi="说明错误 === null && \(!说明 \|\| 说明\.dai_bu_chong\.length === 0\)"/);
     expect(外壳模板).not.toMatch(/<XiaoXiTiao\s+v-if=/);
   });
 
@@ -1337,6 +1377,7 @@ describe('FP-04 路由过渡落地时序', () => {
       routes: [
         { path: '/lu', component: 探针乙, meta: { xuYaoDengLu: false } },
         { path: '/tan', component: 探针甲, meta: { xuYaoDengLu: true } },
+        { path: '/:pathMatch(.*)*', component: { render: () => null } },
       ],
     });
     const 包装 = mount(探针宿主, { global: { plugins: [路由器] }, attachTo: document.body });

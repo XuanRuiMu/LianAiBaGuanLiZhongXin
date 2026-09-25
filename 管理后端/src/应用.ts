@@ -7,7 +7,7 @@ import { 取文案 } from './文案';
 import { 成功响应, 失败响应 } from './响应';
 import { 错误码 } from './错误码';
 import { 日志, 取请求编号 } from './日志';
-import { 归一化错误中间件 } from './错误归一化';
+import { 响应健康检查失败, 归一化错误中间件 } from './错误归一化';
 import type { 查询池 } from './数据库';
 import type { 缓存客户端 } from './缓存';
 import { 认证中间件 } from './中间件/认证';
@@ -136,31 +136,33 @@ export function 创建应用(选项: 应用选项 = {}) {
     成功响应(响应, { zhuang_tai: '正常', shi_jian: new Date().toISOString() });
   });
 
-  应用.get('/api/ready', async (_请求: Request, 响应: Response): Promise<void> => {
-    const 池 = (_请求.app.locals as { 池?: 查询池 }).池;
-    const 缓存 = (_请求.app.locals as { 缓存?: 缓存客户端 }).缓存;
+  应用.get('/api/ready', async (请求: Request, 响应: Response): Promise<void> => {
+    const 池 = (请求.app.locals as { 池?: 查询池 }).池;
+    const 缓存 = (请求.app.locals as { 缓存?: 缓存客户端 }).缓存;
+    const 故障: unknown[] = [];
     if (!池) {
-      成功响应(响应, { zhuang_tai: 'bu_ke_yong', jiu_xu: false, kui: ['shu_ju_ku_wei_zhu_ru'] });
-      return;
-    }
-    const 故障: string[] = [];
-    try {
-      await 池.query('SELECT 1', []);
-    } catch {
-      故障.push('shu_ju_ku_bu_ke_da');
-    }
-    if (缓存) {
+      故障.push(new Error('查询依赖未注入'));
+    } else {
       try {
-        await 缓存.set('jian_kang_tan_zhen', '1', 10);
-      } catch {
-        故障.push('huan_cun_bu_ke_da');
+        await 池.query('SELECT 1', []);
+      } catch (错误) {
+        故障.push(错误);
       }
     }
-    if (故障.length === 0) {
-      成功响应(响应, { zhuang_tai: 'jiu_xu', jiu_xu: true, kui: [] });
+    if (!缓存) {
+      故障.push(new Error('缓存依赖未注入'));
+    } else {
+      try {
+        await 缓存.set('jian_kang_tan_zhen', '1', 10);
+      } catch (错误) {
+        故障.push(错误);
+      }
+    }
+    if (故障.length > 0) {
+      响应健康检查失败(响应, '就绪检查', 故障, 请求);
       return;
     }
-    成功响应(响应, { zhuang_tai: 'jiang_ji', jiu_xu: false, kui: 故障 });
+    成功响应(响应, { zhuang_tai: 'jiu_xu', jiu_xu: true, kui: [] });
   });
 
   应用.get('/api/zhi-biao', async (_请求: Request, 响应: Response): Promise<void> => {

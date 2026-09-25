@@ -60,7 +60,7 @@
 
 ### 体积与浏览器基线
 
-构建产物由 vite 在 build 期内存度量并写进 `dist/build-stats.json`，`体积预算.test.ts` 用源码指纹绑定当前源码：首屏 index gzip **48,670 B**（裁定值 49,160 B）、首屏原始 **125,639 B**（裁定值 126,070 B）、全站 js+css gzip **84,046 B**（裁定值 84,530 B）。浏览器侧只依赖 `fetch` 的 `credentials:'include'` 与 `AbortSignal.timeout`（门槛见 [部署手册 1.2](docs/部署手册.md)）。
+构建产物由 vite 在 build 期内存度量并写进 `dist/build-stats.json`，`体积预算.test.ts` 用源码指纹绑定当前源码：首屏 index gzip **48,936 B**（硬指标 49,160 B）、首屏原始 **125,143 B**（硬指标 126,070 B）、全站 js+css gzip **87,630 B**（裁定值 88,000 B，余量 370 B）。FP-15 新链相比前基线全站增加 **3,330 B**、首屏实测锁增加 **168 B**；首屏仍低于原硬指标。浏览器侧只依赖 `fetch` 的 `credentials:'include'` 与 `AbortSignal.timeout`（门槛见 [部署手册 1.2](docs/部署手册.md)）。
 
 ---
 

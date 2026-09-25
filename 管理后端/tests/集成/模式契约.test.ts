@@ -1,10 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { Pool } from 'pg';
-import fs from 'node:fs';
-import path from 'node:path';
-import dotenv from 'dotenv';
 import { 取管理角色, 按用户编号取角色, 清空管理员缓存 } from '../../src/中间件/管理员';
 import { 登录取用户语句 } from '../../src/路由/登录';
+import { 创建隔离数据库池 } from '../测试数据库';
 
 /**
  * 用户表RBAC模式契约（真连库）。
@@ -12,49 +9,11 @@ import { 登录取用户语句 } from '../../src/路由/登录';
  * 于是 Postgres 42703 一路吞成通用 500，服务全绿却整站不可用。
  */
 
-const 假连接串标记 = 'localhost:5432/test';
 const 契约列 = ['管理员', '运营', '审核员'];
-
-function 取真实连接串(): string {
-  const 显式 = (process.env.TEST_DATABASE_URL ?? '').trim();
-  if (显式 !== '') {
-    return 显式;
-  }
-  const 运行值 = (process.env.DATABASE_URL ?? '').trim();
-  if (运行值 !== '' && !运行值.includes(假连接串标记)) {
-    return 运行值;
-  }
-  const 环境文件 = path.resolve(__dirname, '..', '..', '.env');
-  try {
-    const 解析 = dotenv.parse(fs.readFileSync(环境文件));
-    return (解析['DATABASE_URL'] ?? '').trim();
-  } catch {
-    return '';
-  }
-}
-
-async function 取真实池(): Promise<Pool | null> {
-  const 连接串 = 取真实连接串();
-  if (连接串 === '') {
-    console.warn('[模式契约] 未配置真实库连接串（TEST_DATABASE_URL / DATABASE_URL / 管理后端/.env），跳过');
-    return null;
-  }
-  const 池 = new Pool({ connectionString: 连接串, connectionTimeoutMillis: 3000 });
-  try {
-    await 池.query('SELECT 1');
-    return 池;
-  } catch {
-    await 池.end().catch(() => undefined);
-    throw new Error('[模式契约] 已配置真实库连接串但不可达，禁止静默跳过');
-  }
-}
 
 describe('用户表RBAC模式契约', () => {
   it('用户表存在 管理员/运营/审核员 三列且旗标列非空有默认值', async () => {
-    const 池 = await 取真实池();
-    if (!池) {
-      return;
-    }
+    const 池 = await 创建隔离数据库池();
     try {
       const 结果 = await 池.query(
         'SELECT column_name, is_nullable, column_default, data_type FROM information_schema.columns WHERE table_name = $1 ORDER BY column_name',
@@ -76,10 +35,7 @@ describe('用户表RBAC模式契约', () => {
   }, 20000);
 
   it('管理端角色查询语句在真实库可直接执行且映射合法', async () => {
-    const 池 = await 取真实池();
-    if (!池) {
-      return;
-    }
+    const 池 = await 创建隔离数据库池();
     try {
       // 复现 #17 的原始语句本身：改前此处在 42703 上直接抛错
       const 结果 = await 池.query('SELECT "管理员", "运营", "审核员" FROM "用户" ORDER BY "创建时间" ASC LIMIT 1');
@@ -102,10 +58,7 @@ describe('用户表RBAC模式契约', () => {
   }, 20000);
 
   it('登录取用户语句在真实库可直接执行且七列可读', async () => {
-    const 池 = await 取真实池();
-    if (!池) {
-      return;
-    }
+    const 池 = await 创建隔离数据库池();
     try {
       const 结果 = await 池.query(登录取用户语句, ['00000000000']);
       expect(Array.isArray(结果.rows)).toBe(true);
@@ -120,10 +73,7 @@ describe('用户表RBAC模式契约', () => {
   }, 20000);
 
   it('真实库门禁按三旗标解析角色：超管行解析为 chao_guan，无旗标行为 null', async () => {
-    const 池 = await 取真实池();
-    if (!池) {
-      return;
-    }
+    const 池 = await 创建隔离数据库池();
     try {
       清空管理员缓存();
       const 超管 = await 池.query('SELECT "ID" FROM "用户" WHERE "管理员" IS TRUE LIMIT 1');
@@ -143,10 +93,7 @@ describe('用户表RBAC模式契约', () => {
   }, 20000);
 
   it('真库回滚事务内三角色旗标各解析为对应角色（不落库，不改真实用户数据）', async () => {
-    const 池 = await 取真实池();
-    if (!池) {
-      return;
-    }
+    const 池 = await 创建隔离数据库池();
     const 客户端 = await 池.connect();
     let 已回滚 = false;
     const 回滚 = async (): Promise<void> => {

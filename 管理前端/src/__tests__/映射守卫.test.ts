@@ -36,6 +36,7 @@ import {
   是正常封禁级别,
 } from '../枚举映射';
 import { 使用登录仓库 } from '../stores/登录';
+import { 是已知服务端错误码 } from '../api/错误展示';
 import { 路由表 } from '../router';
 
 const 校验源路径 = '../管理后端/src/校验.ts';
@@ -71,8 +72,9 @@ function 取契约错误码(): string[] {
   if (起 < 0) {
     throw new Error('docs/契约.md 缺「十五、管理端错误码表」，码表无出处');
   }
+  const 前端起点 = 行清单.findIndex((项) => 项.startsWith('### 前端'));
   const 码 = 行清单
-    .slice(起)
+    .slice(起, 前端起点 < 0 ? undefined : 前端起点)
     .map((项) => /^\|\s*([A-Z][A-Z_]*)\s*\|/.exec(项)?.[1])
     .filter((项): 项 is string => 项 !== undefined);
   if (码.length === 0) {
@@ -83,11 +85,11 @@ function 取契约错误码(): string[] {
 
 function 取后端错误码(): string[] {
   const 源 = 读(后端错误码源路径);
-  const 命中 = /export const 错误码 = \{([\s\S]*?)\} as const/.exec(源);
+  const 命中 = /export const 错误注册表 = \{([\s\S]*?)\} as const/.exec(源);
   if (命中 === null) {
-    throw new Error('管理后端/src/错误码.ts 的 错误码 常量解析失败，三方同源守卫拒绝空跑');
+    throw new Error('管理后端/src/错误码.ts 的 错误注册表解析失败，三方同源守卫拒绝空跑');
   }
-  const 码 = [...命中[1].matchAll(/'([A-Z][A-Z_]*)'/g)].map((项) => 项[1]);
+  const 码 = [...命中[1].matchAll(/code:\s*'([A-Z][A-Z_]*)'/g)].map((项) => 项[1]);
   if (码.length === 0) {
     throw new Error('管理后端/src/错误码.ts 解析出 0 个码');
   }
@@ -387,7 +389,9 @@ describe('FP-09C 错误码三方同源', () => {
     expect(后端码.length).toBeGreaterThanOrEqual(18);
     expect([...集合差(后端码, 契约码), ...集合差(契约码, 后端码)]).toEqual([]);
     expect([...集合差(后端码, 术语表码), ...集合差(术语表码, 后端码)]).toEqual([]);
-    expect(new Set(后端码).size).toBe(后端码.length);
+     expect(new Set(后端码).size).toBe(后端码.length);
+     expect(后端码.every((码) => 是已知服务端错误码(码))).toBe(true);
+     expect(是已知服务端错误码('XIN_ZENG_MA')).toBe(false);
   });
 
   it('反证：少一行、多一行、改一行都能被打红', () => {
@@ -430,6 +434,10 @@ beforeEach(() => {
   vi.clearAllMocks();
   使用登录仓库().设置身份('chao_guan', ['cha_kan', 'feng_jin', 'feng_jin_shen_he', 'tong_ji_xie', 'gao_we']);
 });
+
+vi.mock('../api/探针', () => ({
+  就绪检查: vi.fn().mockResolvedValue({ zhuang_tai: 'jiu_xu', jiu_xu: true, kui: [] }),
+}));
 
 vi.mock('../api/管理', () => ({
   账号列表: vi.fn().mockResolvedValue({ 行: [], 分页: undefined }),
@@ -475,7 +483,6 @@ vi.mock('../api/管理', () => ({
   留存统计: vi.fn().mockResolvedValue({}),
   用量统计: vi.fn().mockResolvedValue({}),
   埋点字典: vi.fn().mockResolvedValue({}),
-  就绪检查: vi.fn(),
   指标概览: vi.fn(),
   审核列表: vi.fn().mockResolvedValue({ 行: [], 分页: undefined }),
   审核新建: vi.fn(),
@@ -483,6 +490,13 @@ vi.mock('../api/管理', () => ({
   审核复审: vi.fn(),
   审核多项处理: vi.fn(),
   处理记录列表: vi.fn().mockResolvedValue({ 行: [], 分页: undefined }),
+}));
+
+vi.mock('../api/会话', () => ({
+  我的身份: vi.fn().mockResolvedValue({ yong_hu_id: 'yi', jiao_se: 'chao_guan', neng_li: ['cha_kan'] }),
+  管理登录: vi.fn(),
+  刷新管理令牌: vi.fn().mockRejectedValue(new Error('wei-deng-lu')),
+  管理登出: vi.fn().mockResolvedValue({ yi_tui_chu: true }),
 }));
 
 const 接口 = await import('../api/管理');

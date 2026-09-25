@@ -4,9 +4,13 @@
   "description": "恋爱吧管理中心 n8n 自定义节点",
   "license": "MIT",
   "main": "dist/index.js",
+  "packageManager": "npm@11.19.1",
+  "engines": {
+    "node": ">=26.10.0 <27"
+  },
   "scripts": {
     "build": "tsc",
-    "test": "node --test dist/*.test.js"
+    "test": "npm run build && node --test test/nodes.test.cjs"
   },
   "n8n": {
     "n8nNodesApiVersion": 1,
@@ -19,9 +23,9 @@
     ]
   },
   "devDependencies": {
-    "typescript": "^5.9.3"
+    "typescript": "7.0.2"
   },
   "dependencies": {
-    "n8n-workflow": "^1.82.0"
+    "n8n-workflow": "2.40.1"
   }
 }

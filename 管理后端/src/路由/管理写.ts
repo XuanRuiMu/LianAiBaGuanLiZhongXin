@@ -78,7 +78,7 @@ export function 创建管理写路由(写限流: RequestHandler): Router {
   const 路由 = Router();
   // YH-108 高危写入口无旁路开关：授回收/夺舍/归还仅超管可执行，门禁缺失即静默提权
   const 高危门禁: RequestHandler = (请求, 响应, 下一步) => {
-    void import('../中间件/管理员').then(({ 高危操作门禁 }) => 高危操作门禁(请求, 响应, 下一步));
+    void import('../中间件/管理员.js').then(({ 高危操作门禁 }) => 高危操作门禁(请求, 响应, 下一步));
   };
 
   路由.post('/shou-quan', 写限流, 高危门禁, async (请求: Request, 响应: Response): Promise<void> => {
