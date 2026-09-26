@@ -37,6 +37,15 @@ DATABASE_URL="$databaseUrl" node "$migrationRoot/backend/scripts/run_migration.j
 registeredCount="$("${compose[@]}" exec -T postgres psql -U lovewithme -d lovewithme_test -Atc 'SELECT count(*) FROM schema_migrations')"
 test "$registeredCount" = "$migrationCount"
 
+# 真库门禁：tests/真库 下的用例按 tests/测试数据库.ts 的硬规矩，只允许由隔离门禁注入
+# TEST_DATABASE_URL 后执行（禁止回退 .env 或跳过），故必须在此处、迁移落地后运行。
+# 放在三服务 build 之前，失败可尽早暴露，不必等镜像构建完。
+echo "执行管理后端真库门禁：tests/真库"
+(
+  cd "$managementDir/管理后端"
+  TEST_DATABASE_URL="$databaseUrl" npm run --silent test:真库
+)
+
 "${compose[@]}" up -d --build --wait management-backend tts-service n8n
 backendPort="$("${compose[@]}" port management-backend 3100 | sed 's/.*://')"
 ttsPort="$("${compose[@]}" port tts-service 8000 | sed 's/.*://')"
@@ -57,4 +66,4 @@ for _ in $(seq 1 30); do
 done
 test "$loginReady" = true
 "${compose[@]}" exec -T n8n node -e "for (const file of ['查询统计','发起问答','触发流程','语音合成']) require('/home/node/.n8n/custom/n8n-nodes-liaolian/dist/nodes/' + file + '.node.js')"
-echo "隔离门禁通过：迁移=${registeredCount}，三服务健康，n8n节点可加载"
+echo "隔离门禁通过：迁移=${registeredCount}，真库门禁已过，三服务健康，n8n节点可加载"

@@ -8,7 +8,8 @@
     "build": "tsc --noEmit && tsc -p tsconfig.build.json",
     "start": "node dist/启动.js",
     "lint": "eslint .",
-    "test": "vitest run"
+    "test": "vitest run tests/单元",
+    "test:真库": "vitest run tests/真库"
   },
   "engines": {
     "node": ">=26.0.0"

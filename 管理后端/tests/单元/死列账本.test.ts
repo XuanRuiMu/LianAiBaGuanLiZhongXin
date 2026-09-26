@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
-import { 创建隔离数据库池 } from '../测试数据库';
 
 const 后端根 = path.resolve(__dirname, '..', '..');
 const 管理端根 = path.resolve(后端根, '..');
@@ -117,19 +116,6 @@ const 前端列定义源 = fs.readFileSync(path.join(管理端根, '管理前端
 const 前端枚举出口源 = fs.readFileSync(path.join(管理端根, '管理前端', 'src', '枚举映射.ts'), 'utf8');
 const 账号列清单 = 取常量列(后端账号源, '列表列');
 
-async function 取表列(表: string): Promise<Set<string>> {
-  const 池 = await 创建隔离数据库池();
-  try {
-    const 结果 = await 池.query(
-      'SELECT column_name FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = $1',
-      [表],
-    );
-    return new Set(结果.rows.map((行) => String(行['column_name'])));
-  } finally {
-    await 池.end().catch(() => undefined);
-  }
-}
-
 describe('FP-28a 用户.性别 死列读取账本（管理中心删列前置条件）', () => {
   it('扫描面与禁读形态本身非空，账本不允许空跑', () => {
     const 文件数 = 扫描面.reduce((计, 面) => 计 + 源文件清单(面.根, 面.后缀).length, 0);
@@ -164,25 +150,6 @@ describe('FP-28a 用户.性别 死列读取账本（管理中心删列前置条�
     const 码集 = [...键表体.matchAll(/^\s+([^:]+):/gm)].map((匹配) => 匹配[1].trim()).sort();
     expect(码集).toEqual(['female', 'male']);
     expect(族源).not.toMatch(/'nan'|'nv'|=== 'female'|=== 'male'/);
-  });
-
-  it('真库只读核对：账号列清单的每一列都在真实库存在，且清单里没有 `性别`', async () => {
-    const 用户列 = await 取表列('用户');
-    const 封禁列 = await 取表列('账号封禁');
-    const 缺列: string[] = [];
-    for (const 段 of 账号列清单) {
-      const 命中 = /^(?:u|f)\."([^"]+)"(?:\s+AS\s+"([^"]+)")?$/.exec(段);
-      if (命中 === null) {
-        throw new Error(`账号列清单解析不出片段：${段}`);
-      }
-      const 表列 = 段.startsWith('u.') ? 用户列 : 封禁列;
-      if (!表列.has(命中[1])) {
-        缺列.push(`${段.startsWith('u.') ? '用户' : '账号封禁'}.${命中[1]}`);
-      }
-    }
-    expect(缺列, '账号列清单里有真实库不存在的列，删列或改列后账本未同步').toEqual([]);
-    expect(用户列.has('默认性别'), '`默认性别` 需由 037 迁移补齐，未补齐的库上此读点即 42703').toBe(true);
-    expect(账号列清单.some((段) => 段 === 'u."性别"')).toBe(false);
   });
 
   it('反证：把任一禁读形态塞回源码都要被账本判红，且放行合规行', () => {

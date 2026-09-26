@@ -73,12 +73,21 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Checkout sibling repo 和我恋爱吧（跨仓同源守卫需读对端真源）
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: XuanRuiMu/HeWoLianAiBa
+          ref: main
+          path: 和我恋爱吧
+          persist-credentials: false
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
           node-version: '26.10.0'
           cache: npm
           cache-dependency-path: 管理后端/package-lock.json
-      - name: 冻结安装构建检查并测试
+      - name: 冻结安装构建检查并测试（单元车道，不含真库）
         working-directory: 管理后端
         run: |
           npm ci
@@ -92,6 +101,15 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Checkout sibling repo 和我恋爱吧（映射守卫需读对端生产真源）
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: XuanRuiMu/HeWoLianAiBa
+          ref: main
+          path: 和我恋爱吧
+          persist-credentials: false
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
           node-version: '26.10.0'
@@ -118,7 +136,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: XuanRuiMu/HeWoLianAiBa
-          ref: 3b28d2e5c3abe6e35fe51e6c860c246618f231c2
+          ref: main
           path: 和我恋爱吧
           persist-credentials: false
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
@@ -129,5 +147,5 @@ jobs:
       - name: 安装迁移执行器依赖
         working-directory: 管理后端
         run: npm ci
-      - name: 执行隔离迁移构建健康与节点加载门禁
+      - name: 执行隔离迁移构建健康、真库门禁与节点加载门禁
         run: bash infra/scripts/verify-isolated.sh
