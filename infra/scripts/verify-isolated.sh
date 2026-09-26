@@ -54,16 +54,29 @@ curl --fail --silent --show-error "http://127.0.0.1:${backendPort}/api/jian-kang
 curl --fail --silent --show-error "http://127.0.0.1:${ttsPort}/health" >/dev/null
 curl --fail --silent --show-error "http://127.0.0.1:${n8nPort}/healthz" >/dev/null
 loginReady=false
+# n8n 2.x 的 /rest/login 账号字段是 emailOrLdapLoginId，不是旧版的 email。
+# 传 email 会被 zod 判为缺字段并返回 400：
+#   {"code":"invalid_type","expected":"string","received":"undefined",
+#    "path":["emailOrLdapLoginId"],"message":"Required"}
+# 密码仍走 bcrypt 校验，传错密码返回 401，故本检查不会被「一律 200」架空。
 for _ in $(seq 1 30); do
   if curl --fail --silent --show-error \
     -H 'Content-Type: application/json' \
-    --data-binary '{"email":"fp04b-ci@example.invalid","password":"fp04b-ci-only"}' \
+    --data-binary '{"emailOrLdapLoginId":"fp04b-ci@example.invalid","password":"fp04b-ci-only"}' \
     "http://127.0.0.1:${n8nPort}/rest/login" >/dev/null; then
     loginReady=true
     break
   fi
   sleep 2
 done
+if [ "$loginReady" != true ]; then
+  echo "n8n 登录在 60 秒内未就绪，最后一次响应：" >&2
+  curl --silent --show-error \
+    -H 'Content-Type: application/json' \
+    --data-binary '{"emailOrLdapLoginId":"fp04b-ci@example.invalid","password":"fp04b-ci-only"}' \
+    "http://127.0.0.1:${n8nPort}/rest/login" >&2 || true
+  echo >&2
+fi
 test "$loginReady" = true
 "${compose[@]}" exec -T n8n node -e "for (const file of ['查询统计','发起问答','触发流程','语音合成']) require('/home/node/.n8n/custom/n8n-nodes-liaolian/dist/nodes/' + file + '.node.js')"
 echo "隔离门禁通过：迁移=${registeredCount}，真库门禁已过，三服务健康，n8n节点可加载"
