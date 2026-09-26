@@ -5,6 +5,7 @@ declare module 'node:fs' {
   }
   interface 文件系统 {
     readFileSync(路径: string, 编码: string): string;
+    existsSync(路径: string): boolean;
     statSync(路径: string): 文件状态;
     readdirSync(路径: string): string[];
   }

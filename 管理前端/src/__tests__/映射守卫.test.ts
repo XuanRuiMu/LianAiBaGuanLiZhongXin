@@ -45,8 +45,14 @@ const 契约源路径 = '../docs/契约.md';
 const 术语表源路径 = '../docs/术语表.md';
 const 后端错误码源路径 = '../管理后端/src/错误码.ts';
 const 后端思考源路径 = '../管理后端/src/路由/思考.ts';
-const 生产事件白名单源路径 = '../../和我恋爱吧/backend/src/services/思考记录.ts';
-const 生产事件迁移源路径 = '../../和我恋爱吧/backend/database/migrations/018_思考记录.sql';
+/* 对端仓定位：本地工作区里两个项目是同级文件夹（cwd=管理前端，故为 ../../和我恋爱吧）；
+   GitHub Actions 的 checkout 只能落在工作区内（cwd=管理前端，故为 ../和我恋爱吧）。
+   两种布局都探一遍；都探不到时由读() 抛错，映射守卫不允许因布局不同而静默跳过。 */
+const 对端前缀 = ['../../和我恋爱吧', '../和我恋爱吧'].find((候选) =>
+  fs.existsSync(`${候选}/backend/src/services/思考记录.ts`),
+);
+const 生产事件白名单源路径 = 对端前缀 && `${对端前缀}/backend/src/services/思考记录.ts`;
+const 生产事件迁移源路径 = 对端前缀 && `${对端前缀}/backend/database/migrations/018_思考记录.sql`;
 
 function 取术语表错误码(): string[] {
   const 行 = 读(术语表源路径)
@@ -104,7 +110,10 @@ function 集合差(左: readonly string[], 右: readonly string[]): string[] {
 const 原码形态 = /[a-z]+_[a-z]+/;
 const 未收录形态 = /未收录（[^）]*）/g;
 
-function 读(路径: string): string {
+function 读(路径: string | undefined): string {
+  if (!路径) {
+    throw new Error('对端仓 和我恋爱吧 未检出（本地与 CI 两种布局均未命中），映射值域守卫拒绝空跑');
+  }
   return fs.readFileSync(路径, 'utf8');
 }
 

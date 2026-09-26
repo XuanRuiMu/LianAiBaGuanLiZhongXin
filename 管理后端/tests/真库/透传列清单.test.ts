@@ -5,7 +5,14 @@ import { 创建隔离数据库池 } from '../测试数据库';
 
 const 后端根 = path.resolve(__dirname, '..', '..');
 const 思考源 = path.join(后端根, 'src', '路由', '思考.ts');
-const 迁移根 = path.resolve(后端根, '..', '..', '和我恋爱吧', 'backend', 'database');
+/* 对端仓定位：本地工作区里两个项目是同级文件夹（位于本仓库根的父目录下）；
+   GitHub Actions 的 checkout 只能落在工作区内（即本仓库根下）。
+   两种布局都认，找不到时由取迁移文件 抛错——列出处对账绝不允许因布局不同而空跑。 */
+const 仓库根 = path.resolve(后端根, '..');
+const 对端仓根 = [path.resolve(仓库根, '..', '和我恋爱吧'), path.resolve(仓库根, '和我恋爱吧')].find(
+  (候选) => fs.existsSync(候选),
+);
+const 迁移根 = 对端仓根 && path.join(对端仓根, 'backend', 'database');
 const 思考记录表 = '思考记录';
 const 目标表名 = ['记忆', '对话摘要', '关键事件', '夺舍日志', '评估', 思考记录表];
 
@@ -124,7 +131,10 @@ function 取迁移文件(根: string): string[] {
   return ['init.sql', ...迁移.map((名) => path.join('migrations', 名))];
 }
 
-function 解析迁移列(根: string = 迁移根): Map<string, string[]> {
+function 解析迁移列(根: string | undefined = 迁移根): Map<string, string[]> {
+  if (根 === undefined) {
+    throw new Error('对端仓 和我恋爱吧 未检出（本地与 CI 两种布局均未命中），V-04 列出处对账无法执行');
+  }
   const 集合 = new Map<string, string[]>();
   const 并入 = (表: string, 列: string): void => {
     const 现有 = 集合.get(表) ?? [];
@@ -132,9 +142,9 @@ function 解析迁移列(根: string = 迁移根): Map<string, string[]> {
       集合.set(表, [...现有, 列]);
     }
   };
-  for (const 相对 of 取迁移文件(根)) {
-    const 文 = 剥行注释(fs.readFileSync(path.join(根, 相对), 'utf8'));
-    for (const 匹配 of 文.matchAll(语句正则)) {
+  const 迁移文件表 = 取迁移文件(根);
+  for (const 相对 of 迁移文件表) {
+    const 文 = 剥行注释(fs.readFileSync(path.join(根, 相对), 'utf8'));    for (const 匹配 of 文.matchAll(语句正则)) {
       const 句子 = 匹配[0];
       const 名字 = 取引号串(句子);
       if (/^CREATE\s+TABLE/i.test(句子)) {
@@ -342,7 +352,7 @@ describe('FP-11 透传列清单与真实库模式双向一致', () => {
     expect(未登记新增[0]).toContain('悄悄加的列');
 
     expect(() => 对账列('夺舍日志', ['ID'], [], {}, {})).toThrow('解析不出表 夺舍日志 的任何列');
-    expect(() => 解析迁移列(path.join(迁移根, '不存在'))).toThrow('生产迁移目录不存在');
+    expect(() => 解析迁移列(path.join(迁移根 ?? '未检出对端仓', '不存在'))).toThrow('生产迁移目录不存在');
 
     const 派生已失效 = 对账列('记忆', 记忆声明, 记忆列, { 内容: '样张：内容本就有物理列' }, {});
     expect(派生已失效).toHaveLength(1);
