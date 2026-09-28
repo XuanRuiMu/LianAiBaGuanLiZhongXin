@@ -21,14 +21,6 @@ function 取请求标识(请求: Request): string {
   return `ip:${ipKeyGenerator(取真实IP(请求) ?? 'unknown')}`;
 }
 
-function 取真实IP键(请求: Request): string {
-  try {
-    return ipKeyGenerator(取真实IP(请求));
-  } catch {
-    return 'unknown';
-  }
-}
-
 function 取缓存作存储(缓存: {
   get: (键: string) => Promise<string | null>;
   set: (键: string, 值: string, 存活秒?: number) => Promise<unknown>;
@@ -108,5 +100,3 @@ export function 创建写限流(选项: 限流选项 = {}, 缓存?: {
   const 配置 = 当前配置();
   return 创建限流器(配置.写限流窗口毫秒, 配置.写限流次数, 选项, 缓存);
 }
-
-export { 取真实IP键 };

@@ -43,9 +43,7 @@ describe('限频与热重载', () => {
     expect(当前配置().每页上限).toBe(100);
   });
 
-  it('密钥不在热重载键内生产绝不热重载', async () => {
-    const { 启动环境监听 } = await import('../../src/配置.js');
-    expect(typeof 启动环境监听).toBe('function');
+  it('轮换密钥后旧令牌即刻401', async () => {
     const 旧密钥 = String(process.env.JWT_SECRET);
     const 令牌 = 签发管理令牌();
     process.env.JWT_SECRET = 'lun-huan-hou-de-32-zi-jie-xin-mi-yao-abcdef';

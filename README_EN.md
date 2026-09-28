@@ -76,8 +76,8 @@ pip install -r tts-service/requirements.txt
 cp 管理后端/.env.example 管理后端/.env
 cp 管理前端/.env.example 管理前端/.env
 
-# 3. Start (one-click scripts at repo root)
-./本地启动.ps1        # or ./start.ps1
+# 3. Start (one-click script at repo root)
+./本地启动.ps1
 ```
 
 > See [部署手册](docs/部署手册.md), [运维手册](docs/运维手册.md), [用户手册](docs/用户手册.md) for details.
@@ -99,7 +99,7 @@ LianAiBaGuanLiZhongXin/
 ├── infra/                   # docker-compose / systemd / backup & restore / env config
 ├── docs/                    # architecture · contract · deploy · ops · user · tests · troubleshooting · FAQ
 │   └── archive/             # archived docs
-└── start.ps1 / 本地启动.ps1  # one-click launch
+└── 本地启动.ps1  # one-click launch
 ```
 
 Tests live next to the sources in the same repository: `管理前端/src/__tests__/` for the frontend, `管理后端/tests/{单元,集成}/` for the backend, and the seed-script test under `管理后端/scripts/`.

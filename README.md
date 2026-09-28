@@ -77,7 +77,7 @@ cp 管理后端/.env.example 管理后端/.env
 cp 管理前端/.env.example 管理前端/.env
 
 # 3. 启动（根目录一键脚本）
-./本地启动.ps1        # 或 ./start.ps1
+./本地启动.ps1
 ```
 
 > 详细步骤见 [部署手册](docs/部署手册.md)、[运维手册](docs/运维手册.md)、[用户手册](docs/用户手册.md)。
@@ -99,7 +99,7 @@ LianAiBaGuanLiZhongXin/
 ├── infra/                  # docker-compose / systemd / 备份恢复 / 多环境配置
 ├── docs/                   # 架构 · 契约 · 部署 · 运维 · 用户 · 测试 · 故障排查 · FAQ
 │   └── archive/            # 归档文档
-└── start.ps1 / 本地启动.ps1 # 一键启动脚本
+└── 本地启动.ps1 # 一键启动脚本
 ```
 
 测试与源码同仓同目录：前端在 `管理前端/src/__tests__/`，后端在 `管理后端/tests/{单元,集成}/`，建号脚本测试在 `管理后端/scripts/`。

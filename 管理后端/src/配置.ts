@@ -108,42 +108,6 @@ export function 当前配置(): 管理后端配置 {
   };
 }
 
-const 热重载键 = [
-  'FENYE_SHANG_XIAN',
-  'CHANG_GUI_XIAN_PIN_CI_SHU',
-  'CHANG_GUI_XIAN_PIN_CHUANG_KOU_MIAO',
-  'GUAN_LI_XIE_XIAN_PIN_CI_SHU',
-  'GUAN_LI_XIE_XIAN_PIN_CHUANG_KOU_MIAO',
-  'GUAN_LI_SHUA_XIN_YOU_XIAO_MIAO',
-  'ALLOWED_ORIGINS',
-  'NEI_WANG_BAI_MING_DAN',
-];
-
-export function 启动环境监听(工作目录: string = process.cwd()): () => void {
-  const 文件 = path.join(工作目录, '.env');
-  let 观察器: fs.FSWatcher | null = null;
-  try {
-    观察器 = fs.watch(文件, () => {
-      let 解析: Record<string, string>;
-      try {
-        解析 = dotenv.parse(fs.readFileSync(文件, 'utf8'));
-      } catch {
-        return;
-      }
-      for (const 键 of 热重载键) {
-        if (解析[键] !== undefined) {
-          process.env[键] = 解析[键];
-        }
-      }
-    });
-  } catch {
-    观察器 = null;
-  }
-  return () => {
-    观察器?.close();
-  };
-}
-
 const 主配置同源键 = ['DATABASE_URL', 'REDIS_URL', 'JWT_SECRET', 'JWT_EXPIRES_IN', 'GUAN_LI_SHUA_XIN_YOU_XIAO_MIAO', 'ADMIN_PHONES', 'ALLOWED_ORIGINS', 'NEI_WANG_BAI_MING_DAN', 'TRUST_PROXY', 'KE_XIN_DAI_LI_WANG_DUAN', 'FORCE_HTTPS', 'VITE_API_PROXY_TARGET', 'INTERNAL_TOKEN', 'TTS_SERVICE_URL'];
 
 function 解析环境文件(文件: string): Record<string, string> {
