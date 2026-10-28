@@ -1,4 +1,5 @@
-import { 解析包络, 请求实例, type 分页信息, type 响应包装 } from './请求';
+import { 创建前端错误, 解析包络, 请求实例, 前端错误码, type 分页信息, type 响应包装 } from './请求';
+import { 通用文案 } from '../文案/通用';
 
 export type 分页查询 = {
   ye_ma?: number;
@@ -113,18 +114,24 @@ export type 审核新建 = {
   kai_shi_shi_jian?: string;
   jie_shu_shi_jian?: string;
   hu_chi_zu?: string;
+  /** 规则16：服务端要求高危写带二次确认，'true'/'1' 一律视为未确认 */
+  que_ren?: boolean;
 };
 
 export type 审核评审 = {
   mu_biao_id: string;
   tong_guo: boolean;
   bei_zhu?: string;
+  /** 规则16：服务端要求高危写带二次确认，'true'/'1' 一律视为未确认 */
+  que_ren?: boolean;
 };
 
 export type 审核多项处理 = {
   mu_biao_ids: string[];
   lun_ci: string;
   tong_guo: boolean;
+  /** 规则16：服务端要求高危写带二次确认，'true'/'1' 一律视为未确认 */
+  que_ren?: boolean;
 };
 
 export type 处理记录查询 = 分页查询 & {
@@ -291,39 +298,52 @@ export function 指标概览(): Promise<指标状态> {
   return 取详情<指标状态>('/api/zhi-biao');
 }
 
-const 审核路径段: Record<string, string> = {
-  ju_bao: 'ju-bao',
-  gong_dan: 'gong-dan',
-  gong_gao: 'gong-gao',
-  huo_dong: 'huo-dong',
-  shi_yan: 'shi-yan',
-};
+const 审核路径段 = new Map<string, string>([
+  ['ju_bao', 'ju-bao'],
+  ['gong_dan', 'gong-dan'],
+  ['gong_gao', 'gong-gao'],
+  ['huo_dong', 'huo-dong'],
+  ['shi_yan', 'shi-yan'],
+]);
+
+/**
+ * 审核目标类型白名单入口：命中才给路径段，未命中一律抛错拒绝。
+ * 禁止 `?? 目标类型` 原值回落——外部传入的 `../`、`?` 等形态会被拼进 URL 路径段；
+ * 用 Map 查找同时避开对象原型链上的同名键（toString 之类）。
+ */
+function 取审核路径段(目标类型: string): string {
+  const 路径段 = 审核路径段.get(目标类型);
+  if (路径段 === undefined) {
+    throw 创建前端错误(通用文案.请求失败, 前端错误码.本地校验);
+  }
+  return 路径段;
+}
 
 export function 审核列表(目标类型: string, 查询: 审核查询 = {}): Promise<列表结果<表格行>> {
-  const 路径段 = 审核路径段[目标类型] ?? 目标类型;
+  const 路径段 = 取审核路径段(目标类型);
   return 取列表<表格行>(`/api/guan-li/${路径段}-lie-biao`, { ...查询 });
 }
 
 export async function 审核新建(目标类型: string, 正文: 审核新建): Promise<表格行> {
-  const 路径段 = 审核路径段[目标类型] ?? 目标类型;
+  const 路径段 = 取审核路径段(目标类型);
   const 响应: 响应包装 = await 请求实例.post(`/api/guan-li/${路径段}-xin-jian`, 正文);
   return 解析包络<表格行>(响应.data).数据;
 }
 
 export async function 审核初审(目标类型: string, 正文: 审核评审): Promise<封禁写入结果> {
-  const 路径段 = 审核路径段[目标类型] ?? 目标类型;
+  const 路径段 = 取审核路径段(目标类型);
   const 响应: 响应包装 = await 请求实例.post(`/api/guan-li/${路径段}-yi-shen`, 正文);
   return 解析包络<封禁写入结果>(响应.data).数据;
 }
 
 export async function 审核复审(目标类型: string, 正文: 审核评审): Promise<封禁写入结果> {
-  const 路径段 = 审核路径段[目标类型] ?? 目标类型;
+  const 路径段 = 取审核路径段(目标类型);
   const 响应: 响应包装 = await 请求实例.post(`/api/guan-li/${路径段}-er-shen`, 正文);
   return 解析包络<封禁写入结果>(响应.data).数据;
 }
 
 export async function 审核多项处理(目标类型: string, 正文: 审核多项处理): Promise<表格行> {
-  const 路径段 = 审核路径段[目标类型] ?? 目标类型;
+  const 路径段 = 取审核路径段(目标类型);
   const 响应: 响应包装 = await 请求实例.post(`/api/guan-li/${路径段}-pi-liang`, 正文);
   return 解析包络<表格行>(响应.data).数据;
 }

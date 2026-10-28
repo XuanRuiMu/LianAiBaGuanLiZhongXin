@@ -234,6 +234,7 @@ onMounted(() => {
         <input
           v-model="用户编号"
           class="输入"
+          maxlength="36"
         >
       </label>
       <label class="字段">
@@ -241,6 +242,7 @@ onMounted(() => {
         <input
           v-model="角色编号"
           class="输入"
+          maxlength="36"
         >
       </label>
       <Transition name="组">
@@ -252,6 +254,7 @@ onMounted(() => {
           <input
             v-model="管理员编号"
             class="输入"
+            maxlength="36"
           >
         </label>
       </Transition>

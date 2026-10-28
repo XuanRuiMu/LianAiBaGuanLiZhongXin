@@ -197,6 +197,7 @@ onMounted(() => {
           <input
             v-model="写入用户"
             class="输入"
+            maxlength="36"
           >
         </label>
         <label class="字段">
@@ -204,6 +205,7 @@ onMounted(() => {
           <input
             v-model="写入地址"
             class="输入"
+            maxlength="45"
           >
         </label>
         <label class="字段">
@@ -211,6 +213,7 @@ onMounted(() => {
           <input
             v-model="写入原因"
             class="输入"
+            maxlength="500"
           >
         </label>
         <label class="字段">
@@ -244,6 +247,7 @@ onMounted(() => {
           <input
             v-model="写入解封时间"
             class="输入"
+            type="datetime-local"
           >
         </label>
         <button
@@ -264,6 +268,7 @@ onMounted(() => {
             <input
               v-model="查询地址"
               class="输入"
+              maxlength="45"
             >
           </label>
           <button

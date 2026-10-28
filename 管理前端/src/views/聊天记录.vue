@@ -150,6 +150,7 @@ onMounted(() => {
           <input
             v-model="用户编号"
             class="输入"
+            maxlength="36"
           >
         </label>
       </Transition>
@@ -162,6 +163,7 @@ onMounted(() => {
           <input
             v-model="角色编号"
             class="输入"
+            maxlength="36"
           >
         </label>
       </Transition>
@@ -174,6 +176,7 @@ onMounted(() => {
           <input
             v-model="发送者编号"
             class="输入"
+            maxlength="36"
           >
         </label>
       </Transition>
@@ -186,6 +189,7 @@ onMounted(() => {
           <input
             v-model="接收者编号"
             class="输入"
+            maxlength="36"
           >
         </label>
       </Transition>

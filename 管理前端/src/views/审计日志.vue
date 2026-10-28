@@ -109,6 +109,7 @@ onMounted(() => {
         <input
           v-model="用户编号"
           class="输入"
+          maxlength="36"
         >
       </label>
       <label class="字段">

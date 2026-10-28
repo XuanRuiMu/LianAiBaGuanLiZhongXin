@@ -1,9 +1,9 @@
-name: love-management
+name: lianaiba-guanli
 
 services:
   management-backend:
     build: ../管理后端
-    container_name: love-management-backend
+    container_name: lianaiba-guanli-houduan
     restart: unless-stopped
     ports:
       - "${MANAGEMENT_BACKEND_PORT:-3100}:3100"
@@ -14,7 +14,7 @@ services:
       MANAGEMENT_BACKEND_PORT: 3100
       APP_ENV: ${APP_ENV:-prod}
     networks:
-      - lovewithme-network
+      - lianaiba-network
     healthcheck:
       test: ["CMD-SHELL", "node -e \"fetch('http://localhost:3100/api/jian-kang').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))\" || exit 1"]
       interval: 30s
@@ -23,8 +23,8 @@ services:
       start_period: 20s
 
   tts-service:
-    build: ../tts-service
-    container_name: love-management-tts
+    build: ../YuYinFuWu
+    container_name: lianaiba-guanli-yuyin
     restart: unless-stopped
     ports:
       - "${TTS_PORT:-8001}:8000"
@@ -32,7 +32,7 @@ services:
       - path: .env
         required: false
     networks:
-      - lovewithme-network
+      - lianaiba-network
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request;urllib.request.urlopen('http://localhost:8000/health')\" || exit 1"]
       interval: 30s
@@ -43,7 +43,7 @@ services:
   n8n:
     # YH-136 镜像浮动收敛：全pin digest，禁今天构建明天变
     image: n8nio/n8n:2.40.6@sha256:9c7871d5cc4fc2565bb905e4df5bf7d6a5a4bf2f4313fb99a2b3fa380f331d7c
-    container_name: love-management-n8n
+    container_name: lianaiba-guanli-n8n
     restart: unless-stopped
     # YH-134 资源上限：单容器异常禁拖垮宿主
     mem_limit: 1g
@@ -67,7 +67,7 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     networks:
-      - lovewithme-network
+      - lianaiba-network
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:5678/healthz || exit 1"]
       interval: 30s
@@ -76,7 +76,7 @@ services:
       start_period: 60s
 
 networks:
-  lovewithme-network:
+  lianaiba-network:
     # YH-142 compose自举：默认自建网，外部网覆写禁换机起不来
     driver: bridge
 

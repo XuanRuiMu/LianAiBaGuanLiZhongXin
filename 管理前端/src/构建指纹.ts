@@ -12,6 +12,12 @@ function 收集文件(目录: string, 前缀: string, 结果: string[]): void {
   }
 }
 
+/**
+ * 源码指纹：对 src/ 全量文件与 index.html 的内容取 sha256。
+ * 由 vite.config.ts 的构建期插件写入 dist/build-stats.json，
+ * 供 `FP16重试与就绪收口.test.ts` 等产物断言比对「当前源码 ↔ 已构建产物」是否同源。
+ * 不做任何体积判定（体积预算硬门已于 2026-10-14 按负责人决定移除）。
+ */
 export function 源码指纹(根目录 = '.'): string {
   const 前缀 = 根目录.endsWith('/') ? 根目录 : `${根目录}/`;
   const 文件: string[] = [];

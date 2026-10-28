@@ -7,6 +7,16 @@ import type { 查询池 } from '../数据库';
 import type { 认证请求 } from '../中间件/认证';
 import { 取真实IP } from '../真实IP';
 import { 响应依赖缺失, 响应查询降级 } from '../错误归一化';
+import { 清洗行列表, type 字段清洗项 } from '../文本清洗';
+
+/**
+ * 输出安全：「详情」是审计表的 JSONB 列，内容由主项目的审计写入点决定，
+ * 其中确含玩家可控串（违禁词命中、AI 审核理由、封禁原因等，见 和我恋爱吧/HouDuan/src/routes/消息.ts
+ * 与 services/账号封禁.ts 的 xiang_qing 写法）。该列在管理端是登记可见列
+ * （管理前端/src/列定义.ts），因此读出口必须按玩家内容口径剥控制字符并按码点截断。
+ * JSONB 出参经 pg 驱动解析为对象，非字符串值在 清洗行 内按「非字符串原样保留」处理。
+ */
+const 审计文本字段: readonly 字段清洗项[] = [{ 字段: '详情', 上限: 500 }];
 
 function 取池(请求: Request): 查询池 | undefined {
   return (请求.app.locals as { 池?: 查询池 }).池;
@@ -88,7 +98,7 @@ export function 创建审计路由(): Router {
       参数,
     );
     await 记敏感读审计(池, 请求, 'lie_biao_cha_xun');
-    成功响应(响应, 列表结果.rows, { ye_ma: 页码, mei_ye_tiao_shu: 每页条数, zong_shu: 总数 });
+    成功响应(响应, 清洗行列表(列表结果.rows, 审计文本字段), { ye_ma: 页码, mei_ye_tiao_shu: 每页条数, zong_shu: 总数 });
   });
 
   路由.get('/shen-ji-bao-liu', async (请求: Request, 响应: Response): Promise<void> => {
@@ -155,7 +165,7 @@ export function 创建审计路由(): Router {
     );
     const 水印 = `dao_chu_shui_yin:${(请求 as 认证请求).登录用户?.yongHuId ?? 'wei_zhi'}:${new Date().toISOString()}:${审批单.trim()}`;
     await 记敏感读审计(池, 请求, 'dao_chu');
-    成功响应(响应, { shui_yin: 水印, shen_pi_dan: 审批单.trim(), lie_biao: 列表结果.rows }, { ye_ma: 页码, mei_ye_tiao_shu: 每页条数, zong_shu: 列表结果.rows.length });
+    成功响应(响应, { shui_yin: 水印, shen_pi_dan: 审批单.trim(), lie_biao: 清洗行列表(列表结果.rows, 审计文本字段) }, { ye_ma: 页码, mei_ye_tiao_shu: 每页条数, zong_shu: 列表结果.rows.length });
   });
 
   return 路由;

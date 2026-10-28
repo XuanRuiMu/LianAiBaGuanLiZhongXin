@@ -46,7 +46,7 @@
 | --- | --- |
 | **Admin frontend** (`管理前端/`) | Vue 3 + Vite + TypeScript + Pinia + Vue Router (8 business pages = 7 navigation panels + account detail); the request layer uses the browser-native `fetch`, zero third-party HTTP libraries (no axios / echarts / three) |
 | **Admin backend** (`管理后端/`) | Node.js ≥20 + Express 5 + TypeScript + PostgreSQL (pg) + Redis (ioredis) + JWT + Helmet + rate limiting |
-| **TTS service** (`tts-service/`) | Python + FastAPI — voice synthesis (auth / voices / cache) |
+| **TTS service** (`YuYinFuWu/`) | Python + FastAPI — voice synthesis (auth / voices / cache) |
 | **n8n nodes** (`n8n-nodes-liaolian/`) | Custom n8n nodes: daily ops stats / orchestration workflows |
 | **Infrastructure** (`infra/`) | Docker Compose, systemd, backup / restore / deploy scripts, multi-env config |
 
@@ -60,7 +60,7 @@ Backend security design: JWT auth + admin-permission middleware + global rate li
 
 ### Bundle size and browser baseline
 
-Vite measures the artifacts in memory at build time and writes `dist/build-stats.json`; `体积预算.test.ts` binds the measurement to the current sources via a source fingerprint: first-screen index gzip **48,936 B** (hard limit 49,160 B), first-screen raw **125,143 B** (hard limit 126,070 B), site-wide js+css gzip **87,630 B** (budget 88,000 B, 370 B headroom). Compared with the pre-FP-15 baseline, the new chain adds **3,330 B** site-wide and **168 B** to the measured first-screen lock; first-screen remains below its hard limit. On the browser side only `fetch` with `credentials:'include'` and `AbortSignal.timeout` are required (thresholds: [deploy manual §1.2](docs/部署手册.md)).
+Vite measures the artifacts in memory at build time and writes them to `dist/build-stats.json`, together with a source fingerprint in the same batch so the current sources can be compared against the built output. The bundle-size hard gate was removed on 2026-10-14 by the owner's decision and `体积预算.test.ts` was deleted with it, so the numbers below are **reference values** and no longer block the build: this round (2026-10-23) `npm run build` measured the first-screen `index` js at **127,693 B** raw / **49,887 B** gzipped, and site-wide js+css gzip at **90,431 B** (js 83,428 B + css 7,003 B). The historical hard limits (first-screen gzip 49,160 B, first-screen raw 126,070 B, site-wide 88,000 B) have all been overtaken by the current values and are kept only as a look-back baseline. On the browser side only `fetch` with `credentials:'include'` and `AbortSignal.timeout` are required (thresholds: [deploy manual §1.2](docs/部署手册.md)).
 
 ---
 
@@ -70,7 +70,7 @@ Vite measures the artifacts in memory at build time and writes `dist/build-stats
 # 1. Install subproject deps
 npm --prefix 管理后端 install
 npm --prefix 管理前端 install
-pip install -r tts-service/requirements.txt
+pip install -r YuYinFuWu/requirements.txt
 
 # 2. Configure env (see each subproject's .env.example)
 cp 管理后端/.env.example 管理后端/.env
@@ -94,7 +94,7 @@ LianAiBaGuanLiZhongXin/
 │       ├── 路由/             # auth · accounts · review · ban · audit · stats · chat · reasoning · admin-write
 │       ├── 中间件/           # auth(admin) / auth / rate limit
 │       └── 数据库.ts 缓存.ts 日志.ts 埋点.ts …
-├── tts-service/             # FastAPI voice synthesis (Python)
+├── YuYinFuWu/             # FastAPI voice synthesis (Python)
 ├── n8n-nodes-liaolian/      # n8n custom nodes + workflows (daily ops stats, etc.)
 ├── infra/                   # docker-compose / systemd / backup & restore / env config
 ├── docs/                    # architecture · contract · deploy · ops · user · tests · troubleshooting · FAQ
@@ -113,10 +113,10 @@ Each subproject ships its own tests:
 ```bash
 npm --prefix 管理后端 test    # Vitest unit + integration
 npm --prefix 管理前端 test    # Vitest component + guard tests
-cd tts-service && pytest      # TTS service tests
+cd YuYinFuWu && pytest      # TTS service tests
 ```
 
-Scale (matches the per-file counts of `npm run test`, only ever growing): **admin frontend 12 files / 293 cases**, **admin backend 28 files / 282 cases**, plus the pytest suite under `tts-service/tests/`. Most frontend cases are guards — cross-stack literal sameness, three-way terminology sync, the motion ledger, the size budget and the character-exact query string of the request layer are all locked by mechanical assertions. Details: [test case document](docs/测试用例文档.md).
+Scale (full re-run on 2026-10-23, matching the per-file counts of `npm run test`): **admin frontend 8 files / 194 cases**, **admin backend 7 files / 106 cases** (`npm test` runs only `tests/单元`; the `tests/真库` directory is currently empty), plus the pytest suite under `YuYinFuWu/tests/`. Guard tests make up most of the 194 frontend cases — cross-stack literal sameness, terminology sync, the motion ledger, the column contracts and the request-layer endpoint whitelist are all locked by mechanical assertions. Details: [test case document](docs/测试用例文档.md).
 
 ---
 

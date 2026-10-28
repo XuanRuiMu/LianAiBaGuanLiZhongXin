@@ -10,7 +10,8 @@ import {
 } from '../校验';
 import type { 查询池 } from '../数据库';
 import type { 认证请求 } from '../中间件/认证';
-import { 取管理角色 } from '../中间件/管理员';
+import { 取管理角色, 敏感读门禁 } from '../中间件/管理员';
+import { 清洗行, 清洗行列表, type 字段清洗项 } from '../文本清洗';
 import { 取真实IP } from '../真实IP';
 import { 响应依赖缺失 } from '../错误归一化';
 
@@ -39,6 +40,18 @@ function 脱敏列表行(行: Record<string, unknown>): Record<string, unknown> 
   副本['手机号'] = 掩码手机号(副本['手机号']);
   return 副本;
 }
+
+/**
+ * 输出安全（与 路由/封禁、路由/聊天、路由/思考、路由/审核 同口径）：
+ * 账号资料里的 昵称 / 签名 / 人设标签 都是玩家自由文本，历史存量可能带控制字符或超长，
+ * 读出口必须再过一层 文本清洗，否则控制字符会被管理端界面放大展示。
+ * 上限按各字段在管理端的展示合理值定：昵称 50、签名 500、人设标签 200。
+ */
+const 账号文本字段: readonly 字段清洗项[] = [
+  { 字段: '昵称', 上限: 50 },
+  { 字段: '签名', 上限: 500 },
+  { 字段: '人设标签', 上限: 200 },
+];
 
 async function 记敏感读审计(池: 查询池, 请求: Request, 目标用户: string, 动作: string): Promise<void> {
   const 操作者 = (请求 as 认证请求).登录用户;
@@ -103,7 +116,7 @@ export function 创建账号路由(): Router {
       `SELECT ${列表列} ${列表来源} ${条件子句} ORDER BY u."创建时间" DESC LIMIT ${条数占位} OFFSET ${偏移占位}`,
       参数,
     );
-    成功响应(响应, 列表结果.rows.map(脱敏列表行), { ye_ma: 页码, mei_ye_tiao_shu: 每页条数, zong_shu: 总数 });
+    成功响应(响应, 清洗行列表(列表结果.rows.map(脱敏列表行), 账号文本字段), { ye_ma: 页码, mei_ye_tiao_shu: 每页条数, zong_shu: 总数 });
   });
 
   路由.get('/zhang-hao-xiang-qing/:yongHuId', async (请求: Request, 响应: Response): Promise<void> => {
@@ -121,10 +134,12 @@ export function 创建账号路由(): Router {
       throw new 记录缺失(取文案('账号', '账号不存在'));
     }
     await 记敏感读审计(池, 请求, 用户编号, 'guan_li_cha_kan_zhang_hao_xiang_qing');
-    成功响应(响应, 脱敏列表行(结果.rows[0]));
+    成功响应(响应, 清洗行(脱敏列表行(结果.rows[0]), 账号文本字段));
   });
 
-  路由.get('/zhang-hao-jie-mi/:yongHuId', async (请求: Request, 响应: Response): Promise<void> => {
+  // 所见即所得：手机号明文接口收口到超管专属。前端无任何调用入口（全仓 grep 零命中），
+  // 此前挂在通用只读门禁下＝任一持 cha_kan 的角色都能直连取走明文，审计只是事后留痕。
+  路由.get('/zhang-hao-jie-mi/:yongHuId', 敏感读门禁, async (请求: Request, 响应: Response): Promise<void> => {
     const 池 = 取池(请求);
     if (!池) {
       响应依赖缺失(响应, '账号', '数据库', 请求);
@@ -139,7 +154,7 @@ export function 创建账号路由(): Router {
       throw new 记录缺失(取文案('账号', '账号不存在'));
     }
     await 记敏感读审计(池, 请求, 用户编号, 'guan_li_jie_mi_shou_ji_hao');
-    成功响应(响应, 补角色(结果.rows[0]));
+    成功响应(响应, 清洗行(补角色(结果.rows[0]), 账号文本字段));
   });
 
   return 路由;

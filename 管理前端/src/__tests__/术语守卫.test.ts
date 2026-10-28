@@ -14,8 +14,8 @@ import { 列定义登记 } from '../列定义';
 const 词典目录 = 'src/文案';
 const 术语表源路径 = '../docs/术语表.md';
 const 扫描目录 = ['src/views', 'src/components', 'src/router', 'src/stores', 'src/api', 'src/枚举映射'];
-const 扫描文件 = ['src/App.vue', 'src/枚举映射.ts', 'src/列定义.ts'];
-const 首屏可达文件 = ['src/App.vue', 'src/main.ts', 'src/router/index.ts', 'src/api/请求.ts', 'src/api/探针.ts', 'src/stores/登录.ts'];
+const 扫描文件 = ['src/根组件.vue', 'src/枚举映射.ts', 'src/列定义.ts'];
+const 首屏可达文件 = ['src/根组件.vue', 'src/入口.ts', 'src/router/路由表.ts', 'src/api/请求.ts', 'src/api/探针.ts', 'src/stores/登录.ts'];
 
 function 读(路径: string): string {
   return fs.readFileSync(路径, 'utf8');
@@ -582,7 +582,7 @@ describe('FP-01 术语单源守卫', () => {
     }
     expect(违例).toEqual([]);
     expect(首屏可达文件.length).toBeGreaterThanOrEqual(6);
-    expect([...读('src/App.vue').matchAll(/from '([^']*枚举映射[^']*)'/g)].map((匹配) => 匹配[1])).toEqual([
+    expect([...读('src/根组件.vue').matchAll(/from '([^']*枚举映射[^']*)'/g)].map((匹配) => 匹配[1])).toEqual([
       './枚举映射/管理角色',
     ]);
     expect(枚举映射可达词典('src/枚举映射/管理角色.ts')).toEqual(['账号枚举', '通用']);

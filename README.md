@@ -46,7 +46,7 @@
 | --- | --- |
 | **管理前端**（`管理前端/`）| Vue 3 + Vite + TypeScript + Pinia + Vue Router（8 个业务页面 = 7 个导航面板 + 账号详情）；请求层用浏览器原生 `fetch`，零第三方 HTTP 库（无 axios / echarts / three）|
 | **管理后端**（`管理后端/`）| Node.js ≥20 + Express 5 + TypeScript + PostgreSQL（pg）+ Redis（ioredis）+ JWT + Helmet + 限流 |
-| **TTS 服务**（`tts-service/`）| Python + FastAPI，语音合成服务（鉴权 / 音色 / 缓存）|
+| **TTS 服务**（`YuYinFuWu/`）| Python + FastAPI，语音合成服务（鉴权 / 音色 / 缓存）|
 | **n8n 节点**（`n8n-nodes-liaolian/`）| 自定义 n8n 节点：每日运营统计 / 编排触发等自动化工作流 |
 | **基础设施**（`infra/`）| Docker Compose、systemd 服务、备份 / 恢复 / 部署脚本、多环境配置 |
 
@@ -60,7 +60,7 @@
 
 ### 体积与浏览器基线
 
-构建产物由 vite 在 build 期内存度量并写进 `dist/build-stats.json`，`体积预算.test.ts` 用源码指纹绑定当前源码：首屏 index gzip **48,936 B**（硬指标 49,160 B）、首屏原始 **125,143 B**（硬指标 126,070 B）、全站 js+css gzip **87,630 B**（裁定值 88,000 B，余量 370 B）。FP-15 新链相比前基线全站增加 **3,330 B**、首屏实测锁增加 **168 B**；首屏仍低于原硬指标。浏览器侧只依赖 `fetch` 的 `credentials:'include'` 与 `AbortSignal.timeout`（门槛见 [部署手册 1.2](docs/部署手册.md)）。
+构建产物由 vite 在 build 期内存度量并写进 `dist/build-stats.json`（同批写入源码指纹，供比对「当前源码 ↔ 已构建产物」是否同源）。体积预算硬门已于 2026-10-14 按负责人决定移除，`体积预算.test.ts` 随之删除，下列数值只是**参考值**，不再卡构建：本轮（2026-10-23）`npm run build` 实测首屏 `index` js 原始 **127,693 B**、gzip **49,887 B**，全站 js+css gzip **90,431 B**（js 83,428 B＋css 7,003 B）。历史硬指标（首屏 gzip 49,160 B、首屏原始 126,070 B、全站 88,000 B）均已被现值越线，仅留作回看基线。浏览器侧只依赖 `fetch` 的 `credentials:'include'` 与 `AbortSignal.timeout`（门槛见 [部署手册 1.2](docs/部署手册.md)）。
 
 ---
 
@@ -70,7 +70,7 @@
 # 1. 安装各子项目依赖
 npm --prefix 管理后端 install
 npm --prefix 管理前端 install
-pip install -r tts-service/requirements.txt
+pip install -r YuYinFuWu/requirements.txt
 
 # 2. 配置环境变量（参照各子项目 .env.example）
 cp 管理后端/.env.example 管理后端/.env
@@ -94,7 +94,7 @@ LianAiBaGuanLiZhongXin/
 │       ├── 路由/             # 登录·账号·审核·封禁·审计·统计·聊天·思考·管理写
 │       ├── 中间件/           # 认证(admin) / 认证 / 限流
 │       └── 数据库.ts 缓存.ts 日志.ts 埋点.ts ...
-├── tts-service/            # FastAPI 语音合成服务（Python）
+├── YuYinFuWu/            # FastAPI 语音合成服务（Python）
 ├── n8n-nodes-liaolian/     # n8n 自定义节点 + 工作流（每日运营统计等）
 ├── infra/                  # docker-compose / systemd / 备份恢复 / 多环境配置
 ├── docs/                   # 架构 · 契约 · 部署 · 运维 · 用户 · 测试 · 故障排查 · FAQ
@@ -113,10 +113,10 @@ LianAiBaGuanLiZhongXin/
 ```bash
 npm --prefix 管理后端 test    # Vitest 单元 + 集成测试
 npm --prefix 管理前端 test    # Vitest 组件 + 守卫测试
-cd tts-service && pytest      # TTS 服务测试
+cd YuYinFuWu && pytest      # TTS 服务测试
 ```
 
-规模（与 `npm run test` 逐文件计数一致，只增不减）：**管理前端 12 个文件 293 例**、**管理后端 28 个文件 282 例**，另有 `tts-service/tests/` 的 pytest 用例。前端 293 例里守卫类占大头——跨端字面同源、术语三向同步、动效台账、体积预算、请求层逐字符查询串都由机械断言锁死。用例明细见 [测试用例文档](docs/测试用例文档.md)。
+规模（2026-10-23 全量实测，与 `npm run test` 逐文件计数一致）：**管理前端 8 个文件 194 例**、**管理后端 7 个文件 106 例**（`npm test` 只跑 `tests/单元`，`tests/真库` 目录当前为空），另有 `YuYinFuWu/tests/` 的 pytest 用例。前端 194 例里守卫类占大头——跨端字面同源、术语同步、动效台账、列契约与接口白名单入口都由机械断言锁死。用例明细见 [测试用例文档](docs/测试用例文档.md)。
 
 ---
 

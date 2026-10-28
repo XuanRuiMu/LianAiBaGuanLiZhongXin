@@ -10,6 +10,21 @@ permissions:
   contents: read
 
 jobs:
+  # 密钥扫描闸：扫当前入库状态（默认浅历史，等价 HEAD 全量文件）。
+  # 不使用 fetch-depth: 0 全量历史：仓库历史存在已泄露的旧值（需先轮换凭据并处置历史，
+  # 详见提交说明），在全量扫描转绿前不对历史单独放宽 allowlist。
+  secret-scan:
+    name: Secret Scan (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+
+      - name: Run gitleaks
+        uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   n8n-test:
     name: n8n节点构建测试
     runs-on: ubuntu-latest
@@ -40,7 +55,7 @@ jobs:
       - name: 安装锁文件工具
         run: python -m pip install --disable-pip-version-check uv==0.12.18
       - name: 校验锁导出并执行全量测试
-        working-directory: tts-service
+        working-directory: YuYinFuWu
         run: |
           uv lock --check
           uv export --frozen --all-groups --no-emit-project --no-header --output-file "$RUNNER_TEMP/requirements.lock"
@@ -55,13 +70,17 @@ jobs:
     timeout-minutes: 10
     env:
       MIGRATIONS_ROOT: ${{ github.workspace }}/和我恋爱吧
+      # 非凭据：生产编排 N8N_OWNER_EMAIL 为强制注入项（无默认值），此处给 config 校验占位
       N8N_OWNER_EMAIL: fp04b-ci@example.invalid
-      N8N_OWNER_FIRST_NAME: FP04B
-      N8N_OWNER_LAST_NAME: CI
-      N8N_OWNER_PASSWORD_HASH: '$2b$12$yhGxMaIIGa5.KldNteEuqu/Me5fdF7wq0AFtHgv9rrRrKajYxaZFq'
-      N8N_ENCRYPTION_KEY: fp04b-compose-encryption-key-32b
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: 生成隔离栈一次性随机凭据（凭据不入库：每次运行动态生成，config 校验只需非空占位）
+        run: |
+          echo "POSTGRES_PASSWORD=$(openssl rand -hex 24)" >> "$GITHUB_ENV"
+          echo "JWT_SECRET=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+          echo "INTERNAL_TOKEN=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+          echo "N8N_ENCRYPTION_KEY=$(openssl rand -hex 16)" >> "$GITHUB_ENV"
+          echo "N8N_OWNER_PASSWORD_HASH=$(openssl rand -hex 24)" >> "$GITHUB_ENV"
       - name: 校验生产与隔离编排
         run: |
           docker compose --file infra/docker-compose.yml config --quiet

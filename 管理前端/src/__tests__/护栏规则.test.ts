@@ -113,7 +113,7 @@ describe('FP-08 内联 eslint 规则：no-visible-cn-literal', () => {
         }
       }
     }
-    for (const 路径 of ['src/App.vue', 'src/main.ts']) {
+    for (const 路径 of ['src/根组件.vue', 'src/入口.ts']) {
       if (/eslint[-]disable/.test(fs.readFileSync(路径, 'utf8'))) {
         命中.push(路径);
       }
@@ -145,7 +145,7 @@ describe('FP-08 eslint.config.mjs 接线', () => {
     expect(护栏块?.rules?.['local/no-visible-cn-literal']).toBe('error');
     expect(护栏块?.rules?.['local/no-data-key-literal']).toBe('error');
     expect(护栏块?.files).toEqual(
-      expect.arrayContaining(['src/views/**/*.vue', 'src/components/**/*.vue', 'src/App.vue', 'src/main.ts', 'src/api/**/*.ts', 'src/router/**/*.ts', 'src/stores/**/*.ts']),
+      expect.arrayContaining(['src/views/**/*.vue', 'src/components/**/*.vue', 'src/根组件.vue', 'src/入口.ts', 'src/api/**/*.ts', 'src/router/**/*.ts', 'src/stores/**/*.ts']),
     );
     expect(Object.keys(护栏块?.plugins ?? {})).toEqual(['local']);
   });

@@ -21,7 +21,7 @@ import {
 } from '../api/请求';
 import { 取错误展示 } from '../api/错误展示';
 import { 使用登录仓库 } from '../stores/登录';
-import { 路由表 } from '../router';
+import { 路由表 } from '../router/路由表';
 import XiaoXiTiao from '../components/XiaoXiTiao.vue';
 
 const 装饰文字 = [
@@ -531,16 +531,16 @@ describe('FP-04 登录页与应用外壳不再渲染装饰文字', () => {
   });
 
   it('恋管印章与人物章元素全部移除', () => {
-    for (const 路径 of [...落地视图清单, 'src/App.vue']) {
+    for (const 路径 of [...落地视图清单, 'src/根组件.vue']) {
       expect(读(路径), `${路径} 仍挂着 印章 元素`).not.toContain('印章');
     }
     expect(读('src/views/账号详情.vue')).not.toContain('人物章');
-    expect(读('src/App.vue')).not.toContain('恋管');
+    expect(读('src/根组件.vue')).not.toContain('恋管');
   });
 
   it('导航地标与主题按钮的文本取自词典而不是硬编码', async () => {
     window.sessionStorage.setItem('guan_li_hui_hua', 'yi_deng_lu');
-    const { default: 外壳 } = await import('../App.vue');
+    const { default: 外壳 } = await import('../根组件.vue');
     const 包装 = mount(外壳, { global: { plugins: [await 建路由('/zhang-hao')], stubs: { RouterView: true } } });
     await flushPromises();
     expect(包装.find('nav').attributes('aria-label')).toBe(取文案('导航', '管理导航'));
@@ -1369,7 +1369,7 @@ describe('FP-11 思考链快照按登记列全量渲染', () => {
 
 const 主题样式表 = 读('src/主题.css');
 
-const 外壳源 = 读('src/App.vue');
+const 外壳源 = 读('src/根组件.vue');
 
 const 登录页源 = 读('src/views/登录页.vue');
 

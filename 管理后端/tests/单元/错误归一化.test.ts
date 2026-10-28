@@ -171,7 +171,7 @@ describe('FP-15 HTTP 与健康检查失败契约', () => {
     const 冲突 = await request(创建测试应用({ 池: 空更新 }).应用)
       .post('/api/guan-li/ju-bao-yi-shen')
       .set(授权头(签发管理令牌()))
-      .send({ mu_biao_id: '11111111-1111-4111-8111-111111111111', tong_guo: true });
+      .send({ mu_biao_id: '11111111-1111-4111-8111-111111111111', tong_guo: true, que_ren: true });
     expect(冲突.status).toBe(409);
     断言失败包络(冲突.body, 'SHEN_HE_DUI_XIANG_YI_BIAN', true);
 

@@ -22,9 +22,22 @@ import type { 查询池 } from '../数据库';
 import type { 认证请求 } from '../中间件/认证';
 import { 取真实IP } from '../真实IP';
 import { 响应依赖缺失, 响应查询降级 } from '../错误归一化';
+import { 清洗行列表, type 字段清洗项 } from '../文本清洗';
 
 function 取池(请求: Request): 查询池 | undefined {
   return (请求.app.locals as { 池?: 查询池 }).池;
+}
+
+/**
+ * 规则16 业务安全：高危写的二次确认校验（唯一实现）。
+ * 与 路由/管理写.ts 的授回收同口径——que_ren 必须是严格布尔真，
+ * 'true' / 1 / 缺省一律视为未确认（不信任客户端回传的松散形态）。
+ * 抛 校验失败 走全局错误归一化返回 400 + 统一文案「该操作需再次确认后执行」。
+ */
+function 校验二次确认(正文: Record<string, unknown>): void {
+  if ((正文['que_ren'] ?? 正文['queRen']) !== true) {
+    throw new 校验失败(取文案('管理写', '需再次确认'));
+  }
 }
 
 const 审核表名: Record<string, string> = {
@@ -52,6 +65,24 @@ const 审核超时小时: Record<string, number> = {
 };
 
 type 查函数 = (文本: string, 参数?: unknown[]) => Promise<import('../数据库').查询结果>;
+
+/**
+ * 输出安全：五类审核目标各自的玩家/AI 生成内容字段读出口清洗配置。
+ * 上限取该字段在管理端列表的展示合理值（与写入侧上限对齐）：
+ *  - 原因/标题/名称 是短文本，500/200 码点足够完整展示；
+ *  - 内容/描述 是长文本，2000（工单/活动/实验）与 5000（公告，写入侧即 5000）码点，
+ *    再长只会把审核列表行撑爆，全文核对走主项目。
+ */
+const 审核内容字段: Record<string, readonly 字段清洗项[]> = {
+  ju_bao: [{ 字段: '原因', 上限: 500 }],
+  gong_dan: [{ 字段: '标题', 上限: 200 }, { 字段: '内容', 上限: 2000 }],
+  gong_gao: [{ 字段: '标题', 上限: 200 }, { 字段: '内容', 上限: 5000 }],
+  huo_dong: [{ 字段: '名称', 上限: 200 }, { 字段: '描述', 上限: 2000 }],
+  shi_yan: [{ 字段: '名称', 上限: 200 }, { 字段: '描述', 上限: 2000 }],
+};
+
+/** 审核留痕备注：写入侧已 slice 500，读出口按同口径剥控制字符，保持展示一致 */
+const 留痕备注字段: readonly 字段清洗项[] = [{ 字段: '备注', 上限: 500 }];
 
 async function 记审核留痕(
   查: 查函数,
@@ -135,7 +166,7 @@ async function 列表审核(请求: Request, 响应: Response, 目标类型: str
       `SELECT ${审核列表列(目标类型)} FROM "${表}" ${条件子句} ORDER BY "创建时间" DESC LIMIT ${条数占位} OFFSET ${偏移占位}`,
       参数,
     );
-    成功响应(响应, 列表结果.rows, { ye_ma: 页码, mei_ye_tiao_shu: 每页条数, zong_shu: 总数 });
+    成功响应(响应, 清洗行列表(列表结果.rows, 审核内容字段[目标类型] ?? []), { ye_ma: 页码, mei_ye_tiao_shu: 每页条数, zong_shu: 总数 });
   } catch (错误) {
     响应查询降级(响应, 错误, '审核运营', '审核', 请求);
   }
@@ -148,6 +179,9 @@ async function 新建审核(请求: Request, 响应: Response, 目标类型: str
     return;
   }
   const 正文 = (请求.body ?? {}) as Record<string, unknown>;
+  // 规则16 业务安全：新建举报/工单/公告/活动/实验与授回收同属高危写，必须二次确认。
+  // 口径与 路由/管理写.ts 的授回收完全一致（que_ren 严格布尔真），不接受 'true'/'1'。
+  校验二次确认(正文);
   const 操作者 = (请求 as 认证请求).登录用户;
   const 操作人 = 操作者?.yongHuId ?? null;
   let 插入语句 = '';
@@ -348,6 +382,8 @@ async function 发布下线(请求: Request, 响应: Response, 目标类型: 'go
     return;
   }
   const 正文 = (请求.body ?? {}) as Record<string, unknown>;
+  // 规则16 业务安全：发布/下线/结束/关闭与新建同属高危写，缺二次确认一律 400
+  校验二次确认(正文);
   const 目标编号 = 校验UUID('mu_biao_id', 取可选字符串(正文['mu_biao_id']));
   const 动作原始 = 取可选字符串(正文['dong_zuo']) ?? 'fa_bu';
   if (动作原始 !== 'fa_bu' && 动作原始 !== 'xia_xian' && 动作原始 !== 'jie_shu' && 动作原始 !== 'guan_bi') {
@@ -459,7 +495,7 @@ export function 创建审核路由(写限流: RequestHandler): Router {
         `SELECT "ID", "目标类型", "目标ID", "动作", "操作人ID", "结果", "备注", "创建时间" FROM "审核留痕" ${条件子句} ORDER BY "创建时间" DESC LIMIT ${条数占位} OFFSET ${偏移占位}`,
         参数,
       );
-      成功响应(响应, 列表结果.rows, { ye_ma: 页码, mei_ye_tiao_shu: 每页条数, zong_shu: 总数 });
+      成功响应(响应, 清洗行列表(列表结果.rows, 留痕备注字段), { ye_ma: 页码, mei_ye_tiao_shu: 每页条数, zong_shu: 总数 });
     } catch (错误) {
       响应查询降级(响应, 错误, '审核运营', '审核', 请求);
     }

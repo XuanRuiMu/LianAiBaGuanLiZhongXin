@@ -611,7 +611,7 @@ describe('FP-07 改写后的可见提示与稳定码成对锁死', () => {
     const 评审 = await request(应用)
       .post('/api/guan-li/ju-bao-yi-shen')
       .set(授权())
-      .send({ mu_biao_id: 编号, tong_guo: true });
+      .send({ mu_biao_id: 编号, tong_guo: true, que_ren: true });
     expect(评审.status).toBe(409);
     expect(评审.body.ti_shi).toBe(取文案('审核', '对象已变化'));
     expect(评审.body.cuo_wu_ma).toBe(错误码.审核对象已变);

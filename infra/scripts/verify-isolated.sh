@@ -5,7 +5,7 @@ scriptDir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 infraDir="$(cd "$scriptDir/.." && pwd)"
 managementDir="$(cd "$infraDir/.." && pwd)"
 migrationRoot="${MIGRATIONS_ROOT:-$managementDir/../和我恋爱吧}"
-compose=(docker compose --project-name love-management-fp04b --file "$infraDir/docker-compose.test.yml")
+compose=(docker compose --project-name lianaiba-guanli-fp04b --file "$infraDir/docker-compose.test.yml")
 
 cleanup() {
   MIGRATIONS_ROOT="$migrationRoot" "${compose[@]}" down --volumes --remove-orphans
@@ -26,15 +26,29 @@ export MIGRATIONS_ROOT="$migrationRoot"
 export NODE_PATH="$managementDir/管理后端/node_modules${NODE_PATH:+:$NODE_PATH}"
 node -e "require.resolve('pg')"
 
+# ---- 一次性凭据：每次运行动态随机生成，仅经环境变量注入 compose，绝不写入仓库或脚本 ----
+# 规范：私钥 / 令牌 / 口令永不硬编码、永不进版本库、永不进日志
+# 命名说明：bash 对中文标识符的支持随发行版/语言环境而异（已实测部分构建直接拒绝），
+# 故此处按编码规范降级为驼峰拼音；PowerShell 侧 verify-isolated.ps1 保留中文命名。
+suiJiShiLiuJinZhi() { node -e 'console.log(require("crypto").randomBytes(process.argv[1]|0).toString("hex"))' "$1"; }
+export POSTGRES_PASSWORD="$(suiJiShiLiuJinZhi 24)"
+export JWT_SECRET="$(suiJiShiLiuJinZhi 32)"
+export INTERNAL_TOKEN="$(suiJiShiLiuJinZhi 32)"
+export N8N_ENCRYPTION_KEY="$(suiJiShiLiuJinZhi 16)"
+export N8N_OWNER_EMAIL="${N8N_OWNER_EMAIL:-fp04b-ci@example.invalid}"
+n8nKouLing="$(suiJiShiLiuJinZhi 32)"
+# n8n 实例属主口令经 bcrypt 注入（bcryptjs 为管理后端依赖，NODE_PATH 已导出）
+export N8N_OWNER_PASSWORD_HASH="$(N8N_OWNER_PASSWORD="$n8nKouLing" node -e 'console.log(require("bcryptjs").hashSync(process.env.N8N_OWNER_PASSWORD,12))')"
+
 "${compose[@]}" up -d --wait postgres redis
 databaseAddress="$("${compose[@]}" port postgres 5432)"
 databasePort="${databaseAddress##*:}"
-databaseUrl="postgresql://lovewithme:lovewithme_test_password@127.0.0.1:${databasePort}/lovewithme_test"
+databaseUrl="postgresql://lianaiba:${POSTGRES_PASSWORD}@127.0.0.1:${databasePort}/lianaiba_test"
 migrationDir="$migrationRoot/backend/database/migrations"
 migrationCount="$(find "$migrationDir" -maxdepth 1 -type f -name '*.sql' | wc -l | tr -d ' ')"
 DATABASE_URL="$databaseUrl" node "$migrationRoot/backend/scripts/run_migration.js" "$migrationDir"
 DATABASE_URL="$databaseUrl" node "$migrationRoot/backend/scripts/run_migration.js" "$migrationDir"
-registeredCount="$("${compose[@]}" exec -T postgres psql -U lovewithme -d lovewithme_test -Atc 'SELECT count(*) FROM schema_migrations')"
+registeredCount="$("${compose[@]}" exec -T postgres psql -U lianaiba -d lianaiba_test -Atc 'SELECT count(*) FROM schema_migrations')"
 test "$registeredCount" = "$migrationCount"
 
 # 真库门禁：tests/真库 下的用例按 tests/测试数据库.ts 的硬规矩，只允许由隔离门禁注入
@@ -62,7 +76,7 @@ loginReady=false
 for _ in $(seq 1 30); do
   if curl --fail --silent --show-error \
     -H 'Content-Type: application/json' \
-    --data-binary '{"emailOrLdapLoginId":"fp04b-ci@example.invalid","password":"fp04b-ci-only"}' \
+    --data-binary "{\"emailOrLdapLoginId\":\"$N8N_OWNER_EMAIL\",\"password\":\"$n8nKouLing\"}" \
     "http://127.0.0.1:${n8nPort}/rest/login" >/dev/null; then
     loginReady=true
     break
@@ -73,7 +87,7 @@ if [ "$loginReady" != true ]; then
   echo "n8n 登录在 60 秒内未就绪，最后一次响应：" >&2
   curl --silent --show-error \
     -H 'Content-Type: application/json' \
-    --data-binary '{"emailOrLdapLoginId":"fp04b-ci@example.invalid","password":"fp04b-ci-only"}' \
+    --data-binary "{\"emailOrLdapLoginId\":\"$N8N_OWNER_EMAIL\",\"password\":\"$n8nKouLing\"}" \
     "http://127.0.0.1:${n8nPort}/rest/login" >&2 || true
   echo >&2
 fi

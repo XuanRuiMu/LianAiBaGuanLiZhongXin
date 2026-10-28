@@ -78,7 +78,7 @@ if ($缺失.Count -gt 0) {
 
 $后端目录 = Join-Path $根目录 '管理后端'
 $前端目录 = Join-Path $根目录 '管理前端'
-$语音目录 = Join-Path $根目录 'tts-service'
+$语音目录 = Join-Path $根目录 'YuYinFuWu'
 $后端入口 = Join-Path $后端目录 'dist\启动.js'
 if (-not (Test-Path -LiteralPath $后端入口)) {
   throw "启动失败：管理后端未构建，请先在管理后端执行 npm run build"

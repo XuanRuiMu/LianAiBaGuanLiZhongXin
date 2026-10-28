@@ -358,8 +358,8 @@ export default tseslint.config(
   },
   {
     files: [
-      'src/App.vue',
-      'src/main.ts',
+      'src/根组件.vue',
+      'src/入口.ts',
       'src/router/**/*.ts',
       'src/stores/**/*.ts',
       'src/api/**/*.ts',

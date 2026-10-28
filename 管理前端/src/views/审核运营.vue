@@ -1,5 +1,5 @@
-﻿<script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref } from 'vue';
+<script setup lang="ts">
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { 审核列表, 审核新建, 审核初审, 审核复审, 审核多项处理, 处理记录列表, type 表格行 } from '../api/管理';
 import type { 分页信息 } from '../api/请求';
 import { 创建请求错误状态, 执行请求 } from '../api/错误展示';
@@ -7,6 +7,7 @@ import { 默认每页条数, 默认页码 } from '../配置';
 import { 列定义登记 } from '../列定义';
 import { 审核状态选项 } from '../枚举映射/审核状态';
 import { 使用登录仓库 } from '../stores/登录';
+import QueRenCeng from '../components/QueRenCeng.vue';
 import YeMei from '../components/YeMei.vue';
 import FenYeTiao from '../components/FenYeTiao.vue';
 import ShuJuBiaoGe from '../components/ShuJuBiaoGe.vue';
@@ -30,6 +31,10 @@ const 标签列: Array<{ 值: 目标类型名; 键: 标签键 }> = [
 
 const 登录仓库 = 使用登录仓库();
 const 当前标签 = ref<目标类型名>('ju_bao');
+/** 新建内容写入侧上限随目标类型变：工单 2000、公告 5000（见 管理后端/src/路由/审核.ts:186/193）；
+ *  举报/活动/实验不写「内容」字段，按工单口径兜底。跟着标签动态收口，
+ *  既不把公告的长正文砍到 2000，也不放任工单超 2000 去换一个 400。 */
+const 新建内容上限 = computed(() => (当前标签.value === 'gong_gao' ? 5000 : 2000));
 const 状态筛选 = ref('');
 const 只看超时 = ref(false);
 const 行列表 = ref<表格行[]>([]);
@@ -52,6 +57,30 @@ const {
   作废: 作废错误,
 } = 错误状态;
 const 成功提示 = ref('');
+/**
+ * 规则16 业务安全：新建举报/工单/公告/活动/实验与评审/多项处理/发布下线都属高危写，
+ * 后端已强制 que_ren === true（缺省一律 400）。前端必须在提交前弹出站内确认层，
+ * 与 账号列表.vue 的授/回收同一交互口径；待确认动作存在 ref 里，确认时再执行。
+ */
+const 待确认动作 = ref<(() => Promise<void>) | null>(null);
+const 待确认说明 = ref('');
+
+function 请求二次确认(说明: string, 动作: () => Promise<void>): void {
+  待确认说明.value = 说明;
+  待确认动作.value = 动作;
+}
+
+async function 确认层确认(): Promise<void> {
+  const 动作 = 待确认动作.value;
+  待确认动作.value = null;
+  if (动作) {
+    await 动作();
+  }
+}
+
+function 确认层取消(): void {
+  待确认动作.value = null;
+}
 
 function 可选文本(原始: string): string | undefined {
   const 修剪 = 原始.trim();
@@ -89,18 +118,21 @@ function 切换标签(目标: 目标类型名): void {
 
 async function 提交新建(): Promise<void> {
   成功提示.value = '';
-  await 执行请求(错误状态, undefined, () => 审核新建(当前标签.value, {
-    bei_ju_bao_yong_hu_id: 可选文本(被举报用户.value),
-    bei_ju_bao_nei_rong_id: 可选文本(被举报内容.value),
-    yuan_yin: 可选文本(新建原因.value),
-    biao_ti: 可选文本(新建标题.value),
-    nei_rong: 可选文本(新建内容.value),
-    ming_cheng: 可选文本(新建名称.value),
-    miao_shu: 可选文本(新建描述.value),
-  }), async () => {
-    成功提示.value = 审核文案.新建成功;
-    await 查询();
-  }, 提交新建);
+  请求二次确认(审核文案.新建确认说明, async () => {
+    await 执行请求(错误状态, undefined, () => 审核新建(当前标签.value, {
+      bei_ju_bao_yong_hu_id: 可选文本(被举报用户.value),
+      bei_ju_bao_nei_rong_id: 可选文本(被举报内容.value),
+      yuan_yin: 可选文本(新建原因.value),
+      biao_ti: 可选文本(新建标题.value),
+      nei_rong: 可选文本(新建内容.value),
+      ming_cheng: 可选文本(新建名称.value),
+      miao_shu: 可选文本(新建描述.value),
+      que_ren: true,
+    }), async () => {
+      成功提示.value = 审核文案.新建成功;
+      await 查询();
+    }, 提交新建);
+  });
 }
 
 async function 提交评审(轮次: 'yi_shen' | 'er_shen', 通过: boolean): Promise<void> {
@@ -109,12 +141,15 @@ async function 提交评审(轮次: 'yi_shen' | 'er_shen', 通过: boolean): Pro
     return;
   }
   成功提示.value = '';
-  await 执行请求(错误状态, undefined, () => 轮次 === 'yi_shen'
-    ? 审核初审(当前标签.value, { mu_biao_id: 目标, tong_guo: 通过, bei_zhu: 可选文本(评审备注.value) })
-    : 审核复审(当前标签.value, { mu_biao_id: 目标, tong_guo: 通过, bei_zhu: 可选文本(评审备注.value) }), async () => {
-    成功提示.value = 审核文案.评审成功;
-    await 查询();
-  }, () => 提交评审(轮次, 通过));
+  请求二次确认(审核文案.评审确认说明, async () => {
+    const 正文 = { mu_biao_id: 目标, tong_guo: 通过, bei_zhu: 可选文本(评审备注.value), que_ren: true };
+    await 执行请求(错误状态, undefined, () => (轮次 === 'yi_shen'
+      ? 审核初审(当前标签.value, 正文)
+      : 审核复审(当前标签.value, 正文)), async () => {
+      成功提示.value = 审核文案.评审成功;
+      await 查询();
+    }, () => 提交评审(轮次, 通过));
+  });
 }
 
 async function 提交多项处理(通过: boolean): Promise<void> {
@@ -123,10 +158,12 @@ async function 提交多项处理(通过: boolean): Promise<void> {
     return;
   }
   成功提示.value = '';
-  await 执行请求(错误状态, undefined, () => 审核多项处理(当前标签.value, { mu_biao_ids: 清单, lun_ci: 'yi_shen', tong_guo: 通过 }), async () => {
-    成功提示.value = 审核文案.处理多项成功;
-    await 查询();
-  }, () => 提交多项处理(通过));
+  请求二次确认(审核文案.多项处理确认说明, async () => {
+    await 执行请求(错误状态, undefined, () => 审核多项处理(当前标签.value, { mu_biao_ids: 清单, lun_ci: 'yi_shen', tong_guo: 通过, que_ren: true }), async () => {
+      成功提示.value = 审核文案.处理多项成功;
+      await 查询();
+    }, () => 提交多项处理(通过));
+  });
 }
 
 function 上一页(): void {
@@ -247,6 +284,7 @@ onMounted(() => {
         <input
           v-model="新建标题"
           class="输入"
+          maxlength="200"
         >
       </label>
       <label class="字段">
@@ -254,6 +292,7 @@ onMounted(() => {
         <input
           v-model="新建内容"
           class="输入"
+          :maxlength="新建内容上限"
         >
       </label>
       <label class="字段">
@@ -261,6 +300,7 @@ onMounted(() => {
         <input
           v-model="新建名称"
           class="输入"
+          maxlength="200"
         >
       </label>
       <label class="字段">
@@ -268,6 +308,7 @@ onMounted(() => {
         <input
           v-model="新建描述"
           class="输入"
+          maxlength="2000"
         >
       </label>
       <label class="字段">
@@ -275,6 +316,7 @@ onMounted(() => {
         <input
           v-model="新建原因"
           class="输入"
+          maxlength="500"
         >
       </label>
       <label class="字段">
@@ -282,6 +324,7 @@ onMounted(() => {
         <input
           v-model="被举报用户"
           class="输入"
+          maxlength="36"
         >
       </label>
       <label class="字段">
@@ -320,6 +363,7 @@ onMounted(() => {
         <input
           v-model="评审目标"
           class="输入"
+          maxlength="36"
         >
       </label>
       <label class="字段">
@@ -327,6 +371,7 @@ onMounted(() => {
         <input
           v-model="评审备注"
           class="输入"
+          maxlength="500"
         >
       </label>
       <button
@@ -373,6 +418,7 @@ onMounted(() => {
         <input
           v-model="多项目标"
           class="输入"
+          maxlength="1850"
         >
       </label>
       <button
@@ -401,6 +447,15 @@ onMounted(() => {
       :lie="列定义登记.审核留痕"
       :hang="处理记录行"
       :hang-jian="null"
+    />
+    <QueRenCeng
+      :xian-shi="待确认动作 !== null"
+      :biao-ti="通用文案.二次确认"
+      :zheng-wen="待确认说明"
+      wei-xian
+      ce-shi-biao-shi="shen-he-que-ren-ceng"
+      @que-ren="确认层确认"
+      @qu-xiao="确认层取消"
     />
   </section>
 </template>

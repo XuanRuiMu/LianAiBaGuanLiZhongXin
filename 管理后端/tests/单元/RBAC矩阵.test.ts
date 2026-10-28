@@ -42,7 +42,6 @@ const 只读路由 = [
   '/api/guan-li/wo-de-jiao-se',
   '/api/guan-li/zhang-hao-lie-biao',
   `/api/guan-li/zhang-hao-xiang-qing/${测试用户编号}`,
-  `/api/guan-li/zhang-hao-jie-mi/${测试用户编号}`,
   '/api/guan-li/xiao-xi',
   '/api/guan-li/si-kao-shuo-ming',
   '/api/guan-li/feng-jin-ji-lu',
@@ -51,6 +50,12 @@ const 只读路由 = [
   '/api/guan-li/ju-bao-lie-biao',
   '/api/guan-li/liu-hen',
 ];
+
+/**
+ * 所见即所得收口：手机号明文接口前端零调用，属超管专属敏感读。
+ * 此前它挂在通用只读门禁下，等于任一持 cha_kan 的角色（含审核员）都能直连取走明文。
+ */
+const 超管专属敏感读路由 = [`/api/guan-li/zhang-hao-jie-mi/${测试用户编号}`];
 
 // FP-17 扩权后口径：授回收/夺舍/归还与审核评审发布仍超管专属（gao_we）
 const 超管专属写路由: Array<{ 路径: string; 正文: Record<string, unknown> }> = [
@@ -210,6 +215,20 @@ describe('YH-108 三角色只读可达集合', () => {
       expect(响应.body.shu_ju.jiao_se).toBe(角色);
       expect(响应.body.shu_ju.neng_li).toEqual([...取角色能力(角色)]);
     }
+  });
+
+  it('手机号明文接口仅超管可达：运营/审核员403，超管200并记审计', async () => {
+    const 路径 = 超管专属敏感读路由[0];
+    for (const 角色 of ['yun_ying', 'shen_he_yuan'] as GuanLiJiaoSe[]) {
+      const { 应用, 头 } = 建应用(角色);
+      const 响应 = await request(应用).get(路径).set(头);
+      expect(响应.status, `${角色} 不得读手机号明文`).toBe(403);
+      expect(响应.body.cuo_wu_ma).toBe('WU_GUAN_LI_QUAN_XIAN');
+    }
+    const { 应用, 头, 查询记录 } = 建应用('chao_guan');
+    const 明文响应 = await request(应用).get(路径).set(头);
+    expect(明文响应.status).toBe(200);
+    expect(查询记录.some((记录) => 记录.文本.includes('INSERT INTO "审计日志"'))).toBe(true);
   });
 
   it('无角色令牌访问只读路由403且走 WU_GUAN_LI_QUAN_XIAN 口径', async () => {
@@ -505,7 +524,7 @@ describe('YH-108 前端消费点与角色能力矩阵同源', () => {
 
   // FP-17：菜单条目的条目→能力映射与矩阵同源（统计图表已改挂 tong_ji_xie，审核员不再见统计入口）
   it('菜单条目与后端矩阵逐条同源：账号/聊天/思考/封禁/审计/审核=cha_kan，统计=tong_ji_xie', () => {
-    const 外壳源 = 读前端('App.vue');
+    const 外壳源 = 读前端('根组件.vue');
     const 条目 = [...外壳源.matchAll(/路径: '([^']+)'[^}]*?需能力: '([^']+)'/g)].map((匹配) => ({ 路径: 匹配[1], 能力: 匹配[2] }));
     expect(条目.length).toBeGreaterThanOrEqual(7);
     const 期望映射: Record<string, string> = {
@@ -529,7 +548,7 @@ describe('YH-108 前端消费点与角色能力矩阵同源', () => {
   });
 
   it('菜单条目按矩阵能力位声明，不存在矩阵里没有的能力位也没有全员不可见的死条目', () => {
-    const 外壳源 = 读前端('App.vue');
+    const 外壳源 = 读前端('根组件.vue');
     const 条目 = [...外壳源.matchAll(/需能力: '([^']+)'/g)].map((匹配) => 匹配[1]);
     expect(条目.length).toBeGreaterThanOrEqual(7);
     for (const 能力 of 条目) {

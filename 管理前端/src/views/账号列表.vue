@@ -184,6 +184,7 @@ onMounted(() => {
         <input
           v-model="关键词"
           class="输入"
+          maxlength="50"
         >
       </label>
       <label class="字段">
@@ -191,6 +192,7 @@ onMounted(() => {
         <input
           v-model="手机号"
           class="输入"
+          maxlength="11"
         >
       </label>
       <button
@@ -284,6 +286,7 @@ onMounted(() => {
         <input
           v-model="角色编号"
           class="输入"
+          maxlength="36"
         >
       </label>
       <button

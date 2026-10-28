@@ -37,7 +37,7 @@ import {
 } from '../枚举映射';
 import { 使用登录仓库 } from '../stores/登录';
 import { 是已知服务端错误码 } from '../api/错误展示';
-import { 路由表 } from '../router';
+import { 路由表 } from '../router/路由表';
 
 const 校验源路径 = '../管理后端/src/校验.ts';
 const 管理员源路径 = '../管理后端/src/中间件/管理员.ts';
@@ -49,10 +49,10 @@ const 后端思考源路径 = '../管理后端/src/路由/思考.ts';
    GitHub Actions 的 checkout 只能落在工作区内（cwd=管理前端，故为 ../和我恋爱吧）。
    两种布局都探一遍；都探不到时由读() 抛错，映射守卫不允许因布局不同而静默跳过。 */
 const 对端前缀 = ['../../和我恋爱吧', '../和我恋爱吧'].find((候选) =>
-  fs.existsSync(`${候选}/backend/src/services/思考记录.ts`),
+  fs.existsSync(`${候选}/HouDuan/src/services/思考记录.ts`),
 );
-const 生产事件白名单源路径 = 对端前缀 && `${对端前缀}/backend/src/services/思考记录.ts`;
-const 生产事件迁移源路径 = 对端前缀 && `${对端前缀}/backend/database/migrations/018_思考记录.sql`;
+const 生产事件白名单源路径 = 对端前缀 && `${对端前缀}/HouDuan/src/services/思考记录.ts`;
+const 生产事件迁移源路径 = 对端前缀 && `${对端前缀}/HouDuan/QianYi/migrations/018_思考记录.sql`;
 
 function 取术语表错误码(): string[] {
   const 行 = 读(术语表源路径)
@@ -687,7 +687,7 @@ describe('FP-02 渲染结果不出现裸原码', () => {
     断言无裸原码('登录页', (await 挂视图(登录页, '/deng-lu')).text(), []);
 
     window.sessionStorage.setItem('guan_li_hui_hua', 'yi_deng_lu');
-    const { default: 外壳 } = await import('../App.vue');
+    const { default: 外壳 } = await import('../根组件.vue');
     const 包装 = await 挂视图(外壳, '/zhang-hao', true);
     await flushPromises();
     expect(包装.find('[data-testid="dang-qian-jiao-se"]').text()).toBe('超级管理员');

@@ -8,7 +8,7 @@ $infra目录 = Split-Path -Parent $脚本目录
 $管理目录 = Split-Path -Parent $infra目录
 $迁移根 = [System.IO.Path]::GetFullPath($MigrationsRoot)
 $编排文件 = Join-Path $infra目录 'docker-compose.test.yml'
-$项目名 = 'love-management-fp04b'
+$项目名 = 'lianaiba-guanli-fp04b'
 $Node镜像 = 'node:26.10.0-alpine3.24@sha256:0b36e8c136b94cd4fcf02188228e76c31ad5872eef3fec8cbd2eee500cfd9e80'
 $节点卷键 = @{
   '管理前端' = 'frontend'
@@ -22,6 +22,12 @@ $环境名 = @(
   'NODE_PATH',
   'DATABASE_URL',
   'TEST_DATABASE_URL',
+  'POSTGRES_PASSWORD',
+  'JWT_SECRET',
+  'INTERNAL_TOKEN',
+  'N8N_ENCRYPTION_KEY',
+  'N8N_OWNER_PASSWORD_HASH',
+  'N8N_OWNER_EMAIL',
   'UV_CACHE_DIR',
   'UV_PROJECT_ENVIRONMENT',
   'UV_NO_SYNC',
@@ -88,8 +94,8 @@ function 调用Node项目 {
   if ([string]::IsNullOrWhiteSpace($卷键)) {
     throw "未登记Node项目卷键：$项目"
   }
-  $依赖卷 = "love-management-fp04b-node-$PID-$卷键-dependencies"
-  $产物卷 = "love-management-fp04b-node-$PID-$卷键-output"
+  $依赖卷 = "lianaiba-guanli-fp04b-node-$PID-$卷键-dependencies"
+  $产物卷 = "lianaiba-guanli-fp04b-node-$PID-$卷键-output"
   $Docker参数 = @(
     'run', '--rm',
     '--add-host', 'host.docker.internal:host-gateway',
@@ -145,8 +151,8 @@ function 还原并清理 {
   & docker compose --project-name $项目名 --file $编排文件 down --volumes --remove-orphans | Out-Null
   foreach ($卷键 in $节点卷键.Values) {
     foreach ($卷名 in @(
-      "love-management-fp04b-node-$PID-$卷键-dependencies",
-      "love-management-fp04b-node-$PID-$卷键-output"
+      "lianaiba-guanli-fp04b-node-$PID-$卷键-dependencies",
+      "lianaiba-guanli-fp04b-node-$PID-$卷键-output"
     )) {
       $存在卷 = @(& docker volume ls --filter "name=^$卷名$" --format '{{.Name}}')
       if ($存在卷.Count -ne 0) {
@@ -168,7 +174,7 @@ function 还原并清理 {
   $卷 = @(& docker volume ls --filter "label=com.docker.compose.project=$项目名" --format '{{.Name}}')
   $节点卷残留 = @()
   foreach ($卷键 in $节点卷键.Values) {
-    $节点卷残留 += @(& docker volume ls --filter "name=^love-management-fp04b-node-$PID-$卷键-" --format '{{.Name}}')
+    $节点卷残留 += @(& docker volume ls --filter "name=^lianaiba-guanli-fp04b-node-$PID-$卷键-" --format '{{.Name}}')
   }
   if ($容器.Count -ne 0 -or $网络.Count -ne 0 -or $卷.Count -ne 0 -or $节点卷残留.Count -ne 0) {
     throw "隔离资源清理不完整：容器=$($容器.Count)，网络=$($网络.Count)，卷=$($卷.Count)，Node卷=$($节点卷残留.Count)"
@@ -197,8 +203,8 @@ try {
     (Join-Path $管理目录 '管理前端\package-lock.json'),
     (Join-Path $管理目录 '管理后端\package-lock.json'),
     (Join-Path $管理目录 'n8n-nodes-liaolian\package-lock.json'),
-    (Join-Path $管理目录 'tts-service\pyproject.toml'),
-    (Join-Path $管理目录 'tts-service\uv.lock')
+    (Join-Path $管理目录 'YuYinFuWu\pyproject.toml'),
+    (Join-Path $管理目录 'YuYinFuWu\uv.lock')
   )) {
     if (-not (Test-Path -LiteralPath $路径 -PathType Leaf)) {
       throw "锁定文件不存在：$路径"
@@ -257,7 +263,7 @@ node --test test/nodes.test.cjs
     throw '临时 uv 安装失败'
   }
   $uv = Join-Path $临时根 'tool\bin\uv.exe'
-  $tts目录 = Join-Path $管理目录 'tts-service'
+  $tts目录 = Join-Path $管理目录 'YuYinFuWu'
   $env:UV_CACHE_DIR = Join-Path $临时根 'uv-cache'
   $env:UV_PROJECT_ENVIRONMENT = Join-Path $临时根 'venv'
   $env:PYTHONDONTWRITEBYTECODE = '1'
@@ -296,23 +302,49 @@ node --test test/nodes.test.cjs
     throw "TTS门禁计数不符：测试=$($汇总.TTS测试)，失败=$($汇总.TTS失败)，错误=$($汇总.TTS错误)，跳过=$($汇总.TTS跳过)，覆盖率=$($汇总.TTS覆盖率)"
   }
 
+  # ---- 一次性凭据：每次运行动态随机生成，仅经环境变量注入 compose，绝不写入仓库或脚本 ----
+  # 规范：私钥 / 令牌 / 口令永不硬编码、永不进版本库、永不进日志
+  # 兼容性：Windows PowerShell 5.1（.NET Framework 4.x）无 RandomNumberGenerator.GetBytes 静态方法与
+  # Convert.ToHexString，故用 Create() 实例 + BitConverter；PowerShell 7 同样可用。
+  $随机字节 = {
+    param([int]$数量)
+    $rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+    try {
+      $bytes = New-Object byte[] $数量
+      $rng.GetBytes($bytes)
+      return [System.BitConverter]::ToString($bytes).Replace('-', '').ToLowerInvariant()
+    } finally {
+      $rng.Dispose()
+    }
+  }
+  $env:POSTGRES_PASSWORD = & $随机字节 24
+  $env:JWT_SECRET = & $随机字节 32
+  $env:INTERNAL_TOKEN = & $随机字节 32
+  $env:N8N_ENCRYPTION_KEY = & $随机字节 16
+  if ($env:N8N_OWNER_EMAIL) { } else { $env:N8N_OWNER_EMAIL = 'fp04b-ci@example.invalid' }
+
   $env:MIGRATIONS_ROOT = $迁移根
   $调用结果 = @(调用编排 config --quiet)
   if ($LASTEXITCODE -ne 0) { throw '隔离Compose配置校验失败' }
   调用编排 -参数 @('up', '-d', '--wait', 'postgres', 'redis')
   $数据库地址 = @(调用编排 port postgres 5432)
   $数据库端口 = [int](($数据库地址 | Select-Object -Last 1).Split(':')[-1])
-  $连接串 = "postgresql://lovewithme:lovewithme_test_password@host.docker.internal:$数据库端口/lovewithme_test"
+  $连接串 = "postgresql://lianaiba:" + $env:POSTGRES_PASSWORD + "@host.docker.internal:$数据库端口/lianaiba_test"
   $迁移目录 = Join-Path $迁移根 'backend\database\migrations'
   $迁移数 = @(Get-ChildItem -LiteralPath $迁移目录 -File -Filter '*.sql').Count
   $迁移命令 = "npm ci --no-audit --no-fund >/dev/null && node /inputs/和我恋爱吧/backend/scripts/run_migration.js /inputs/和我恋爱吧/backend/database/migrations && node /inputs/和我恋爱吧/backend/scripts/run_migration.js /inputs/和我恋爱吧/backend/database/migrations"
   调用Node项目 -项目 '管理后端' -命令 $迁移命令 -环境 @{ DATABASE_URL = $连接串 } | Out-Null
-  $查询参数 = @('exec', '-T', 'postgres', 'psql', '-U', 'lovewithme', '-d', 'lovewithme_test', '-Atc', 'SELECT count(*) FROM schema_migrations')
+  $查询参数 = @('exec', '-T', 'postgres', 'psql', '-U', 'lianaiba', '-d', 'lianaiba_test', '-Atc', 'SELECT count(*) FROM schema_migrations')
   $登记数 = [int]((@(调用编排 @查询参数) | Select-Object -Last 1).Trim())
   if ($登记数 -ne $迁移数) {
     throw "迁移登记数不符：$登记数/$迁移数"
   }
   $汇总.迁移数 = $登记数
+
+  # n8n 实例属主口令：随机生成并经 bcrypt 注入（bcryptjs 取自管理后端依赖卷，迁移步骤 npm ci 后已就位）
+  $n8n口令 = & $随机字节 32
+  $哈希输出 = 调用Node项目 -项目 '管理后端' -命令 'node -e "console.log(require(''bcryptjs'').hashSync(process.env.N8N_OWNER_PASSWORD,12))"' -环境 @{ N8N_OWNER_PASSWORD = $n8n口令 }
+  $env:N8N_OWNER_PASSWORD_HASH = (@($哈希输出) | Select-Object -Last 1).Trim()
 
   调用编排 -参数 @('up', '-d', '--build', '--wait', 'management-backend', 'tts-service', 'n8n')
   $后端端口 = [int]((@(调用编排 port management-backend 3100) | Select-Object -Last 1).Split(':')[-1])
@@ -324,7 +356,7 @@ node --test test/nodes.test.cjs
   if ($LASTEXITCODE -ne 0) { throw '语音服务健康失败' }
   & curl.exe --fail --silent --show-error "http://127.0.0.1:$编排端口/healthz" | Out-Null
   if ($LASTEXITCODE -ne 0) { throw 'n8n健康失败' }
-  $登录体 = '{"emailOrLdapLoginId":"fp04b-ci@example.invalid","password":"fp04b-ci-only"}'
+  $登录体 = [ordered]@{ emailOrLdapLoginId = $env:N8N_OWNER_EMAIL; password = $n8n口令 } | ConvertTo-Json -Compress
   $登录成功 = $false
   for ($轮 = 1; $轮 -le 30; $轮++) {
     try {

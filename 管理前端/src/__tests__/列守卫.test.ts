@@ -24,7 +24,7 @@ import { 取徽标文案 } from '../枚举映射';
 import { 时间展示格式 } from '../配置';
 import { 通用文案 } from '../文案/通用';
 import { 使用登录仓库 } from '../stores/登录';
-import { 路由表 } from '../router';
+import { 路由表 } from '../router/路由表';
 
 const 列定义源路径 = 'src/列定义.ts';
 const 登记面 = 列定义登记 as unknown as Record<表名, readonly 列[]>;

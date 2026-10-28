@@ -1,0 +1,30 @@
+# gitleaks 自定义规则：补齐默认规则未覆盖的数据库连接串内嵌凭据
+# 说明：
+# - 规则匹配 postgres/postgresql 连接串中「用户:密码@」形态（密码≥6位）
+# - 本项目凭据规范：口令/密钥一律经 ${VAR:?} 环境变量注入（见 infra/docker-compose.test.yml），
+#   故连接串中的 ${VAR} 注入形态与 MUST- 占位符放行；真实凭据形态一律拦截
+# - CI 侧 secret-scan job 使用默认浅历史扫描（等价当前入库状态）。
+#   历史遗留泄漏项需先轮换凭据/处置历史后再开放 fetch-depth: 0 全量扫描，勿单独放宽 allowlist。
+title = "恋爱吧管理中心 密钥扫描扩展规则"
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "postgres-connection-string-credential"
+description = "PostgreSQL 连接串内嵌真实凭据（应为 ${VAR} 注入形态）"
+regex = '''postgres(?:ql)?:\/\/[A-Za-z0-9_.\-]+:([^@\s"'`]{6,})@[A-Za-z0-9_.\-]+'''
+keywords = ["postgres"]
+[rules.allowlist]
+regexes = [
+  '''\$\{[^}]+\}''',
+  '''MUST-''',
+  '''REPLACE_ME''',
+]
+
+[allowlist]
+description = "无真实凭据的确定性形态：模板空值行与测试装置固定假值"
+regexes = [
+  '''^[A-Za-z0-9_]+=$''',
+  '''lun-huan-hou-de-32-zi-jie-xin-mi-yao''',
+]

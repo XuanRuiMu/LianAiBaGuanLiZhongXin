@@ -30,6 +30,9 @@ export const 驳回 = '驳回';
 export const 已提交新建 = '已提交新建';
 export const 已提交评审 = '已提交评审';
 export const 已提交多项处理 = '已提交多项处理';
+export const 新建确认说明 = '新建后将立即进入待审流程，确认提交？';
+export const 评审确认说明 = '评审结论提交后不可撤销，确认提交？';
+export const 多项处理确认说明 = '一次处理多条记录会同时改其状态，确认提交？';
 
 export const 审核术语 = {
   被举报用户编号,
@@ -64,4 +67,7 @@ export const 审核术语 = {
   已提交新建,
   已提交评审,
   已提交多项处理,
+  新建确认说明,
+  评审确认说明,
+  多项处理确认说明,
 } as const;

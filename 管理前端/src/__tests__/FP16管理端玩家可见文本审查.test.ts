@@ -192,7 +192,7 @@ describe('FP-16 管理中心最终可见文本审查', () => {
       expect(错误注册表.数据表未就绪.状态码).toBe(503);
       expect(错误注册表.依赖未就绪.状态码).toBe(503);
       expect(错误注册表.缓存服务不可用.状态码).toBe(503);
-      const 外壳源 = fs.readFileSync('src/App.vue', 'utf8');
+      const 外壳源 = fs.readFileSync('src/根组件.vue', 'utf8');
       expect(外壳源).toContain("import('./components/就绪错误条.vue')");
       expect(外壳源).not.toContain("from './api/探针'");
       const 就绪条源 = fs.readFileSync('src/components/就绪错误条.vue', 'utf8');

@@ -311,7 +311,7 @@ const 全表 = 样式清单();
 
 const 主题样式 = 读('src/主题.css');
 
-const 外壳源 = 读('src/App.vue');
+const 外壳源 = 读('src/根组件.vue');
 
 const 动效源 = 读('src/动效.ts');
 
@@ -833,7 +833,7 @@ const 能力读方封闭 = (): boolean =>
     .filter((文件) => 文件 !== 'src/stores/登录.ts')
     .every((文件) => !读方越界(读(文件)));
 
-const 冷启动放行前提 = (仓库 = 读('src/stores/登录.ts'), 路由 = 读('src/router/index.ts')): boolean => {
+const 冷启动放行前提 = (仓库 = 读('src/stores/登录.ts'), 路由 = 读('src/router/路由表.ts')): boolean => {
   const 单次闸门 = /function 冷启动会话\(\): Promise<boolean> \{[\s\S]{0,80}?if \(冷启动已续期\) \{[\s\S]{0,80}?冷启动已续期 = true;[\s\S]{0,80}?return 续期会话\(\);/.test(仓库);
   const 守卫等待 = /路由实例\.beforeEach\(async \(目标\) => \{[\s\S]{0,240}?if \(持久令牌冷启动\(\) && 守卫判定\(目标\.path, null, false\) !== null\) \{[\s\S]{0,120}?await 使用登录仓库\(\)\.冷启动会话\(\);[\s\S]{0,240}?return 守卫判定\(目标\.path, 读令牌\(\), 可免登录进入\(\)\)/.test(路由);
   return 单次闸门 && 守卫等待 && /export function 持久令牌冷启动\(\): boolean \{/.test(仓库);
@@ -891,7 +891,7 @@ function vue源清单(): string[] {
   for (const 目录 of ['src/views', 'src/components']) {
     走(目录);
   }
-  vue源清单缓存 = [...出, 'src/App.vue'];
+  vue源清单缓存 = [...出, 'src/根组件.vue'];
   return vue源清单缓存;
 }
 
@@ -1071,7 +1071,7 @@ describe('FP-05 组件级动效与瞬时面穷尽', () => {
     for (const 族 of 动效族) {
       expect(族使用者数(站点, 族), `${族} 族已无使用者`).toBeGreaterThan(0);
     }
-    const 全部挂名 = ['src/views', 'src/components', 'src/App.vue'].flatMap((目录) => 挂名族清单(目录));
+    const 全部挂名 = ['src/views', 'src/components', 'src/根组件.vue'].flatMap((目录) => 挂名族清单(目录));
     expect(全部挂名.length).toBeGreaterThan(0);
     const 无名 = 全部挂名.filter((项) => 项.族 === '' && !项.动态).map((项) => 项.文件);
     expect(无名, '<Transition> 未挂字面族名').toEqual([]);
@@ -1081,7 +1081,7 @@ describe('FP-05 组件级动效与瞬时面穷尽', () => {
     expect(
       全部挂名.filter((项) => 项.动态).map((项) => 项.文件),
       ':name 绑定的族名只允许出现在 App.vue 的方向感知路由过渡一处',
-    ).toEqual(['src/App.vue']);
+    ).toEqual(['src/根组件.vue']);
   });
 
   it('穷尽性：视图与组件的每一个条件节点都必须落到登记族或封闭的恒定判据，落不到即判红', () => {
@@ -1209,9 +1209,9 @@ describe('FP-08 离场语义与站点归类修正', () => {
     expect(离场屏蔽缺陷(拆掉)).toHaveLength(1);
   });
 
-  it('QueRenCeng 的 aria 锚点实例内唯一，全站挂载点仍按台账登记为一处', () => {
+  it('QueRenCeng 的 aria 锚点实例内唯一，全站挂载点按台账登记为两处', () => {
     const 挂载点 = vue源清单().filter((文件) => 文件 !== 'src/components/QueRenCeng.vue' && /<QueRenCeng[\s>]/.test(读(文件)));
-    expect(挂载点, '台账 P8 只登记一处挂载点；新增站点要先同步 §十 台账与站点数').toEqual(['src/views/账号列表.vue']);
+    expect(挂载点, '台账 P8 登记两处挂载点；新增站点要先同步 §十 台账与站点数').toEqual(['src/views/审核运营.vue', 'src/views/账号列表.vue']);
     const 声明 = 读('src/components/QueRenCeng.vue');
     const 锚点 = [...声明.matchAll(/(:?)aria-(?:labelledby|describedby)="([^"]+)"/g)].map((匹) => ({ 静态: 匹[1] === '', 值: 匹[2] }));
     expect(锚点).toHaveLength(2);
@@ -1237,7 +1237,7 @@ describe('FP-08 离场语义与站点归类修正', () => {
     expect(读方越界('const 可见 = computed(() => 导航.filter((项) => 登录仓库.能力列表.includes(项.需能力)));')).toBe(false);
     expect(能力写点封闭('function 设置身份(): void {\n    能力列表.value = [];\n  }\n  function 别处(): void {\n    能力列表.value = [];\n  }')).toBe(false);
     expect(能力写点封闭('function 设置身份(): void {\n    能力列表.value = [];\n  }')).toBe(true);
-    const 路由源 = 读('src/router/index.ts');
+    const 路由源 = 读('src/router/路由表.ts');
     expect(冷启动放行前提(读('src/stores/登录.ts'), 路由源.replace('beforeEach(async', 'beforeEach(').replace('await 使用登录仓库().冷启动会话();', '')), '守卫退回同步放行必须让前提判红').toBe(false);
     expect(冷启动放行前提(读('src/stores/登录.ts').replace('冷启动已续期 = true;', ''), 路由源), '单次闸门被摘掉必须让前提判红').toBe(false);
     expect(冷启动放行前提(读('src/stores/登录.ts').replace('export function 持久令牌冷启动', 'function 持久令牌冷启动'), 路由源), '冷启动判定不再是导出真源必须让前提判红').toBe(false);

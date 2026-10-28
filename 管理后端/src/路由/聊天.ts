@@ -9,6 +9,7 @@ import {
 } from '../校验';
 import type { 查询池 } from '../数据库';
 import { 响应依赖缺失 } from '../错误归一化';
+import { 清洗行列表, type 字段清洗项 } from '../文本清洗';
 
 function 取池(请求: Request): 查询池 | undefined {
   return (请求.app.locals as { 池?: 查询池 }).池;
@@ -18,6 +19,13 @@ const 消息列 =
   '"ID", "用户ID", "角色ID", "内容", "发送者", "类型", "已读", "已撤回", "客户端序号", "创建时间"';
 
 const 好友消息列 = '"ID", "发送者ID", "接收者ID", "内容", "类型", "已读", "撤回", "创建时间"';
+
+/**
+ * 输出安全：消息正文是玩家/AI 生成的长文本，管理端列表展示上限 2000 码点。
+ * 2000 = 管理端消息列宽约两屏可读量，与写入侧单条消息上限同一量级；
+ * 更长的历史消息 GI 管理员要看全文可走主项目，管理端只做监管抽样。
+ */
+const 消息内容字段: readonly 字段清洗项[] = [{ 字段: '内容', 上限: 2000 }];
 
 export function 创建聊天路由(): Router {
   const 路由 = Router();
@@ -68,7 +76,7 @@ export function 创建聊天路由(): Router {
       `SELECT ${消息列} FROM "消息" ${条件子句} ORDER BY "创建时间" ${方向} LIMIT ${条数占位} OFFSET ${偏移占位}`,
       参数,
     );
-    成功响应(响应, 列表结果.rows, { ye_ma: 页码, mei_ye_tiao_shu: 每页条数, zong_shu: 总数 });
+    成功响应(响应, 清洗行列表(列表结果.rows, 消息内容字段), { ye_ma: 页码, mei_ye_tiao_shu: 每页条数, zong_shu: 总数 });
   });
 
   路由.get('/hao-you-xiao-xi', async (请求: Request, 响应: Response): Promise<void> => {
@@ -111,7 +119,7 @@ export function 创建聊天路由(): Router {
       `SELECT ${好友消息列} FROM "好友消息" ${条件子句} ORDER BY "创建时间" DESC LIMIT ${条数占位} OFFSET ${偏移占位}`,
       参数,
     );
-    成功响应(响应, 列表结果.rows, { ye_ma: 页码, mei_ye_tiao_shu: 每页条数, zong_shu: 总数 });
+    成功响应(响应, 清洗行列表(列表结果.rows, 消息内容字段), { ye_ma: 页码, mei_ye_tiao_shu: 每页条数, zong_shu: 总数 });
   });
 
   return 路由;

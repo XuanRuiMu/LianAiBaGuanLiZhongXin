@@ -11,13 +11,16 @@ import {
   type 登录选项,
 } from '../stores/登录';
 import { 管理登录 } from '../api/会话';
-import { 创建前端错误 } from '../api/请求';
+import { 创建前端错误, 前端错误码 } from '../api/请求';
 import { 创建请求错误状态, 执行请求 } from '../api/错误展示';
 import XiaoXiTiao from '../components/XiaoXiTiao.vue';
 import { 登录文案 } from '../文案/登录';
+import { 通用文案 } from '../文案/通用';
 
 const 登录仓库 = 使用登录仓库();
 const 路由器 = useRouter();
+/** 手机号口径与后端 校验.ts:26 `手机号表达式` 完全一致，前端预检不另造一套 */
+const 手机号表达式 = /^1[3-9]\d{9}$/;
 const 手机号 = ref(读记住账号());
 const 密码 = ref('');
 const 草稿选项 = ref<登录选项>(读登录选项());
@@ -46,8 +49,14 @@ watch(
 
 async function 提交(): Promise<void> {
   错误闸门.开始();
-  if (手机号.value.trim().length === 0 || 密码.value.length === 0) {
+  const 手机号文本 = 手机号.value.trim();
+  if (手机号文本.length === 0 || 密码.value.length === 0) {
     清空错误(创建前端错误(登录文案.账号或密码为空));
+    提交中.value = false;
+    return;
+  }
+  if (!手机号表达式.test(手机号文本)) {
+    清空错误(创建前端错误(通用文案.请求失败, 前端错误码.本地校验));
     提交中.value = false;
     return;
   }
@@ -55,7 +64,7 @@ async function 提交(): Promise<void> {
     错误状态,
     提交中,
     () => 管理登录({
-      shou_ji_hao: 手机号.value.trim(),
+      shou_ji_hao: 手机号文本,
       mi_ma: 密码.value,
       chi_jiu_hui_hua: 选项.value.记住密码,
     }),
@@ -90,6 +99,7 @@ onBeforeUnmount(() => {
           v-model="手机号"
           class="输入"
           type="tel"
+          maxlength="11"
           autocomplete="username"
           data-testid="shou-ji-hao-shu-ru"
         >
@@ -100,6 +110,7 @@ onBeforeUnmount(() => {
           v-model="密码"
           class="输入"
           type="password"
+          maxlength="200"
           autocomplete="current-password"
           data-testid="mi-ma-shu-ru"
           @keyup.enter="提交"

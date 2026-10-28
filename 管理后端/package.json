@@ -1,5 +1,5 @@
 {
-  "name": "lian-ai-ba-guan-li-hou-duan",
+  "name": "LianAiBaGuanLiHouDuan",
   "version": "0.1.0",
   "description": "恋爱吧管理中心 - 管理后端（与和我恋爱吧同栈同库，读写分离：查询走只读视图掩码，写入一律事务加审计）",
   "main": "dist/启动.js",
@@ -22,13 +22,13 @@
     "bcryptjs": "3.0.3",
     "cookie-parser": "1.4.7",
     "cors": "2.8.6",
-    "dotenv": "18.0.3",
-    "express": "5.2.1",
-    "express-rate-limit": "8.7.0",
+    "dotenv": "18.0.8",
+    "express": "5.3.0",
+    "express-rate-limit": "8.7.1",
     "helmet": "8.3.0",
     "ioredis": "6.0.0",
     "jsonwebtoken": "9.0.3",
-    "pg": "8.23.0"
+    "pg": "8.23.1"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
@@ -36,15 +36,16 @@
     "@types/cors": "2.8.19",
     "@types/express": "5.0.6",
     "@types/jsonwebtoken": "9.0.10",
-    "@types/node": "26.6.2",
+    "@types/node": "26.6.5",
     "@types/pg": "8.23.1",
     "@types/supertest": "7.2.1",
-    "eslint": "10.11.0",
+    "eslint": "10.13.0",
     "nodemon": "3.1.14",
-    "supertest": "7.3.0",
+    "supertest": "7.3.1",
     "ts-node": "10.9.2",
     "typescript": "6.0.3",
-    "typescript-eslint": "8.70.1",
-    "vitest": "5.0.1"
-  }
+    "typescript-eslint": "8.71.2",
+    "vitest": "5.0.5"
+  },
+  "private": true
 }

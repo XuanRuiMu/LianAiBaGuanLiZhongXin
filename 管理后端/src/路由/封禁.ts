@@ -24,10 +24,21 @@ import type { 缓存客户端 } from '../缓存';
 import { 广播管理员失效 } from '../中间件/管理员';
 import { 取真实IP } from '../真实IP';
 import { 响应依赖缺失, 响应查询降级 } from '../错误归一化';
+import { 清洗行列表, type 字段清洗项 } from '../文本清洗';
 
 function 取池(请求: Request): 查询池 | undefined {
   return (请求.app.locals as { 池?: 查询池 }).池;
 }
+
+/**
+ * 输出安全：封禁记录的「原因」与账号封禁的「最后原因」按 500 码点截断并剥控制字符。
+ * 这两个字段虽是管理员填写，但账号封禁链路的「最后原因」由主项目审核结论拼成
+ * （`${类型}：${原因}`，原因含命中的玩家违禁词与 AI 审核理由），
+ * 玩家可控内容会经此字段显示到管理端，必须按玩家内容口径清洗。
+ */
+const 封禁原因字段: readonly 字段清洗项[] = [{ 字段: '原因', 上限: 500 }];
+
+const 最后原因字段: readonly 字段清洗项[] = [{ 字段: '最后原因', 上限: 500 }];
 
 function 取缓存(请求: Request): 缓存客户端 | undefined {
   return (请求.app.locals as { 缓存?: 缓存客户端 }).缓存;
@@ -70,7 +81,7 @@ export function 创建封禁路由(写限流: RequestHandler): Router {
       `SELECT "ID", "IP", "原因", "严重程度", "解封时间", "创建时间" FROM "封禁记录" ${条件子句} ORDER BY "创建时间" DESC LIMIT ${条数占位} OFFSET ${偏移占位}`,
       参数,
     );
-    成功响应(响应, 列表结果.rows, { ye_ma: 页码, mei_ye_tiao_shu: 每页条数, zong_shu: 总数 });
+    成功响应(响应, 清洗行列表(列表结果.rows, 封禁原因字段), { ye_ma: 页码, mei_ye_tiao_shu: 每页条数, zong_shu: 总数 });
   });
 
   路由.post('/feng-jin', 写限流, 封禁门禁, async (请求: Request, 响应: Response): Promise<void> => {
@@ -153,7 +164,7 @@ export function 创建封禁路由(写限流: RequestHandler): Router {
       const 缓存 = 取缓存(请求);
       await 缓存?.set(`${按用户吊销前缀}${用户编号}`, String(Date.now()), 7 * 24 * 60 * 60);
     }
-    日志.信息('封禁操作', '管理员执行封禁', { 目标用户: 用户编号 ?? '', 目标IP: 地址 ?? '' });
+    日志.信息('封禁操作', '管理员执行封禁', { 目标用户: 用户编号 ?? '', 目标IP: 地址 === undefined ? '未指定' : '已指定' });
     成功响应(响应, { yi_chu_li: true }, undefined, 201);
   });
 
@@ -191,7 +202,7 @@ export function 创建封禁路由(写限流: RequestHandler): Router {
         `SELECT "用户ID" AS "用户ID", "违规次数" AS "违规次数", "级别" AS "级别", "解封时间" AS "解封时间", "申诉状态" AS "申诉状态", "最后原因" AS "最后原因" FROM "账号封禁" ${条件子句} ORDER BY "更新时间" DESC LIMIT ${条数占位} OFFSET ${偏移占位}`,
         参数,
       );
-      成功响应(响应, 列表结果.rows, { ye_ma: 页码, mei_ye_tiao_shu: 每页条数, zong_shu: 总数 });
+      成功响应(响应, 清洗行列表(列表结果.rows, 最后原因字段), { ye_ma: 页码, mei_ye_tiao_shu: 每页条数, zong_shu: 总数 });
     } catch (错误) {
       响应查询降级(响应, 错误, '封禁操作', '封禁', 请求);
     }

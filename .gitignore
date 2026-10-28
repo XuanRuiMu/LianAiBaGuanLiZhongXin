@@ -37,9 +37,14 @@ test-results/
 playwright-report/
 
 # ===== Environment / Secrets =====
+# .env.<环境> 形态一律不入库（infra/envs/.env.prod|dev|test 为本地凭据文件）；
+# 仅放行模板 infra/.env.example 与 infra/envs/.env.*.example（全占位符/空值，不含真实凭据）。
 .env
 .env.local
 .env.*.local
+.env.*
+!.env.example
+!.env.*.example
 *.pem
 *.key
 

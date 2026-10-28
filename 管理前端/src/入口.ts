@@ -1,8 +1,8 @@
 import { createApp } from 'vue';
 import { createPinia } from 'pinia';
 import './主题.css';
-import App from './App.vue';
-import 路由器 from './router';
+import App from './根组件.vue';
+import 路由器 from './router/路由表';
 
 const 应用 = createApp(App);
 应用.use(createPinia());
